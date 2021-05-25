@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -15,30 +15,36 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
-// http2_ping_frame.h author Maya Dagon <mdagon@cisco.com>
-// FIXIT-E currently only supports flags validation
+// appid_debug_log_event.h author Cliff Judge <cljudge@cisco.com>
 
-#ifndef HTTP2_PING_FRAME_H
-#define HTTP2_PING_FRAME_H
+#ifndef APPID_DEBUG_LOG_EVENT_H
+#define APPID_DEBUG_LOG_EVENT_H
 
-#include "http2_frame.h"
+#include <string>
 
-class Http2Frame;
+#include "framework/data_bus.h"
+#include "network_inspectors/appid/appid_debug.h"
 
-class Http2PingFrame : public Http2Frame
+#define APPID_DEBUG_LOG_EVENT "appid_debug_log_event"
+
+class AppIdDebugLogEvent : public snort::DataEvent
 {
 public:
-    friend Http2Frame* Http2Frame::new_frame(const uint8_t*, const uint32_t, const uint8_t*,
-        const uint32_t, Http2FlowData*, HttpCommon::SourceId, Http2Stream* stream);
+    AppIdDebugLogEvent(const AppIdDebugSessionConstraints* constraints, const char* dbg_str) :
+        cs(constraints), debug_str(dbg_str) { }
 
+    const AppIdDebugSessionConstraints* get_appid_debug_constraints() const
+    {
+        return cs;
+    }
+
+    const std::string& get_debug_string() const
+    {
+        return debug_str;
+    }
 private:
-    Http2PingFrame(const uint8_t* header_buffer, const uint32_t header_len,
-        const uint8_t* data_buffer, const uint32_t data_len, Http2FlowData* ssn_data,
-        HttpCommon::SourceId src_id, Http2Stream* _stream) :
-        Http2Frame(header_buffer, header_len, data_buffer, data_len, ssn_data, src_id, _stream) { }
-
-    uint8_t get_flags_mask() const override
-    { return Http2Enums::FLAG_ACK; }
+    const AppIdDebugSessionConstraints* cs = nullptr;
+    std::string debug_str;
 };
-#endif
 
+#endif
