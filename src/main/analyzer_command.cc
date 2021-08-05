@@ -25,6 +25,7 @@
 
 #include <cassert>
 
+#include "control/control.h"
 #include "framework/module.h"
 #include "log/messages.h"
 #include "managers/module_manager.h"
@@ -91,8 +92,9 @@ ACGetStats::~ACGetStats()
 
     // FIXIT-L This should track the owner so it can dump stats to the
     // shell instead of the logs when initiated by a shell command
-    DropStats();
-    LogMessage("==================================================\n"); // Marking End of stats
+    DropStats(ctrlcon);
+    LogRespond(ctrlcon, "==================================================\n"); // Marking End of stats
+
     ModuleManager::clear_global_active_counters();
 }
 
@@ -105,7 +107,7 @@ bool ACResetStats::execute(Analyzer&, void**)
 ACResetStats::ACResetStats(clear_counter_type_t requested_type_l) : requested_type(
         requested_type_l) { }
 
-ACSwap::ACSwap(Swapper* ps, SharedRequest req, bool from_shell) : ps(ps), request(req), from_shell(from_shell)
+ACSwap::ACSwap(Swapper* ps, ControlConn *ctrlcon) : ps(ps), ctrlcon(ctrlcon)
 {
     assert(Swapper::get_reload_in_progress() == false);
     Swapper::set_reload_in_progress(true);
@@ -181,11 +183,12 @@ ACSwap::~ACSwap()
 
     Swapper::set_reload_in_progress(false);
     LogMessage("== reload complete\n");
-    request->respond("== reload complete\n", from_shell, true);
+    if (ctrlcon && !ctrlcon->is_local())
+        ctrlcon->respond("== reload complete\n");
 }
 
-ACHostAttributesSwap::ACHostAttributesSwap(SharedRequest req, bool from_shell)
-    : request(req), from_shell(from_shell)
+ACHostAttributesSwap::ACHostAttributesSwap(ControlConn *ctrlcon)
+    : ctrlcon(ctrlcon)
 {
     assert(Swapper::get_reload_in_progress() == false);
     Swapper::set_reload_in_progress(true);
@@ -202,7 +205,8 @@ ACHostAttributesSwap::~ACHostAttributesSwap()
     HostAttributesManager::swap_cleanup();
     Swapper::set_reload_in_progress(false);
     LogMessage("== reload host attributes complete\n");
-    request->respond("== reload host attributes complete\n", from_shell, true);
+    if (ctrlcon && !ctrlcon->is_local())
+        ctrlcon->respond("== reload host attributes complete\n");
 }
 
 bool ACDAQSwap::execute(Analyzer& analyzer, void**)

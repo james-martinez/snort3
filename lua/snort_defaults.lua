@@ -388,7 +388,7 @@ default_wizard =
           to_client = { '220*SMTP', '220*MAIL' } },
 
         { service = 'ssh', proto = 'tcp', client_first = true,
-          to_server = { '*SSH' }, to_client = { '*SSH' } },
+          to_server = { 'SSH-' }, to_client = { 'SSH-' } },
 
         { service = 'dce_http_server', proto = 'tcp', client_first = false,
           to_client = { 'ncacn_http' } },
@@ -406,6 +406,7 @@ default_wizard =
           to_server = netflow_versions },
 
         { service = 'http2', proto = 'tcp', client_first = true,
+          to_client = { '???|04 00 00 00 00 00|' },
           to_server = { '|50 52 49 20 2a 20 48 54 54 50 2f 32 2e 30 0d 0a 0d 0a 53 4d 0d 0a 0d 0a|' } },
 
 --[[

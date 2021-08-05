@@ -36,6 +36,9 @@
 #define DCE2_SMB_NAME "dce_smb"
 #define DCE2_SMB_HELP "dce over smb inspection"
 
+#define SMB_DEBUG(module_name, module_id, log_level, p, ...) \
+    trace_logf(log_level, module_name , module_id, p, __VA_ARGS__)
+
 #define DCE2_SMB_ID   0xff534d42  /* \xffSMB */
 #define DCE2_SMB2_ID  0xfe534d42  /* \xfeSMB */
 #define DCE2_SMB_ID_SIZE 4
@@ -215,6 +218,8 @@ enum Dce2SmbPduState
 
 extern THREAD_LOCAL dce2SmbStats dce2_smb_stats;
 extern THREAD_LOCAL snort::ProfileStats dce2_smb_pstat_main;
+extern bool smb_module_is_up;
+extern SnortProtocolId snort_protocol_id_smb;
 
 class Dce2SmbSessionData
 {
@@ -230,7 +235,7 @@ public:
     DCE2_SsnData* get_dce2_session_data()
     { return &sd; }
 
-    snort::Flow* get_flow()
+    snort::Flow* get_tcp_flow()
     { return tcp_flow; }
 
     int64_t get_max_file_depth()
@@ -265,6 +270,14 @@ class Dce2SmbFlowData : public snort::FlowData
 {
 public:
     Dce2SmbFlowData(Dce2SmbSessionData*);
+    Dce2SmbFlowData() : snort::FlowData(inspector_id)
+    {
+        dce2_smb_stats.concurrent_sessions++;
+        if (dce2_smb_stats.max_concurrent_sessions < dce2_smb_stats.concurrent_sessions)
+            dce2_smb_stats.max_concurrent_sessions = dce2_smb_stats.concurrent_sessions;
+        ssd = nullptr;
+    }
+
     ~Dce2SmbFlowData() override;
 
     static void init()
@@ -277,6 +290,11 @@ public:
     { return ssd; }
 
     Dce2SmbSessionData* upgrade(const snort::Packet*);
+    void update_smb_session_data(Dce2SmbSessionData* ssd_v)
+    { 
+        if (ssd) delete ssd;
+        ssd = ssd_v;
+    }
     void handle_retransmit(snort::Packet*) override;
 
 public:
@@ -286,10 +304,13 @@ private:
     Dce2SmbSessionData* ssd;
 };
 
+Dce2SmbFlowData* create_expected_smb_flow_data(const snort::Packet*);
 Dce2SmbSessionData* create_new_smb_session(const snort::Packet*, dce2SmbProtoConf*);
+Dce2SmbSessionData* create_smb_session_data(Dce2SmbFlowData*, const snort::Packet*,
+    dce2SmbProtoConf*);
 DCE2_SsnData* get_dce2_session_data(snort::Flow*);
 snort::FileContext* get_smb_file_context(const snort::Packet*);
-snort::FileContext* get_smb_file_context(uint64_t, uint64_t, bool);
+snort::FileContext* get_smb_file_context(snort::Flow*, uint64_t, uint64_t, bool);
 char* get_smb_file_name(const uint8_t*, uint32_t, bool, uint16_t*);
 void set_smb_reassembled_data(uint8_t*, uint16_t);
 

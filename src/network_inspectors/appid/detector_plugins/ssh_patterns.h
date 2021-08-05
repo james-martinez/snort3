@@ -1,6 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
-// Copyright (C) 2011-2013 Sourcefire, Inc.
+// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -17,20 +16,36 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-#ifndef IDLE_PROCESSING_H
-#define IDLE_PROCESSING_H
+// ssh_patterns.cc author Daniel McGarvey <danmcgar@cisco.com>
 
-using IdleHook = void (*)();
+#ifndef SSH_PATTERNS_H
+#define SSH_PATTERNS_H
 
-class IdleProcessing
+/*
+ * SshPatternMatchers is a wrapper around an unordered_map
+ * which maps strings to AppIds. SSH Client Patterns
+ * are registered through a lua API, and these mappings
+ * are used by client_app_ssh.cc to identify clients.
+ * An instance of the class is held by OdpContext.
+ */
+
+#include <string>
+#include <unordered_map>
+
+#include "application_ids.h"
+
+typedef std::unordered_map<std::string, AppId> SshPatternTable;
+
+class SshPatternMatchers 
 {
 public:
-    static void register_handler(IdleHook);
-    static void execute();
-
-    // only needs to be called if changing out the handler set
-    static void unregister_all();
+    void add_ssh_pattern(const std::string& pattern, AppId id);
+    bool has_pattern(const std::string& pattern) const;
+    bool empty() const;
+    AppId get_appid(const std::string& pattern) const;
+    void finalize_patterns();
+private:
+    SshPatternTable ssh_patterns;
 };
 
 #endif
-

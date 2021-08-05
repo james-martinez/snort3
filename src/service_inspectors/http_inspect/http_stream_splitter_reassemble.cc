@@ -101,7 +101,7 @@ void HttpStreamSplitter::chunk_spray(HttpFlowData* session_data, uint8_t* buffer
             decompress_copy(buffer, session_data->section_offset[source_id], data+k, skip_amount,
                 session_data->compression[source_id], session_data->compress_stream[source_id],
                 at_start, session_data->get_infractions(source_id),
-                session_data->events[source_id]);
+                session_data->events[source_id], session_data);
             if ((expected -= skip_amount) == 0)
                 curr_state = CHUNK_DCRLF1;
             k += skip_amount-1;
@@ -131,7 +131,7 @@ void HttpStreamSplitter::chunk_spray(HttpFlowData* session_data, uint8_t* buffer
             decompress_copy(buffer, session_data->section_offset[source_id], data+k, skip_amount,
                 session_data->compression[source_id], session_data->compress_stream[source_id],
                 at_start, session_data->get_infractions(source_id),
-                session_data->events[source_id]);
+                session_data->events[source_id], session_data);
             k += skip_amount-1;
             break;
           }
@@ -141,7 +141,7 @@ void HttpStreamSplitter::chunk_spray(HttpFlowData* session_data, uint8_t* buffer
 
 void HttpStreamSplitter::decompress_copy(uint8_t* buffer, uint32_t& offset, const uint8_t* data,
     uint32_t length, HttpEnums::CompressId& compression, z_stream*& compress_stream,
-    bool at_start, HttpInfractions* infractions, HttpEventGen* events)
+    bool at_start, HttpInfractions* infractions, HttpEventGen* events, HttpFlowData* session_data)
 {
     if ((compression == CMP_GZIP) || (compression == CMP_DEFLATE))
     {
@@ -179,6 +179,7 @@ void HttpStreamSplitter::decompress_copy(uint8_t* buffer, uint32_t& offset, cons
                 inflateEnd(compress_stream);
                 delete compress_stream;
                 compress_stream = nullptr;
+                session_data->update_deallocations(session_data->zlib_inflate_memory);
             }
             return;
         }
@@ -195,7 +196,7 @@ void HttpStreamSplitter::decompress_copy(uint8_t* buffer, uint32_t& offset, cons
 
             // Start over at the beginning
             decompress_copy(buffer, offset, data, length, compression, compress_stream, false,
-                infractions, events);
+                infractions, events, session_data);
             return;
         }
         else
@@ -206,6 +207,7 @@ void HttpStreamSplitter::decompress_copy(uint8_t* buffer, uint32_t& offset, cons
             inflateEnd(compress_stream);
             delete compress_stream;
             compress_stream = nullptr;
+            session_data->update_deallocations(session_data->zlib_inflate_memory);
             // Since we failed to uncompress the data, fall through
         }
     }
@@ -396,7 +398,7 @@ const StreamBuffer HttpStreamSplitter::reassemble(Flow* flow, unsigned total,
         decompress_copy(buffer, session_data->section_offset[source_id], data, len,
             session_data->compression[source_id], session_data->compress_stream[source_id],
             at_start, session_data->get_infractions(source_id),
-            session_data->events[source_id]);
+            session_data->events[source_id], session_data);
     }
     else
     {
@@ -408,17 +410,22 @@ const StreamBuffer HttpStreamSplitter::reassemble(Flow* flow, unsigned total,
         uint32_t& running_total = session_data->running_total[source_id];
         assert(running_total == total);
         running_total = 0;
-        const uint16_t buf_size =
+        const uint32_t buf_size =
             session_data->section_offset[source_id] - session_data->num_excess[source_id];
 
         if (session_data->partial_flush[source_id])
         {
-            // Store the data from a partial flush for reuse
-            partial_buffer = new uint8_t[buf_size];
-            memcpy(partial_buffer, buffer, buf_size);
-            partial_buffer_length = buf_size;
+            // It's possible we're doing a partial flush but there is no actual data to flush after
+            // decompression.
+            if (buf_size > 0)
+            {
+                // Store the data from a partial flush for reuse
+                partial_buffer = new uint8_t[buf_size];
+                memcpy(partial_buffer, buffer, buf_size);
+                partial_buffer_length = buf_size;
+                session_data->update_allocations(partial_buffer_length);
+            }
             partial_raw_bytes += total;
-            session_data->update_allocations(partial_buffer_length);
         }
         else
             partial_raw_bytes = 0;

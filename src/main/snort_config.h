@@ -72,11 +72,13 @@ enum RunFlag
     RUN_FLAG__IP_FRAGS_ONLY       = 0x00200000,
     RUN_FLAG__DUMP_RULE_STATE     = 0x00400000,
 
+    RUN_FLAG__TEST_FEATURES       = 0x00800000,
+
 #ifdef SHELL
-    RUN_FLAG__SHELL               = 0x00800000,
+    RUN_FLAG__SHELL               = 0x01000000,
 #endif
 #ifdef PIGLET
-    RUN_FLAG__PIGLET              = 0x01000000,
+    RUN_FLAG__PIGLET              = 0x02000000,
 #endif
 };
 
@@ -119,7 +121,8 @@ enum TunnelFlags
     TUNNEL_6IN6   = 0x20,
     TUNNEL_GRE    = 0x40,
     TUNNEL_MPLS   = 0x80,
-    TUNNEL_VXLAN  = 0x100
+    TUNNEL_VXLAN  = 0x100,
+    TUNNEL_GENEVE = 0x200
 };
 
 enum DumpConfigType
@@ -328,7 +331,7 @@ public:
     //------------------------------------------------------
     // FIXIT-L command line only stuff, add to conf / module
 
-    uint32_t event_log_id = 0;
+    uint16_t event_log_id = 0;
     SfCidr obfuscation_net;
     std::string bpf_filter;
     std::string metadata_filter;
@@ -542,7 +545,7 @@ public:
     { return run_flags & RUN_FLAG__INLINE_TEST; }
 
     // event stuff
-    uint32_t get_event_log_id() const
+    uint16_t get_event_log_id() const
     { return event_log_id; }
 
     bool process_all_events() const
@@ -609,6 +612,9 @@ public:
 
     bool assure_established() const
     { return run_flags & RUN_FLAG__ASSURE_EST; }
+
+    bool test_features() const
+    { return run_flags & RUN_FLAG__TEST_FEATURES; }
 
     // other stuff
     uint8_t min_ttl() const

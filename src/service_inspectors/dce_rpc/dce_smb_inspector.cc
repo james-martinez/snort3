@@ -21,7 +21,6 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
 #include "dce_smb_inspector.h"
 
 #include "dce_smb_common.h"
@@ -29,12 +28,15 @@
 #include "dce_smb_utils.h"
 #include "dce_smb2_session_cache.h"
 
+#define DCE_SMB_PROTOCOL_ID "netbios-ssn"
+
 using namespace snort;
 
-Dce2Smb::Dce2Smb(const dce2SmbProtoConf& pc)
-{
-    config = pc;
-}
+bool smb_module_is_up = false;
+SnortProtocolId snort_protocol_id_smb = UNKNOWN_PROTOCOL_ID;
+
+Dce2Smb::Dce2Smb(const dce2SmbProtoConf& pc) :
+    config(pc) { }
 
 Dce2Smb::~Dce2Smb()
 {
@@ -42,6 +44,12 @@ Dce2Smb::~Dce2Smb()
     {
         DCE2_ListDestroy(config.smb_invalid_shares);
     }
+}
+
+bool Dce2Smb::configure(SnortConfig* sc)
+{
+    snort_protocol_id_smb = sc->proto_ref->add(DCE_SMB_PROTOCOL_ID);
+    return true;
 }
 
 void Dce2Smb::show(const SnortConfig*) const
@@ -61,7 +69,14 @@ void Dce2Smb::eval(Packet* p)
 
     Dce2SmbSessionData* smb_session_data;
     if (smb_flowdata)
+    {
         smb_session_data = smb_flowdata->get_smb_session_data();
+        // if flow data present but session data is not, it is an expected session
+        // try to update the session data, will only do for SMBv2. Ideally it should
+        // be done in handle_expected, but we dont have access to the config there.
+        if (!smb_session_data)
+            smb_session_data = create_smb_session_data(smb_flowdata, p, &config);
+    }
     else
         smb_session_data = create_new_smb_session(p, &config);
 
@@ -72,18 +87,17 @@ void Dce2Smb::eval(Packet* p)
         p->endianness = new DceEndianness();
 
         smb_session_data->process();
-
         //smb_session_data may not be valid anymore in case of upgrade
         //but flow will always have updated session
         if (!dce2_detected)
             DCE2_Detect(get_dce2_session_data(p->flow));
-
         delete(p->endianness);
         p->endianness = nullptr;
     }
     else
     {
-        debug_logf(dce_smb_trace, p, "non-smb packet detected\n");
+	    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
+	        p, "non-smb packet detected with dsize as %u\n", p->dsize);
     }
 }
 
@@ -97,8 +111,6 @@ void Dce2Smb::clear(Packet* p)
 //-------------------------------------------------------------------------
 // api stuff
 //-------------------------------------------------------------------------
-
-size_t session_cache_size;
 
 static Module* mod_ctor()
 {
@@ -118,38 +130,20 @@ static void dce2_smb_init()
     DceContextData::init(DCE2_TRANS_TYPE__SMB);
 }
 
-static void dce2_smb_thread_int()
-{
-    DCE2_SmbSessionCacheInit(session_cache_size);
-}
-
-static void dce_smb_thread_term()
-{
-    delete smb2_session_cache;
-}
-
-static size_t get_max_smb_session(dce2SmbProtoConf* config)
-{
-    size_t smb_sess_storage_req = (sizeof(Dce2Smb2SessionTracker) +
-        sizeof(Dce2Smb2TreeTracker) + sizeof(Dce2Smb2RequestTracker) +
-        (sizeof(Dce2Smb2FileTracker) * SMB_AVG_FILES_PER_SESSION));
-
-    size_t max_smb_mem = DCE2_ScSmbMemcap(config);
-
-    return (max_smb_mem/smb_sess_storage_req);
-}
-
 static Inspector* dce2_smb_ctor(Module* m)
 {
     Dce2SmbModule* mod = (Dce2SmbModule*)m;
     dce2SmbProtoConf config;
     mod->get_data(config);
-    session_cache_size = get_max_smb_session(&config);
+    size_t max_smb_mem = DCE2_ScSmbMemcap(&config);
+    smb_module_is_up = true;
+    smb2_session_cache.reload_prune(max_smb_mem);
     return new Dce2Smb(config);
 }
 
 static void dce2_smb_dtor(Inspector* p)
 {
+    smb_module_is_up = false;
     delete p;
 }
 
@@ -170,11 +164,11 @@ const InspectApi dce2_smb_api =
     IT_SERVICE,
     PROTO_BIT__PDU,
     nullptr,  // buffers
-    "netbios-ssn",
+    DCE_SMB_PROTOCOL_ID,
     dce2_smb_init,
-    nullptr, // pterm
-    dce2_smb_thread_int, // tinit
-    dce_smb_thread_term, // tterm
+    nullptr,
+    nullptr, // tinit
+    nullptr, // tterm
     dce2_smb_ctor,
     dce2_smb_dtor,
     nullptr, // ssn

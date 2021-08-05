@@ -1,3 +1,126 @@
+2021/07/28 - 3.1.9.0
+
+actions: allow session data to stay accessible for loggers for reject rule action
+byte_options: address compiler warnings
+control: add idle expire removal to control channels
+dump_stats: direct output back to command channel
+events: use instance_id to make event_id unique across threads
+file_api: handle file_cache inspection for non-zero offset
+http2_inspect: change xor to or in assert that was failing due to uninitialized variable
+http2_inspect: fix HPACK dynamic table size update management
+http2_inspect: remove unused variables
+http_inspect: add peg count for script bytes processed
+http_inspect: add rule option http_raw_header_complete
+http_inspect: don't allocate 0-length partial inspection buffer
+ips_options: add catch tests for byte_test, byte_jump, byte_math, byte_extract
+ips_options: address compiler warnings
+ips_options: refactor byte_extract, byte_test, byte_math, byte_jump and related tests
+lua: update HTTP/2 default_wizard hex with S2C pattern match
+stats: update file and appid stats to use Log functions provided from stats.cc
+
+2021/07/15 - 3.1.8.0
+
+appid: support SSH client detection through lua detector
+dce_rpc: fix crash when expected session comes after snort reload
+dce_rpc: handling raw packets
+dce_smb: added trace messages and multiple level logging for SMB module
+dce_smb: fixed macro definition for SMB_DEBUG
+doc: fix build warnings. Thanks to jiangrj (github.com/jiangrij) for reporting the issue.
+dump_config: support modules without config options in text format
+file_api: handling overlap segments
+http2_inspect: clean data cutter internal state after exhausting flow depth
+http_inspect: add built-in alert for script tags in a short form
+packet_io: check if unreachable_candidate before sending unreachable
+packet_io: unreachable packets shouldn't be sent for ICMP
+snort2lua: set raw_data buffer for rawbytes and B flag in PCRE
+wizard: make SSH spell more specific
+
+2021/06/30 - 3.1.7.0
+
+appid: enhance netbios service detector to identify SMB versions as web app
+appid: update documentation
+appid: update the DNS detector to support the all record request
+control: resolve socket issues due to race conditions
+doc: updates for http2_inspect
+framework: update base API version to 3
+main: implement test_features run flag to enable debug-like output
+mime: track memory for mime sessions
+payload_injector: don't inject if there are unflushed S2C TCP packets queued
+reputation: include list id for daq trace log
+sfip: fix unit tests for non-regtest builds
+snort2lua: fix lua conversion of unsupported http preproc options without parameters
+snort2lua: remove footprint size config
+stream: fix is_ack_valid to return true even when current ack is to the left of snd_una, per RFC793
+
+2021/06/16 - 3.1.6.0
+
+appid: extract auxiliary ip when uri is provided by third-party
+appid: perform detection on request body for HTTP2 traffic.
+appid: remove error message when userappid.conf is not present
+appid: remove unused metadata offset functionality
+appid: support fragmented metadata
+appid: use 32 bits for storing protocol field in RPC port map message
+codecs: geneve - add support for Geneve encapsulation
+codecs: geneve - add vni to alert_csv and alert_json
+codecs: support inner flow NAT
+control: allow compile with shell disabled
+control: clean up cppcheck issues
+control: expose ContrlConn API
+control: refactor control channel management to better handle control responses
+control: remove SHELL compile flag from header
+control: remove unused IdleProcessing functionality
+dce_rpc: SMB multichannel - add smb multichannel file support
+dce_rpc: SMB multichannel - handle negotiate command to create expected flow
+dce_rpc: SMB multichannel - introduce locks
+dce_rpc: SMB multichannel - make session cache global
+dce_rpc: SMB multichannel - own memory tracking in global cache
+dce_rpc: fix warnings
+dce_rpc: handle reload prune for smb session cache
+dce_rpc: store shared pointer of session tracker
+doc: update JS normalizer options
+file_api: increase file count only once per file
+file_api: store processing flow in context
+filters: change rate filter to use network policy id instead of ips policy id
+filters: support rate filter to work with PDUs
+flow: enable support for multiple expected sessions
+ftp: create additional expected session if negotiated IP is different from server IP on packet
+gtp : check protocol type according to gtp version
+host_cache: remove unused lua mock code from the tests
+http2_inspect: don't perform valid sequence check on rst_stream frame
+http2_inspect: improve request line generation and checks
+http2_inspect: rule options and doc clean up
+http2_inspect: track dynamic table memory allocation
+http_inspect: add JS Normalizer to dev_notes
+http_inspect: add JS normalization for external scripts
+http_inspect: additional memory tracking
+http_inspect: extend built-in alerts for Javascript processing
+http_inspect: improve MPSE in HttpJsNorm (script start conditions)
+http_inspect: limit section size target for file processing
+http_inspect: publish event for http/2 request bodies
+http_inspect: support partial detect for Javascripts
+http_inspect: track memory footprint of zlib inflation
+http_inspect: update test mock api
+iec104: delete trailing spaces
+ips_options: fix intrusion alerts generation for tcp rpc PORTMAP traffic when rpc_decode is bound to the flow
+main: add support for resuming particular thread
+main: fix config dump for list-based inspector aliases
+mime: store extra data in stash
+packet_io: enable expected session flags
+protocols: remove inline specifiers for functions defined within a structure declaration
+pub_sub: add get_uri_host() to HttpEvent
+pub_sub: update HttpEvent::get_host to get_authority - now always includes port if there is one
+reputation: daq trace log
+reputation: support auxiliary IP matching upon reload
+rna: filter DHCP events and some refactoring
+rna: update last seen time on deleted host rediscovery
+stream: enable support for multiple expected sessions
+stream_tcp: populate flow contents in context for non-wire packets
+time: make Periodic class SO_PUBLIC
+trace: place trace options under the DEBUG_MSGS macro
+utils: fix warning about empty statement
+utils: refactor JSTokenizer
+utils: rework JSNormalizer class
+
 2021/05/20 - 3.1.5.0
 
 appid: Publish an event when appid debug command is issued

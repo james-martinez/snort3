@@ -125,6 +125,8 @@ set ( DP_APPID_SOURCES
     detector_plugins/http_url_patterns.h
     detector_plugins/sip_patterns.cc
     detector_plugins/sip_patterns.h
+    detector_plugins/ssh_patterns.cc
+    detector_plugins/ssh_patterns.h
     detector_plugins/ssl_patterns.cc
     detector_plugins/ssl_patterns.h
 )
@@ -154,6 +156,7 @@ set ( APPID_SOURCES
     appid_ha.h
     appid_http_session.cc
     appid_http_session.h
+    appid_http2_req_body_event_handler.h
     appid_opportunistic_tls_event_handler.h
     appid_peg_counts.h
     appid_peg_counts.cc

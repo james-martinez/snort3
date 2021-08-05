@@ -166,10 +166,13 @@ void Active::kill_session(Packet* p, EncodeFlags flags)
         break;
 
     default:
-        if ( packet_force_dropped() )
-            send_unreach(p, UnreachResponse::FWD);
-        else
-            send_unreach(p, UnreachResponse::PORT);
+        if (is_unreachable_candidate(p))
+        {
+            if ( packet_force_dropped() )
+                send_unreach(p, UnreachResponse::FWD);
+            else
+                send_unreach(p, UnreachResponse::PORT);
+        }
         break;
     }
 }
@@ -495,20 +498,8 @@ bool Active::is_reset_candidate(const Packet* p)
 
 bool Active::is_unreachable_candidate(const Packet* p)
 {
-    // FIXIT-L allow unr to tcp/udp/icmp4/icmp6 only or for all
-    switch ( p->type() )
-    {
-    case PktType::TCP:
-    case PktType::UDP:
+    if ( p->type() == PktType::TCP || p->type() == PktType::UDP)
         return true;
-
-    case PktType::ICMP:
-        // FIXIT-L return false for icmp unreachables
-        return true;
-
-    default:
-        break;
-    }
 
     return false;
 }
@@ -688,12 +679,18 @@ void Active::reset_session(Packet* p, bool force)
     reset_session(p, &default_reset, force);
 }
 
-void Active::reset_session(Packet* p, ActiveAction* reject, bool force)
+void Active::update_reset_status(Packet* p, bool force)
 {
     active_action = ACT_RESET;
     update_status(p, force);
+}
 
-    if ( force or (p->context->conf->inline_mode() and SFDAQ::forwarding_packet(p->pkth)))
+void Active::reset_session(Packet* p, ActiveAction* reject, bool force, bool skip_update_status)
+{
+    if ( !skip_update_status )
+        update_reset_status(p, force);
+
+    if ( force or (p->context->conf->inline_mode() and SFDAQ::forwarding_packet(p->pkth)) )
         Stream::drop_flow(p);
 
     if (reject)

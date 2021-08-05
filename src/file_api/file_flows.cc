@@ -187,6 +187,7 @@ FileContext* FileFlows::find_main_file_context(FilePosition pos, FileDirection d
     }
 
     context = new FileContext;
+    context->set_processing_flow(flow);
     main_context = context;
     context->check_policy(flow, dir, file_policy);
 
@@ -239,6 +240,8 @@ FileContext* FileFlows::get_file_context(
         else
         {
             context = new FileContext;
+            context->set_processing_flow(flow);
+
             partially_processed_contexts[multi_file_processing_id] = context;
             if (partially_processed_contexts.size() > file_counts.max_concurrent_files_per_flow)
                 file_counts.max_concurrent_files_per_flow = partially_processed_contexts.size();
@@ -309,13 +312,16 @@ bool FileFlows::file_process(Packet* p, uint64_t file_id, const uint8_t* file_da
 
     set_current_file_context(context);
 
-    if (!context->get_processed_bytes())
+    // Only increase file count when there are no queued segments
+    // This will ensure we only count a file once in case it has
+    // processed bytes 0 but many queued segments
+    if (!context->get_processed_bytes() and !context->segments_queued())
     {
         context->check_policy(flow, dir, file_policy);
         context->set_file_id(file_id);
     }
 
-    if ( ((offset != 0) or (position == SNORT_FILE_FULL)) and context->is_cacheable() and
+    if ( context->is_cacheable() and
             (FileService::get_file_cache()->cached_verdict_lookup(p, context, file_policy) !=
         FILE_VERDICT_UNKNOWN) )
     {
