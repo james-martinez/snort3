@@ -414,7 +414,7 @@ bool FlowControl::process(PktType type, Packet* p, bool* new_flow)
 
     // FIXIT-M refactor to unlink_uni immediately after session
     // is processed by inspector manager (all flows)
-    if ( flow->next && is_bidirectional(flow) )
+    if ( is_bidirectional(flow) )
         cache->unlink_uni(flow);
 
     return true;
@@ -437,8 +437,10 @@ unsigned FlowControl::process(Flow* flow, Packet* p)
     if ( flow->flow_state != Flow::FlowState::SETUP )
     {
         flow->set_direction(p);
+
         // This call can reset the flow state to SETUP in lazy flow timeout cases
-        flow->session->precheck(p);
+        if ( flow->flow_state != Flow::FlowState::ALLOW )
+            flow->session->precheck(p);
     }
 
     if ( flow->flow_state != Flow::FlowState::SETUP )
@@ -460,6 +462,7 @@ unsigned FlowControl::process(Flow* flow, Packet* p)
         // process expected flows
         check_expected_flow(flow, p);
 
+        flow->set_client_initiate(p);
         DataBus::publish(FLOW_STATE_SETUP_EVENT, p);
 
         if ( flow->flow_state == Flow::FlowState::SETUP ||
@@ -469,7 +472,6 @@ unsigned FlowControl::process(Flow* flow, Packet* p)
 
         ++news;
         flow->flowstats.start_time = p->pkth->ts;
-        flow->set_client_initiate(p);
     }
 
     // This requires the packet direction to be set
@@ -573,10 +575,11 @@ int FlowControl::add_expected_ignore( const Packet* ctrlPkt, PktType type, IpPro
 
 int FlowControl::add_expected( const Packet* ctrlPkt, PktType type, IpProtocol ip_proto,
     const SfIp *srcIP, uint16_t srcPort, const SfIp *dstIP, uint16_t dstPort,
-    SnortProtocolId snort_protocol_id, FlowData* fd, bool swap_app_direction, bool expect_multi)
+    SnortProtocolId snort_protocol_id, FlowData* fd, bool swap_app_direction, bool expect_multi,
+    bool bidirectional)
 {
     return exp_cache->add_flow( ctrlPkt, type, ip_proto, srcIP, srcPort, dstIP, dstPort,
-        SSN_DIR_BOTH, fd, snort_protocol_id, swap_app_direction, expect_multi);
+        SSN_DIR_BOTH, fd, snort_protocol_id, swap_app_direction, expect_multi, bidirectional);
 }
 
 bool FlowControl::is_expected(Packet* p)

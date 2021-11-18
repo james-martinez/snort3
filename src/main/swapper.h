@@ -43,14 +43,9 @@ public:
     void finish(Analyzer&);
     snort::SnortConfig* get_new_conf() { return new_conf; }
 
-    static bool get_reload_in_progress() { return reload_in_progress; }
-    static void set_reload_in_progress(bool rip) { reload_in_progress = rip; }
-
 private:
     const snort::SnortConfig* old_conf;
     snort::SnortConfig* new_conf;
-
-    static bool reload_in_progress;
 };
 
 #endif

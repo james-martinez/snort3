@@ -33,11 +33,14 @@
 #include "main/snort.h"
 #include "main/snort_config.h"
 #include "packet_io/active.h"
+#include "trace/trace.h"
 
 #include "file_service.h"
 #include "file_stats.h"
 
 using namespace snort;
+
+THREAD_LOCAL const Trace* file_trace = nullptr;
 
 static const Parameter file_magic_params[] =
 {
@@ -193,13 +196,16 @@ static const Parameter file_id_params[] =
       "Non-Encoded MIME attachment extraction depth (-1 no limit)" },
 
     { "decompress_pdf", Parameter::PT_BOOL, nullptr, "false",
-      "decompress pdf files in MIME attachments" },
+      "decompress pdf files" },
 
     { "decompress_swf", Parameter::PT_BOOL, nullptr, "false",
-      "decompress swf files in MIME attachments" },
+      "decompress swf files" },
 
     { "decompress_zip", Parameter::PT_BOOL, nullptr, "false",
-      "decompress zip files in MIME attachments" },
+      "decompress zip files" },
+
+    { "decompress_buffer_size", Parameter::PT_INT, "1024:max31", "100000",
+      "file decompression buffer size" },
 
     { "qp_decode_depth", Parameter::PT_INT, "-1:65535", "-1",
       "Quoted Printable decoding depth (-1 no limit)" },
@@ -226,6 +232,15 @@ FileIdModule::~FileIdModule()
 {
     if (fc)
         delete fc;
+}
+
+void FileIdModule::set_trace(const Trace* trace) const
+{ file_trace = trace; }
+
+const TraceOption* FileIdModule::get_trace_options() const
+{
+    static const TraceOption filetrace_options(nullptr, 0, nullptr);
+    return &filetrace_options;
 }
 
 const PegInfo* FileIdModule::get_pegs() const
@@ -333,6 +348,9 @@ bool FileIdModule::set(const char*, Value& v, SnortConfig*)
 
     else if ( v.is("decompress_zip") )
         FileService::decode_conf.set_decompress_zip(v.get_bool());
+
+    else if ( v.is("decompress_buffer_size") )
+        FileService::decode_conf.set_decompress_buffer_size(v.get_uint32());
 
     else if (v.is("b64_decode_depth"))
     {

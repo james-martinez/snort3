@@ -13,7 +13,18 @@ FLEX_TARGET ( js_tokenizer ${CMAKE_CURRENT_SOURCE_DIR}/../js_tokenizer.l
 add_catch_test( js_normalizer_test
     SOURCES
         ${FLEX_js_tokenizer_OUTPUTS}
+        ../js_identifier_ctx.cc
         ../js_normalizer.cc
+        ../streambuf.cc
         ../util_cstring.cc
 )
 
+add_catch_test( js_identifier_ctx_test
+    SOURCES
+        ../js_identifier_ctx.cc
+)
+
+add_catch_test( streambuf_test
+    SOURCES
+        ../streambuf.cc
+)

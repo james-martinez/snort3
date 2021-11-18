@@ -24,6 +24,8 @@
 
 #include "snort_module.h"
 
+#include <string>
+
 #include "detection/detect.h"
 #include "detection/fp_detect.h"
 #include "framework/module.h"
@@ -40,7 +42,7 @@
 #include "parser/vars.h"
 #include "trace/trace_config.h"
 
-#ifdef UNIT_TEST
+#if defined(UNIT_TEST) || defined(BENCHMARK_TEST)
 #include "catch/unit_test.h"
 #endif
 
@@ -347,6 +349,9 @@ static const Parameter s_params[] =
     { "--dirty-pig", Parameter::PT_IMPLIED, nullptr, nullptr,
       "don't flush packets on shutdown" },
 
+    { "--dump-builtin-options", Parameter::PT_STRING, nullptr, nullptr,
+      "additional options to include with --dump-builtin-rules stubs" },
+
     { "--dump-builtin-rules", Parameter::PT_STRING, "(optional)", nullptr,
       "[<module prefix>] output stub rules for selected modules" },
 
@@ -362,6 +367,9 @@ static const Parameter s_params[] =
 
     { "--dump-defaults", Parameter::PT_STRING, "(optional)", nullptr,
       "[<module prefix>] output module defaults in Lua format" },
+
+    { "--dump-rule-databases", Parameter::PT_STRING, nullptr, nullptr,
+      "dump rule databases to given directory (hyperscan only)" },
 
     { "--dump-rule-deps", Parameter::PT_IMPLIED, nullptr, nullptr,
       "dump rule dependencies in json format for use by other tools" },
@@ -567,9 +575,9 @@ static const Parameter s_params[] =
     { "--tweaks", Parameter::PT_STRING, nullptr, nullptr,
       "tune configuration" },
 
-#ifdef UNIT_TEST
+#if defined(UNIT_TEST) || defined(BENCHMARK_TEST)
     { "--catch-test", Parameter::PT_STRING, nullptr, nullptr,
-      "comma separated list of cat unit test tags or 'all'" },
+      "comma separated list of Catch test tags or 'all'" },
 #endif
     { "--version", Parameter::PT_IMPLIED, nullptr, nullptr,
       "show version number (same as -V)" },
@@ -671,6 +679,7 @@ private:
     SFDAQModuleConfig* module_config;
     bool no_warn_flowbits = false;
     bool no_warn_rules = false;
+    std::string stub_opts;
 };
 
 void SnortModule::set_trace(const Trace* trace) const
@@ -875,8 +884,11 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
     else if ( v.is("--dirty-pig") )
         sc->set_dirty_pig(true);
 
+    else if ( v.is("--dump-builtin-options") )
+        stub_opts = v.get_string();
+
     else if ( v.is("--dump-builtin-rules") )
-        dump_builtin_rules(sc, v.get_string());
+        dump_builtin_rules(sc, v.get_string(), stub_opts.c_str());
 
     else if ( v.is("--dump-config") )
     {
@@ -901,6 +913,11 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
     else if ( v.is("--dump-defaults") )
         dump_defaults(sc, v.get_string());
 
+    else if ( v.is("--dump-rule-databases") )
+    {
+        sc->set_rule_db_dir(v.get_string());
+        sc->run_flags |= (RUN_FLAG__TEST | RUN_FLAG__MEM_CHECK);
+    }
     else if ( v.is("--dump-rule-deps") )
     {
         sc->run_flags |= (RUN_FLAG__DUMP_RULE_DEPS | RUN_FLAG__TEST);
@@ -1104,7 +1121,7 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
     else if ( v.is("--tweaks") )
         sc->set_tweaks(v.get_string());
 
-#ifdef UNIT_TEST
+#if defined(UNIT_TEST) || defined(BENCHMARK_TEST)
     else if ( v.is("--catch-test") )
         catch_set_filter(v.get_string());
 #endif

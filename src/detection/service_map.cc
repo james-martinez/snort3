@@ -91,7 +91,7 @@ void ServiceMapFree(srmm_table_t* table)
 //-------------------------------------------------------------------------
 
 static void delete_pg(void* pv)
-{ PortGroup::free((PortGroup*)pv); }
+{ delete (RuleGroup*)pv; }
 
 static GHash* alloc_spgmm()
 {
@@ -107,7 +107,7 @@ static void free_spgmm(GHash* table)
     delete table;
 }
 
-srmm_table_t* ServicePortGroupMapNew()
+srmm_table_t* ServiceRuleGroupMapNew()
 {
     srmm_table_t* table = (srmm_table_t*)snort_calloc(sizeof(srmm_table_t));
 
@@ -117,7 +117,7 @@ srmm_table_t* ServicePortGroupMapNew()
     return table;
 }
 
-void ServicePortGroupMapFree(srmm_table_t* table)
+void ServiceRuleGroupMapFree(srmm_table_t* table)
 {
     if ( !table )
         return;
@@ -159,7 +159,7 @@ static void ServiceMapAddOtnRaw(GHash* table, const char* servicename, OptTreeNo
  *  service name.
  */
 static void ServiceMapAddOtn(
-    srmm_table_t* srmm, SnortProtocolId, const char* servicename, OptTreeNode* otn)
+    srmm_table_t* srmm, const char* servicename, OptTreeNode* otn)
 {
     assert(servicename and otn);
 
@@ -170,10 +170,10 @@ static void ServiceMapAddOtn(
         ServiceMapAddOtnRaw(srmm->to_srv, servicename, otn);
 }
 
-void fpPrintServicePortGroupSummary(SnortConfig* sc)
+void fpPrintServiceRuleGroupSummary(SnortConfig* sc)
 {
     LogMessage("+--------------------------------\n");
-    LogMessage("| Service-PortGroup Table Summary \n");
+    LogMessage("| Service-RuleGroup Table Summary \n");
     LogMessage("---------------------------------\n");
 
     if ( unsigned n = sc->spgmmTable->to_srv->get_count() )
@@ -196,27 +196,19 @@ void fpCreateServiceMaps(SnortConfig* sc)
          hashNode = sc->otn_map->find_next())
     {
         OptTreeNode* otn = (OptTreeNode*)hashNode->data;
-        for (PolicyId policyId = 0;
-             policyId < otn->proto_node_num;
-             policyId++ )
+
+        // skip builtin rules
+        if ( otn->sigInfo.builtin )
+            continue;
+
+        /* Not enabled, don't do the FP content */
+        if ( !otn->enabled_somewhere() )
+            continue;
+
+        for ( const auto& svc : otn->sigInfo.services )
         {
-            RuleTreeNode* rtn = getRtnFromOtn(otn, policyId);
-            if ( rtn )
-            {
-                // skip builtin rules
-                if ( otn->sigInfo.builtin )
-                    continue;
-
-                /* Not enabled, don't do the FP content */
-                if ( !rtn->enabled() )
-                    continue;
-
-                for ( const auto& svc : otn->sigInfo.services )
-                {
-                    const char* s = svc.service.c_str();
-                    ServiceMapAddOtn(sc->srmmTable, rtn->snort_protocol_id, s, otn);
-                }
-            }
+            const char* s = svc.service.c_str();
+            ServiceMapAddOtn(sc->srmmTable, s, otn);
         }
     }
 }
@@ -234,9 +226,9 @@ sopg_table_t::sopg_table_t(unsigned n)
         to_cli.resize(n, nullptr);
 }
 
-PortGroup* sopg_table_t::get_port_group(bool c2s, SnortProtocolId snort_protocol_id)
+RuleGroup* sopg_table_t::get_port_group(bool c2s, SnortProtocolId snort_protocol_id)
 {
-    PortGroupVector& v = c2s ? to_srv : to_cli;
+    RuleGroupVector& v = c2s ? to_srv : to_cli;
 
     if ( snort_protocol_id >= v.size() )
         return nullptr;

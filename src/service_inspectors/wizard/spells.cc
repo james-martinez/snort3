@@ -29,7 +29,7 @@ using namespace std;
 
 #define WILD 0x100
 
-SpellBook::SpellBook()
+SpellBook::SpellBook() : glob(nullptr)
 {
     // allows skipping leading whitespace only
     root->next[(int)' '] = root;
@@ -152,31 +152,25 @@ const MagicPage* SpellBook::find_spell(
             while ( i < n )
             {
                 if ( const MagicPage* q = find_spell(s, n, p->any, i) )
+                {
+                    glob = q->any ? q : p;
                     return q;
+                }
                 ++i;
             }
-            return p->any;
+            return p;
         }
+
+        // If no match but has glob, continue lookup from glob
+        if ( p->value.empty() && glob )
+        {   
+            p = glob;
+            glob = nullptr;
+            
+            return find_spell(s, n, p, i);
+        }
+
         return p->value.empty() ? nullptr : p;
     }
     return p;
 }
-
-const char* SpellBook::find_spell(
-    const uint8_t* data, unsigned len, const MagicPage*& p) const
-{
-    // FIXIT-L make configurable upper bound to limit globbing
-    unsigned max = 64;
-    assert(p);
-
-    if ( len > max )
-        len = max;
-
-    p = find_spell(data, len, p, 0);
-
-    if ( p and !p->value.empty() )
-        return p->value.c_str();
-
-    return nullptr;
-}
-

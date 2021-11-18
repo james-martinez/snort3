@@ -23,7 +23,9 @@
 
 #include "http_msg_body.h"
 
+#include "decompress/file_olefile.h"
 #include "file_api/file_flows.h"
+#include "file_api/file_service.h"
 #include "pub_sub/http_request_body_event.h"
 
 #include "http_api.h"
@@ -33,6 +35,7 @@
 #include "http_msg_header.h"
 #include "http_msg_request.h"
 #include "http_test_manager.h"
+#include "http_uri.h"
 
 using namespace snort;
 using namespace HttpCommon;
@@ -77,6 +80,8 @@ void HttpMsgBody::publish()
 void HttpMsgBody::bookkeeping_regular_flush(uint32_t& partial_detect_length,
     uint8_t*& partial_detect_buffer, uint32_t& partial_js_detect_length, int32_t detect_length)
 {
+    params->js_norm_param.js_norm->set_detection_depth(session_data->detect_depth_remaining[source_id]);
+
     session_data->detect_depth_remaining[source_id] -= detect_length;
     partial_detect_buffer = nullptr;
     partial_detect_length = 0;
@@ -121,7 +126,12 @@ void HttpMsgBody::analyze()
             msg_text.start() + partial_inspected_octets);
     }
     else
+    {
+        // First flush of inspection section - set full file decompress buffer size
+        session_data->file_decomp_buffer_size_remaining[source_id] =
+            FileService::decode_conf.get_decompress_buffer_size();
         msg_text_new.set(msg_text);
+    }
 
     int32_t& pub_depth_remaining = session_data->publish_depth_remaining[source_id];
     if (pub_depth_remaining > 0)
@@ -151,13 +161,16 @@ void HttpMsgBody::analyze()
 
             if (partial_detect_length > 0)
             {
-                const int32_t total_length = partial_detect_length + decompressed_file_body.length();
+                const int32_t total_length = partial_detect_length +
+                    decompressed_file_body.length();
+                assert(total_length <=
+                    (int64_t)FileService::decode_conf.get_decompress_buffer_size());
                 uint8_t* const cumulative_buffer = new uint8_t[total_length];
                 memcpy(cumulative_buffer, partial_detect_buffer, partial_detect_length);
                 memcpy(cumulative_buffer + partial_detect_length, decompressed_file_body.start(),
                     decompressed_file_body.length());
                 cumulative_data.set(total_length, cumulative_buffer, true);
-                do_js_normalization(cumulative_data, js_norm_body, true);
+                do_legacy_js_normalization(cumulative_data, js_norm_body);
                 if ((int32_t)partial_js_detect_length == js_norm_body.length())
                 {
                     clean_partial(partial_inspected_octets, partial_detect_length,
@@ -166,7 +179,9 @@ void HttpMsgBody::analyze()
                 }
             }
             else
-                do_js_normalization(decompressed_file_body, js_norm_body, false);
+                do_legacy_js_normalization(decompressed_file_body, js_norm_body);
+
+            ++session_data->pdu_idx;
 
             const int32_t detect_length =
                 (js_norm_body.length() <= session_data->detect_depth_remaining[source_id]) ?
@@ -247,13 +262,14 @@ void HttpMsgBody::do_file_decompression(const Field& input, Field& output)
         output.set(input);
         return;
     }
-    uint8_t* buffer = new uint8_t[MAX_OCTETS];
+    const uint32_t buffer_size = session_data->file_decomp_buffer_size_remaining[source_id];
+    uint8_t* buffer = new uint8_t[buffer_size];
     session_data->fd_alert_context.infractions = transaction->get_infractions(source_id);
     session_data->fd_alert_context.events = session_data->events[source_id];
     session_data->fd_state->Next_In = input.start();
     session_data->fd_state->Avail_In = (uint32_t)input.length();
     session_data->fd_state->Next_Out = buffer;
-    session_data->fd_state->Avail_Out = MAX_OCTETS;
+    session_data->fd_state->Avail_Out = buffer_size;
 
     const fd_status_t status = File_Decomp(session_data->fd_state);
 
@@ -274,7 +290,11 @@ void HttpMsgBody::do_file_decompression(const Field& input, Field& output)
         create_event(EVENT_FILE_DECOMPR_OVERRUN);
         // Fall through
     default:
-        output.set(session_data->fd_state->Next_Out - buffer, buffer, true);
+        const uint32_t output_length = session_data->fd_state->Next_Out - buffer;
+        output.set(output_length, buffer, true);
+        assert((uint64_t)session_data->file_decomp_buffer_size_remaining[source_id] >=
+            output_length);
+        session_data->file_decomp_buffer_size_remaining[source_id] -= output_length;
         break;
     }
 }
@@ -315,63 +335,42 @@ void HttpMsgBody::fd_event_callback(void* context, int event)
     }
 }
 
-void HttpMsgBody::do_js_normalization(const Field& input, Field& output, bool partial_detect)
+void HttpMsgBody::do_enhanced_js_normalization(const Field& input, Field& output)
 {
-    if (!params->js_norm_param.is_javascript_normalization or source_id == SRC_CLIENT)
-        output.set(input);
-    else if (params->js_norm_param.normalize_javascript)
-        params->js_norm_param.js_norm->legacy_normalize(input, output,
-            transaction->get_infractions(source_id), session_data->events[source_id],
-            params->js_norm_param.max_javascript_whitespaces);
-    else if (params->js_norm_param.js_normalization_depth)
+    if (session_data->js_data_lost_once)
+        return;
+
+    auto infractions = transaction->get_infractions(source_id);
+    auto back = !session_data->partial_flush[source_id];
+    auto http_header = get_header(source_id);
+    auto normalizer = params->js_norm_param.js_norm;
+
+    if (session_data->is_pdu_missed())
+    {
+        *infractions += INF_JS_PDU_MISS;
+        session_data->events[HttpCommon::SRC_SERVER]->create_event(EVENT_JS_PDU_MISS);
+
+        session_data->js_data_lost_once = true;
+        return;
+    }
+
+    if (http_header and http_header->is_external_js())
+        normalizer->do_external(input, output, infractions, session_data, back);
+    else
+        normalizer->do_inline(input, output, infractions, session_data, back);
+}
+
+void HttpMsgBody::do_legacy_js_normalization(const Field& input, Field& output)
+{
+    if (!params->js_norm_param.normalize_javascript || source_id == SRC_CLIENT)
     {
         output.set(input);
-
-        bool js_continuation = session_data->js_normalizer;
-        uint8_t*& buf = session_data->js_detect_buffer[source_id];
-        uint32_t& len = session_data->js_detect_length[source_id];
-
-        if (partial_detect)
-            session_data->release_js_ctx();
-        else
-        {
-            session_data->update_deallocations(len);
-            delete[] buf;
-            buf = nullptr;
-            len = 0;
-        }
-
-        auto http_header = get_header(source_id);
-        if (http_header and http_header->is_external_js())
-            params->js_norm_param.js_norm->enhanced_external_normalize(input, enhanced_js_norm_body,
-                transaction->get_infractions(source_id), session_data);
-        else
-            params->js_norm_param.js_norm->enhanced_inline_normalize(input, enhanced_js_norm_body,
-                transaction->get_infractions(source_id), session_data);
-
-        const int32_t norm_length =
-            (enhanced_js_norm_body.length() <= session_data->detect_depth_remaining[source_id]) ?
-            enhanced_js_norm_body.length() : session_data->detect_depth_remaining[source_id];
-
-        if ( norm_length > 0 )
-        {
-            set_script_data(enhanced_js_norm_body.start(), (unsigned int)norm_length);
-
-            if (partial_detect)
-                return;
-
-            if (js_continuation)
-            {
-                auto nscript_len = enhanced_js_norm_body.length();
-                uint8_t* nscript = new uint8_t[nscript_len];
-
-                memcpy(nscript, enhanced_js_norm_body.start(), nscript_len);
-                buf = nscript;
-                len = nscript_len;
-                session_data->update_allocations(len);
-            }
-        }
+        return;
     }
+
+    params->js_norm_param.js_norm->do_legacy(input, output,
+        transaction->get_infractions(source_id), session_data->events[source_id],
+        params->js_norm_param.max_javascript_whitespaces);
 }
 
 void HttpMsgBody::do_file_processing(const Field& file_data)
@@ -405,7 +404,6 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
             return;
 
         const FileDirection dir = source_id == SRC_SERVER ? FILE_DOWNLOAD : FILE_UPLOAD;
-        Field cont_disp_filename;
 
         const uint64_t file_index = get_header(source_id)->get_file_cache_index();
 
@@ -416,35 +414,21 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
         {
             session_data->file_depth_remaining[source_id] -= fp_length;
 
-            // With the first piece of the file we must provide the "name". If an upload contains a
-            // filename in a Content-Disposition header, we use that. Otherwise the name is the URI.
+            // With the first piece of the file we must provide the filename and URI
             if (front)
             {
                 if (request != nullptr)
                 {
-                    bool has_cd_filename = false;
-                    if (dir == FILE_UPLOAD)
-                    {
-                        const Field& cd_filename = get_header(source_id)->
-                            get_content_disposition_filename();
-                        if (cd_filename.length() > 0)
-                        {
-                            continue_processing_file = file_flows->set_file_name(
-                                cd_filename.start(), cd_filename.length(), 0, 
-                                get_header(source_id)->get_multi_file_processing_id());
-                            has_cd_filename = true;
-                        }
-                    }
-                    if (!has_cd_filename)
-                    {
-                        const Field& transaction_uri = request->get_uri();
-                        if (transaction_uri.length() > 0)
-                        {
-                            continue_processing_file = file_flows->set_file_name(
-                                transaction_uri.start(), transaction_uri.length(), 0,
-                                get_header(source_id)->get_multi_file_processing_id());
-                        }
-                    }
+                    const uint8_t* filename_buffer;
+                    const uint8_t* uri_buffer;
+                    uint32_t filename_length;
+                    uint32_t uri_length;
+                    get_file_info(dir, filename_buffer, filename_length, uri_buffer, uri_length);
+
+                    continue_processing_file = file_flows->set_file_name(filename_buffer,
+                        filename_length, 0,
+                        get_header(source_id)->get_multi_file_processing_id(), uri_buffer,
+                        uri_length);
                 }
             }
         }
@@ -465,9 +449,106 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
     }
 }
 
+// Parses out the filename and URI associated with this file.
+// For the filename, if the message has a Content-Disposition header with a filename attribute,
+// use that. Otherwise use the segment of the URI path after the last '/' but not including the
+// query or fragment. For the uri, use the request raw uri. If there is no URI or nothing in the
+// path after the last slash, the filename and uri buffers may be empty. The normalized URI is used.
+void HttpMsgBody::get_file_info(FileDirection dir, const uint8_t*& filename_buffer,
+    uint32_t& filename_length, const uint8_t*& uri_buffer, uint32_t& uri_length)
+{
+    filename_buffer = uri_buffer = nullptr;
+    filename_length = uri_length = 0;
+    HttpUri* http_uri = request->get_http_uri();
+
+    // First handle the content-disposition case
+    if (dir == FILE_UPLOAD)
+    {
+        const Field& cd_filename = get_header(source_id)->get_content_disposition_filename();
+        if (cd_filename.length() > 0)
+        {
+            filename_buffer = cd_filename.start();
+            filename_length = cd_filename.length();
+        }
+    }
+
+    if (http_uri)
+    {
+        const Field& uri_field = http_uri->get_norm_classic();
+        if (uri_field.length() > 0)
+        {
+            uri_buffer = uri_field.start();
+            uri_length = uri_field.length();
+        }
+
+        // Don't overwrite the content-disposition filename
+        if (filename_length > 0)
+            return;
+
+        const Field& path = http_uri->get_norm_path(); 
+        if (path.length() > 0)
+        {
+            int last_slash_index = path.length() - 1;
+            while (last_slash_index >= 0)
+            {
+                if (path.start()[last_slash_index] == '/')
+                    break;
+                last_slash_index--;
+            }
+            if (last_slash_index >= 0)
+            {
+                filename_length = (path.length() - (last_slash_index + 1));
+                if (filename_length > 0)
+                    filename_buffer = path.start() + last_slash_index + 1;
+            }
+        }
+    }
+}
+
 const Field& HttpMsgBody::get_classic_client_body()
 {
     return classic_normalize(detect_data, classic_client_body, false, params->uri_param);
+}
+
+const Field& HttpMsgBody::get_decomp_vba_data()
+{
+    if (decompressed_vba_data.length() != STAT_NOT_COMPUTE)
+        return decompressed_vba_data;
+
+    if (!session_data->fd_state->ole_data_ptr || !session_data->fd_state->ole_data_len)
+        return Field::FIELD_NULL;
+
+    uint8_t* buf = nullptr;
+    uint32_t buf_len = 0;
+
+    VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, CURRENT_PACKET,
+               "Found OLE file. Sending %d bytes for the processing.\n",
+                session_data->fd_state->ole_data_len);
+
+    oleprocess(session_data->fd_state->ole_data_ptr, session_data->fd_state->ole_data_len, buf,
+        buf_len);
+    if (buf && buf_len)
+        decompressed_vba_data.set(buf_len, buf, true);
+    else
+        decompressed_vba_data.set(STAT_NOT_PRESENT);
+
+    session_data->fd_state->ole_data_ptr = nullptr;
+    session_data->fd_state->ole_data_len = 0;
+
+    return decompressed_vba_data;
+}
+
+const Field& HttpMsgBody::get_norm_js_data()
+{
+    if (norm_js_data.length() != STAT_NOT_COMPUTE)
+        return norm_js_data;
+
+    do_enhanced_js_normalization(decompressed_file_body, norm_js_data);
+
+    if (norm_js_data.length() == STAT_NOT_COMPUTE)
+        norm_js_data.set(STAT_NOT_PRESENT);
+
+    return norm_js_data;
 }
 
 int32_t HttpMsgBody::get_publish_length() const

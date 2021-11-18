@@ -25,6 +25,7 @@
 #include <FlexLexer.h>
 
 #include "js_tokenizer.h"
+#include "streambuf.h"
 
 namespace snort
 {
@@ -32,36 +33,52 @@ namespace snort
 class JSNormalizer
 {
 public:
-    JSNormalizer();
+    JSNormalizer(JSIdentifierCtxBase& js_ident_ctx, size_t depth,
+        uint8_t max_template_nesting, uint32_t max_scope_depth,
+        int tmp_cap_size = JSTOKENIZER_BUF_MAX_SIZE);
+    ~JSNormalizer();
+
+    JSTokenizer::JSRet normalize(const char* src, size_t src_len);
 
     const char* get_src_next() const
     { return src_next; }
 
-    char* get_dst_next() const // this can go beyond dst length, but no writing happens outside of dst
-    { return dst_next; }
-
     void reset_depth()
     { rem_bytes = depth; }
 
-    void set_depth(size_t depth);
+    const char* take_script()
+    { return out_buf.take_data(); }
 
-    JSTokenizer::JSRet normalize(const char* src, size_t src_len, char* dst, size_t dst_len);
+    const char* get_script() const
+    { return out_buf.data(); }
 
-    static size_t size();
+    size_t script_size()
+    { return out.tellp(); }
+
+    static size_t size()
+    { return sizeof(JSNormalizer) + 16834; /* YY_BUF_SIZE */ }
+
+#ifdef BENCHMARK_TEST
+    void rewind_output()
+    { out_buf.pubseekoff(0, std::ios_base::beg, std::ios_base::out); }
+#endif
 
 private:
     size_t depth;
     size_t rem_bytes;
     bool unlim;
     const char* src_next;
-    char* dst_next;
 
-    std::stringstream in;
-    std::stringstream out;
+    char* tmp_buf;
+    size_t tmp_buf_size;
+
+    istreambuf_glue in_buf;
+    ostreambuf_infl out_buf;
+    std::istream in;
+    std::ostream out;
     JSTokenizer tokenizer;
 };
 
 }
 
 #endif //JS_NORMALIZER_H
-

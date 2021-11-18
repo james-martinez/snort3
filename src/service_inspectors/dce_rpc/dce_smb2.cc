@@ -109,7 +109,7 @@ Dce2Smb2SessionData::Dce2Smb2SessionData(const Packet* p,
     memory::MemoryCap::update_allocations(sizeof(*this));
 }
 
-Dce2Smb2SessionData::~Dce2Smb2SessionData(void)
+Dce2Smb2SessionData::~Dce2Smb2SessionData()
 {
     session_data_mutex.lock();
     for (auto it_session : connected_sessions)
@@ -186,6 +186,9 @@ void Dce2Smb2SessionData::process_command(const Smb2Hdr* smb_hdr,
 {
     const uint8_t* smb_data = (const uint8_t*)smb_hdr + SMB2_HEADER_LENGTH;
     uint16_t structure_size = alignedNtohs((const uint16_t*)smb_data);
+    uint16_t command = alignedNtohs(&(smb_hdr->command));
+    uint64_t session_id = Smb2Sid(smb_hdr);
+    Dce2Smb2SessionTrackerPtr session = find_session(session_id);
 
 // Macro and shorthand to save some repetitive code
 // Should only be used in this function
@@ -206,6 +209,11 @@ void Dce2Smb2SessionData::process_command(const Smb2Hdr* smb_hdr,
             SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, GET_CURRENT_PACKET, \
                 "%s : smb data beyond end detected\n", \
                 smb2_command_string[command]); \
+            if (session) \
+            { \
+                session->set_do_not_delete(false); \
+                session->set_prev_comand(SMB2_COM_MAX); \
+            } \
             return; \
         } \
     }
@@ -217,6 +225,11 @@ void Dce2Smb2SessionData::process_command(const Smb2Hdr* smb_hdr,
             dce2_smb_stats.v2_ ## counter ## _err_resp++; \
             SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, GET_CURRENT_PACKET, "%s_RESP: error\n", \
                 smb2_command_string[command]); \
+            if (session) \
+            { \
+                session->set_do_not_delete(false); \
+                session->set_prev_comand(SMB2_COM_MAX); \
+            } \
             return; \
         } \
     }
@@ -227,19 +240,34 @@ void Dce2Smb2SessionData::process_command(const Smb2Hdr* smb_hdr,
         SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL \
 	    , GET_CURRENT_PACKET, "%s: invalid struct size\n", \
             smb2_command_string[command]); \
+        if (session) \
+        { \
+            session->set_do_not_delete(false); \
+            session->set_prev_comand(SMB2_COM_MAX); \
+        } \
         return; \
     }
 
-    uint16_t command = alignedNtohs(&(smb_hdr->command));
-    uint64_t session_id = Smb2Sid(smb_hdr);
     SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, GET_CURRENT_PACKET,
         "%s : flow %" PRIu32 " mid %" PRIu64 " sid %" PRIu64 " tid %" PRIu32 "\n",
         (command < SMB2_COM_MAX ? smb2_command_string[command] : "unknown"),
         flow_key, Smb2Mid(smb_hdr), session_id, Smb2Tid(smb_hdr));
+
+    // Handling case of two threads trying to do close same session at a time
+    if (command == SMB2_COM_CLOSE and (session and session->get_prev_command() !=  SMB2_COM_MAX))
+    {
+        session->set_do_not_delete(false);
+        return;
+    }
+
+    if (session)
+    {
+        session->set_do_not_delete(true);
+        session->set_prev_comand(command);
+    }
+
     // Try to find the session.
     // The case when session is not available will be handled per command.
-    Dce2Smb2SessionTrackerPtr session = find_session(session_id);
-
     switch (command)
     {
     //commands processed by flow
@@ -253,16 +281,23 @@ void Dce2Smb2SessionData::process_command(const Smb2Hdr* smb_hdr,
                 Dce2SmbFlowData* fd = create_expected_smb_flow_data(p);
                 if (fd)
                 {
+                    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_CRITICAL_LEVEL, GET_CURRENT_PACKET,
+                        "Requesting for expected smb flow\n");
                     int result = Stream::set_snort_protocol_id_expected(p, PktType::TCP,
                         IpProtocol::TCP, p->ptrs.ip_api.get_dst() , 0 ,p->ptrs.ip_api.get_src(),
                         p->flow->server_port , snort_protocol_id_smb, fd, false, true);
-                
+
                     if (result < 0)
                     {
                         SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_CRITICAL_LEVEL, GET_CURRENT_PACKET,
                             "Failed to create expected smb flow\n");
                         delete fd;
                     }
+                }
+                else
+                {
+                    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_CRITICAL_LEVEL, GET_CURRENT_PACKET,
+                        "fd is null in negotiate , failed to create pinhole\n");
                 }
             }
         }
@@ -452,6 +487,11 @@ void Dce2Smb2SessionData::process_command(const Smb2Hdr* smb_hdr,
         dce2_smb_stats.v2_msgs_uninspected++;
         break;
     }
+    if (session)
+    {
+        session->set_prev_comand(SMB2_COM_MAX);
+        session->set_do_not_delete(false);
+    }
 }
 
 // This is the main entry point for SMB2 processing.
@@ -460,6 +500,7 @@ void Dce2Smb2SessionData::process()
     Packet* p = DetectionEngine::get_current_packet();
     const uint8_t* data_ptr = p->data;
     uint16_t data_len = p->dsize;
+    Dce2Smb2SessionTrackerPtr session = nullptr;
 
     // Process the header
     if (p->is_pdu_start())
@@ -467,7 +508,7 @@ void Dce2Smb2SessionData::process()
         // Check header length
         if (data_len < sizeof(NbssHdr) + SMB2_HEADER_LENGTH)
         {
-            SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_CRITICAL_LEVEL, 
+            SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_CRITICAL_LEVEL,
                 p, "Header error with data length %d\n",data_len);
             dce2_smb_stats.v2_hdr_err++;
             return;
@@ -492,9 +533,11 @@ void Dce2Smb2SessionData::process()
             {
                 dce_alert(GID_DCE2, DCE2_SMB_BAD_NEXT_COMMAND_OFFSET,
                     (dce2CommonStats*)&dce2_smb_stats, sd);
-		        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, 
+		        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID,
 		        TRACE_ERROR_LEVEL, p, "bad next command offset\n");
                 dce2_smb_stats.v2_bad_next_cmd_offset++;
+                if (session)
+                    session->set_do_not_delete(false);
                 return;
             }
             if (next_command_offset)
@@ -506,9 +549,11 @@ void Dce2Smb2SessionData::process()
             if (compound_request_index > get_smb_max_compound())
             {
                 dce2_smb_stats.v2_cmpnd_req_lt_crossed++;
-		        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, 
+		        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID,
 		            TRACE_INFO_LEVEL, p, "compound request limit"
                     " reached %" PRIu8 "\n",compound_request_index);
+                if (session)
+                    session->set_do_not_delete(false);
                 return;
             }
         }
@@ -516,6 +561,12 @@ void Dce2Smb2SessionData::process()
     }
     else
     {
+        if ( tcp_file_tracker )
+        {
+             session = find_session(tcp_file_tracker->get_session_id());
+             if (session)
+                 session->set_do_not_delete(true);
+        }
         tcp_file_tracker_mutex.lock();
         if ( tcp_file_tracker and tcp_file_tracker->accepting_raw_data_from(flow_key))
         {
@@ -530,6 +581,8 @@ void Dce2Smb2SessionData::process()
         }
         tcp_file_tracker_mutex.unlock();
     }
+    if (session)
+        session->set_do_not_delete(false);
 }
 
 void Dce2Smb2SessionData::set_reassembled_data(uint8_t* nb_ptr, uint16_t co_len)

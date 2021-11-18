@@ -38,8 +38,10 @@
 #include "http_common.h"
 #include "http_enum.h"
 #include "http_inspect.h"
+#include "http_js_norm.h"
 #include "http_msg_request.h"
 #include "http_msg_body.h"
+#include "http_normalizers.h"
 
 using namespace snort;
 using namespace HttpCommon;
@@ -149,6 +151,16 @@ void HttpMsgHeader::gen_events()
     if (source_id == SRC_CLIENT)
         get_header_value_norm(HEAD_HOST);
 
+    // Host header value too long
+    if ((params->maximum_host_length != -1) && (source_id == SRC_CLIENT))
+    {
+        if (get_all_header_values_raw(HEAD_HOST).length() > params->maximum_host_length)
+        {
+            add_infraction(INF_LONG_HOST_VALUE);
+            create_event(EVENT_LONG_HOSTNAME);
+        }
+    }
+
     // Content-Transfer-Encoding is a MIME header not sanctioned by HTTP. Which may not prevent
     // some clients from recognizing it and applying a decoding that Snort does not expect.
     if (get_header_count(HEAD_CONTENT_TRANSFER_ENCODING) > 0)
@@ -187,6 +199,14 @@ void HttpMsgHeader::gen_events()
         }
         while (consumed != -1);
     }
+
+    // Check for an empty value in Accept-Encoding (two consecutive commas)
+    if (has_consecutive_commas(get_header_value_norm(HEAD_ACCEPT_ENCODING)))
+    {
+        add_infraction(INF_ACCEPT_ENCODING_CONSECUTIVE_COMMAS);
+        create_event(EVENT_ACCEPT_ENCODING_CONSECUTIVE_COMMAS);
+    }
+
 }
 
 void HttpMsgHeader::update_flow()
@@ -430,6 +450,8 @@ void HttpMsgHeader::prepare_body()
     const int64_t& depth = (source_id == SRC_CLIENT) ? params->request_depth :
         params->response_depth;
     session_data->detect_depth_remaining[source_id] = (depth != -1) ? depth : INT64_MAX;
+    params->js_norm_param.js_norm->set_detection_depth(session_data->detect_depth_remaining[source_id]);
+
     if ((source_id == SRC_CLIENT) and params->publish_request_body and session_data->for_http2)
     {
         session_data->publish_octets[source_id] = 0;
@@ -480,8 +502,16 @@ void HttpMsgHeader::setup_file_processing()
             if (boundary_present(content_type))
             {
                 Packet* p = DetectionEngine::get_current_packet();
-                session_data->mime_state[source_id] = new MimeSession(p, &FileService::decode_conf,
-                    &mime_conf, get_multi_file_processing_id(), true);
+                const Field& uri = request->get_uri_norm_classic();
+                if (uri.length() > 0)
+                    session_data->mime_state[source_id] = new MimeSession(p,
+                        &FileService::decode_conf, &mime_conf, get_multi_file_processing_id(),
+                        true, uri.start(), uri.length());
+                else
+                    session_data->mime_state[source_id] = new MimeSession(p,
+                        &FileService::decode_conf, &mime_conf, get_multi_file_processing_id(),
+                        true);
+
                 // Show file processing the Content-Type header as if it were regular data.
                 // This will enable it to find the boundary string.
                 // FIXIT-L develop a proper interface for passing the boundary string.
@@ -638,7 +668,8 @@ void HttpMsgHeader::setup_file_decompression()
     session_data->fd_state->Modes =
         (params->decompress_pdf ? FILE_PDF_DEFL_BIT : 0) |
         (params->decompress_swf ? (FILE_SWF_ZLIB_BIT | FILE_SWF_LZMA_BIT) : 0) |
-        (params->decompress_zip ? FILE_ZIP_DEFL_BIT : 0);
+        (params->decompress_zip ? FILE_ZIP_DEFL_BIT : 0) |
+        (params->decompress_vba ? FILE_VBA_EXTR_BIT : 0);
     session_data->fd_state->Alert_Callback = HttpMsgBody::fd_event_callback;
     session_data->fd_state->Alert_Context = &session_data->fd_alert_context;
     session_data->fd_state->Compr_Depth = 0;
@@ -681,8 +712,6 @@ void HttpMsgHeader::print_section(FILE* output)
         HttpApi::classic_buffer_names[HTTP_BUFFER_RAW_COOKIE-1]);
     get_classic_buffer(HTTP_BUFFER_RAW_HEADER, 0, 0).print(output,
         HttpApi::classic_buffer_names[HTTP_BUFFER_RAW_HEADER-1]);
-    get_classic_buffer(HTTP_BUFFER_RAW_HEADER_COMPLETE, 0, 0).print(output,
-        HttpApi::classic_buffer_names[HTTP_BUFFER_RAW_HEADER_COMPLETE-1]);
     HttpMsgSection::print_section_wrapup(output);
 }
 #endif

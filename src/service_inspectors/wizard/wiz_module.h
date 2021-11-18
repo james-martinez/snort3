@@ -58,6 +58,9 @@ public:
     MagicBook* get_book(bool c2s, bool hex);
     CurseBook* get_curse_book();
 
+    uint16_t get_max_search_depth()
+    { return max_search_depth; }
+
     Usage get_usage() const override
     { return INSPECT; }
 
@@ -73,13 +76,14 @@ private:
     std::vector<std::string> s2c_patterns;
     bool c2s;
 
-    MagicBook* c2s_hexes;
-    MagicBook* s2c_hexes;
+    MagicBook* c2s_hexes = nullptr;
+    MagicBook* s2c_hexes = nullptr;
 
-    MagicBook* c2s_spells;
-    MagicBook* s2c_spells;
+    MagicBook* c2s_spells = nullptr;
+    MagicBook* s2c_spells = nullptr;
 
-    CurseBook* curses;
+    CurseBook* curses = nullptr;
+    uint16_t max_search_depth = 0;
 };
 
 #endif

@@ -408,6 +408,10 @@ void SnortConfig::merge(const SnortConfig* cmd_line_conf)
     if (cmd_line_conf->dirty_pig)
         dirty_pig = cmd_line_conf->dirty_pig;
 
+    // --dump-rule-databases
+    if (!cmd_line_conf->rule_db_dir.empty())
+        rule_db_dir = cmd_line_conf->rule_db_dir;
+
     // --id-offset
     id_offset = cmd_line_conf->id_offset;
     // --id-subdir
@@ -647,6 +651,12 @@ void SnortConfig::set_obfuscation_mask(const char* mask)
     obfuscation_net.set(mask);
 }
 
+void SnortConfig::set_rule_db_dir(const char* directory)
+{
+    assert(directory);
+    rule_db_dir = directory;
+}
+
 void SnortConfig::set_gid(const char* args)
 {
     struct group* gr;
@@ -759,6 +769,16 @@ void SnortConfig::set_overlay_trace_config(TraceConfig* tc)
 {
     delete overlay_trace_config;
     overlay_trace_config = tc;
+}
+
+bool SnortConfig::set_latency_enable()
+{
+    if (latency)
+    {
+        latency->packet_latency.force_enable = true;
+        return true;
+    }
+    return false;
 }
 
 void SnortConfig::set_tunnel_verdicts(const char* args)

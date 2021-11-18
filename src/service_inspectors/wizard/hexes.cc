@@ -162,15 +162,3 @@ const MagicPage* HexBook::find_spell(
     }
     return p;
 }
-
-const char* HexBook::find_spell(
-    const uint8_t* data, unsigned len, const MagicPage*& p) const
-{
-    p = find_spell(data, len, p, 0);
-
-    if ( p and !p->value.empty() )
-        return p->value.c_str();
-
-    return nullptr;
-}
-

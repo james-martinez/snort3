@@ -51,6 +51,7 @@
 #include "file_service.h"
 #include "file_segment.h"
 #include "file_stats.h"
+#include "file_module.h"
 
 using namespace snort;
 
@@ -109,13 +110,14 @@ void FileInfo::copy(const FileInfo& other)
     file_id = other.file_id;
     file_name = other.file_name;
     file_name_set = other.file_name_set;
+    url = other.url;
+    url_set = other.url_set;
     verdict = other.verdict;
     file_type_enabled = other.file_type_enabled;
     file_signature_enabled = other.file_signature_enabled;
     file_capture_enabled = other.file_capture_enabled;
     file_state = other.file_state;
     pending_expire_time = other.pending_expire_time;
-    processing_flow = other.processing_flow;
     // only one copy of file capture
     file_capture = nullptr;
 }
@@ -147,9 +149,24 @@ void FileInfo::set_file_name(const char* name, uint32_t name_size)
     file_name_set = true;
 }
 
+void FileInfo::set_url(const char* url_name, uint32_t url_size)
+{
+    if (url_name and url_size)
+    {
+        url.assign(url_name, url_size);
+    }
+
+    url_set = true;
+}
+
 std::string& FileInfo::get_file_name()
 {
     return file_name;
+}
+
+std::string& FileInfo::get_url()
+{
+    return url;
 }
 
 void FileInfo::set_file_size(uint64_t size)
@@ -242,6 +259,16 @@ bool FileInfo::is_file_capture_enabled()
     return file_capture_enabled;
 }
 
+void FileInfo::set_policy_id(uint32_t id)
+{
+    policy_id = id;
+}
+
+uint32_t FileInfo::get_policy_id()
+{
+    return policy_id;
+}
+
 FileCaptureState FileInfo::reserve_file(FileCapture*& dest)
 {
     if (!file_capture)
@@ -316,7 +343,7 @@ void FileContext::log_file_event(Flow* flow, FilePolicyBase* policy)
         }
 
         if (policy and log_needed)
-            policy->log_file_action(processing_flow, this, FILE_ACTION_DEFAULT);
+            policy->log_file_action(flow, this, FILE_ACTION_DEFAULT);
 
         if ( config->trace_type )
             print(std::cout);
@@ -345,6 +372,8 @@ void FileContext::finish_signature_lookup(Packet* p, bool final_lookup, FilePoli
     if (get_file_sig_sha256())
     {
         verdict = policy->signature_lookup(p, this);
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, 
+            p, "finish signature lookup verdict %d\n", verdict);
         if ( verdict != FILE_VERDICT_UNKNOWN || final_lookup )
         {
             FileCache* file_cache = FileService::get_file_cache();
@@ -414,6 +443,8 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
     {
         update_file_size(data_size, position);
         processing_complete = true;
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
+            p, "File: Type and Sig not enabled\n");
         if (PacketTracer::is_active())
             PacketTracer::log("File: Type and Sig not enabled\n");
         return false;
@@ -422,6 +453,8 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
     if (cacheable and (FileService::get_file_cache()->cached_verdict_lookup(p, this, policy) !=
         FILE_VERDICT_UNKNOWN))
     {
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL,
+            p, "file process completed in file context process\n");
         processing_complete = true;
         return true;
     }
@@ -439,6 +472,8 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
             update_file_size(data_size, position);
             processing_complete = true;
             stop_file_capture();
+            FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, p,
+                "File: Type unknown\n");
             if (PacketTracer::is_active())
                 PacketTracer::log("File: Type unknown\n");
             return false;
@@ -446,13 +481,19 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
 
         if (get_file_type() != SNORT_FILE_TYPE_CONTINUE)
         {
+            FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, p,
+                "File: Type-%s found\n", file_type_name(get_file_type()).c_str());
             if (PacketTracer::is_active())
                 PacketTracer::log("File: Type-%s found\n",
                     file_type_name(get_file_type()).c_str());
             config_file_type(false);
 
             if (PacketTracer::is_active() and (!(is_file_signature_enabled())))
+            {
+                FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, p,
+                   "File: signature config is disabled\n");
                 PacketTracer::log("File: signature config is disabled\n");
+            }
 
             file_stats->files_processed[get_file_type()][get_file_direction()]++;
             //Check file type based on file policy
@@ -468,6 +509,8 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
                 if ( PacketTracer::is_active() and ( v == FILE_VERDICT_BLOCK
                         or v == FILE_VERDICT_REJECT ))
                 {
+                    FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, p,
+                       "File: file type verdict %s\n", v == FILE_VERDICT_BLOCK ? "block" : "reject");
                     PacketTracer::log("File: file type verdict %s\n",
                         v == FILE_VERDICT_BLOCK ? "block" : "reject");
                 }
@@ -480,6 +523,8 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
     /* file signature calculation */
     if (is_file_signature_enabled())
     {
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p, 
+            "file signature is enabled\n");
         if (!sha256)
             process_file_signature_sha256(file_data, data_size, position);
 
@@ -512,6 +557,8 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
             }
             else
             {
+                FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, p,
+                    "File: Sig depth exceeded\n");
                 if (PacketTracer::is_active())
                     PacketTracer::log("File: Sig depth exceeded\n");
                 return false;
@@ -572,10 +619,14 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
 {
     if ((int64_t)processed_bytes + data_size > config->file_signature_depth)
     {
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, GET_CURRENT_PACKET, 
+            "process_file_signature_sha256:FILE_SIG_DEPTH_FAIL\n");
         file_state.sig_state = FILE_SIG_DEPTH_FAIL;
         return;
     }
 
+    FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+        "processing file signature position: %d sig state %d \n", position, file_state.sig_state);
     switch (position)
     {
     case SNORT_FILE_START:
@@ -583,6 +634,8 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
             file_signature_context = snort_calloc(sizeof(SHA256_CTX));
         SHA256_Init((SHA256_CTX*)file_signature_context);
         SHA256_Update((SHA256_CTX*)file_signature_context, file_data, data_size);
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+            "position is start of file\n");
         if (file_state.sig_state == FILE_SIG_FLUSH)
         {
             static uint8_t file_signature_context_backup[sizeof(SHA256_CTX)];
@@ -598,6 +651,8 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
         if (!file_signature_context)
             return;
         SHA256_Update((SHA256_CTX*)file_signature_context, file_data, data_size);
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+            "position is middle of the file\n");
         if (file_state.sig_state == FILE_SIG_FLUSH)
         {
             static uint8_t file_signature_context_backup[sizeof(SHA256_CTX)];
@@ -618,6 +673,8 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
         sha256 = new uint8_t[SHA256_HASH_SIZE];
         SHA256_Final(sha256, (SHA256_CTX*)file_signature_context);
         file_state.sig_state = FILE_SIG_DONE;
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+            "position is end of the file\n");
         break;
 
     case SNORT_FILE_FULL:
@@ -628,6 +685,8 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
         sha256 = new uint8_t[SHA256_HASH_SIZE];
         SHA256_Final(sha256, (SHA256_CTX*)file_signature_context);
         file_state.sig_state = FILE_SIG_DONE;
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+            "position is full file\n");
         break;
 
     default:
@@ -667,6 +726,11 @@ void FileContext::stop_file_capture()
 void FileContext::update_file_size(int data_size, FilePosition position)
 {
     processed_bytes += data_size;
+
+    FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, 
+        GET_CURRENT_PACKET, 
+        "Updating file size of file_id %lu at position %d with processed_bytes %lu\n", 
+        file_id, position, processed_bytes);
     if ((position == SNORT_FILE_END)or (position == SNORT_FILE_FULL))
     {
         file_size = processed_bytes;
@@ -803,6 +867,8 @@ void FileContext::print_file_name(std::ostream& log)
 void FileContext::print(std::ostream& log)
 {
     print_file_name(log);
+    if (url.length() > 0)
+        log << "File URI: "<< url << std::endl;
     log << "File type: " << config->file_type_name(file_type_id)
         << '('<< file_type_id  << ')' << std::endl;
     log << "File size: " << file_size << std::endl;

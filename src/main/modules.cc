@@ -30,6 +30,7 @@
 #include "detection/detection_module.h"
 #include "detection/fp_config.h"
 #include "detection/rules.h"
+#include "detection/tag.h"
 #include "filters/detection_filter.h"
 #include "filters/rate_filter.h"
 #include "filters/sfrf.h"
@@ -181,6 +182,9 @@ static const Parameter search_engine_params[] =
     { "offload_search_method", Parameter::PT_DYNAMIC, (void*)&get_search_methods, nullptr,
       "set fast pattern offload algorithm - choose available search engine" },
 
+    { "rule_db_dir", Parameter::PT_STRING, nullptr, nullptr,
+      "deserialize rule databases from given directory" },
+
     { "search_optimize", Parameter::PT_BOOL, nullptr, "true",
       "tweak state machine construction for better performance" },
 
@@ -283,6 +287,9 @@ bool SearchEngineModule::set(const char*, Value& v, SnortConfig* sc)
 
     else if ( v.is("detect_raw_tcp") )
         fp->set_stream_insert(v.get_bool());
+
+    else if ( v.is("rule_db_dir") )
+        fp->set_rule_db_dir(v.get_string());
 
     else if ( v.is("search_method") )
     {
@@ -749,6 +756,12 @@ static const Parameter output_params[] =
 #define output_help \
     "configure general output parameters"
 
+static const RuleMap output_rules[] =
+{
+    { TAG_LOG_PKT, "tagged packet" },
+    { 0, nullptr }
+};
+
 class OutputModule : public Module
 {
 public:
@@ -757,6 +770,12 @@ public:
 
     Usage get_usage() const override
     { return GLOBAL; }
+
+    unsigned get_gid() const override
+    { return GID_TAG; }
+
+    const RuleMap* get_rules() const override
+    { return output_rules; }
 };
 
 bool OutputModule::set(const char*, Value& v, SnortConfig* sc)
@@ -1207,8 +1226,25 @@ static const Parameter variable_params[] =
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
+static const Parameter action_map_params[] =
+{
+    { "replace" , Parameter::PT_STRING, nullptr, nullptr,
+      "action you want to change" },
+
+    { "with" , Parameter::PT_STRING, nullptr, nullptr,
+      "action you want to use instead" },
+
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
 static const Parameter ips_params[] =
 {
+    { "action_map", Parameter::PT_LIST, action_map_params, nullptr,
+      "change actions like block to alert (applied after action_override)" },
+
+    { "action_override", Parameter::PT_STRING, nullptr, nullptr,
+      "use this action for all rules (applied before action_map)" },
+
     { "default_rule_state", Parameter::PT_ENUM, "no | yes | inherit", "inherit",
       "enable or disable ips rules" },
 
@@ -1256,10 +1292,15 @@ class IpsModule : public Module
 public:
     IpsModule() : Module("ips", ips_help, ips_params) { }
     bool set(const char*, Value&, SnortConfig*) override;
+    bool end(const char*, int, SnortConfig*) override;
     bool matches(const char*, std::string&) override;
 
     Usage get_usage() const override
     { return DETECT; }
+
+private:
+    std::string replace;
+    std::string with;
 };
 
 bool IpsModule::matches(const char*, std::string&)
@@ -1269,7 +1310,10 @@ bool IpsModule::set(const char* fqn, Value& v, SnortConfig* sc)
 {
     IpsPolicy* p = get_ips_policy();
 
-    if ( v.is("default_rule_state") )
+    if ( v.is("action_override") )
+        p->action_override = v.get_string();
+
+    else if ( v.is("default_rule_state") )
         p->default_rule_state = (IpsPolicy::Enable)v.get_uint8();
 
     else if ( v.is("enable_builtin_rules") )
@@ -1292,6 +1336,9 @@ bool IpsModule::set(const char* fqn, Value& v, SnortConfig* sc)
 
     else if ( v.is("obfuscate_pii") )
         p->obfuscate_pii = v.get_bool();
+
+    else if ( v.is("replace") )
+        replace = v.get_string();
 
     else if ( v.is("rules") )
         p->rules += v.get_string();
@@ -1320,9 +1367,31 @@ bool IpsModule::set(const char* fqn, Value& v, SnortConfig* sc)
     else if ( strstr(fqn, "variables.ports.") )
         ParsePortVar(get_var_name(fqn), v.get_string());
 
+    else if ( v.is("with") )
+        with = v.get_string();
+
     else
         return false;
 
+    return true;
+}
+
+bool IpsModule::end(const char* fqn, int idx, SnortConfig*)
+{
+    if ( idx and !strcmp(fqn, "ips.action_map") )
+    {
+        if ( replace.empty() or with.empty() )
+        {
+            ParseError("%s - must set both replace and with", fqn);
+            return false;
+        }
+
+        IpsPolicy* p = get_ips_policy();
+        p->action_map[replace] = with;
+
+        replace.clear();
+        with.clear();
+    }
     return true;
 }
 

@@ -56,8 +56,7 @@ class SFDAQInstance;
 #define PKT_PDU_TAIL         0x00000200  /* end of PDU */
 #define PKT_DETECT_LIMIT     0x00000400  /* alt_dsize is valid */
 
-#define PKT_ALLOW_MULTIPLE_DETECT 0x00000800  /* packet has either pipelined mime attachments
-                                                 or pipeline http requests */
+#define PKT_ALLOW_MULTIPLE_DETECT 0x00000800  /* packet has multiple PDUs */
 #define PKT_PAYLOAD_OBFUSCATE     0x00001000
 
 #define PKT_STATELESS        0x00002000  /* Packet has matched a stateless rule */
@@ -302,6 +301,9 @@ struct SO_PUBLIC Packet
 
     bool is_rebuilt() const
     { return (packet_flags & (PKT_REBUILT_STREAM|PKT_REBUILT_FRAG)) != 0; }
+
+    bool is_defrag() const
+    { return (packet_flags & PKT_REBUILT_FRAG) != 0; }
 
     bool is_retry() const
     { return (packet_flags & PKT_RETRY) != 0; }

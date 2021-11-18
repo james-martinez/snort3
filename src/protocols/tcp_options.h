@@ -109,20 +109,14 @@ struct TcpOption
 
     inline const TcpOption& next() const
     {
-#ifdef __GNUC__
-        const uint8_t tmp_len = ((uint8_t)code <= 1) ? 1 : len;
-        const uint8_t* const tmp = reinterpret_cast<const uint8_t*>(this);
-        const TcpOption* opt = reinterpret_cast<const TcpOption*>(&tmp[tmp_len]);
-        return *opt;
-
-#else
         if ( (uint8_t)code <= 1 )
             return reinterpret_cast<const TcpOption&>(len);
         else
             return reinterpret_cast<const TcpOption&>(data[len -2]);
-#endif
     }
 };
+
+class TcpOptIterator;
 
 /*
  * Use TcpOptIterator ... this should NOT be called directly
@@ -131,7 +125,7 @@ struct TcpOption
 class SO_PUBLIC TcpOptIteratorIter
 {
 public:
-    TcpOptIteratorIter(const TcpOption*);
+    TcpOptIteratorIter(const TcpOption*, const TcpOptIterator*);
 
     bool operator==(const TcpOptIteratorIter& rhs)
     { return opt == rhs.opt; }
@@ -139,16 +133,12 @@ public:
     bool operator!=(const TcpOptIteratorIter& rhs)
     { return opt != rhs.opt; }
 
-    TcpOptIteratorIter& operator++()
-    {
-        opt = &opt->next();
-        return *this;
-    }
-
+    const TcpOptIteratorIter& operator++();
     const TcpOption& operator*() const;
 
 private:
     const TcpOption* opt;
+    const TcpOptIterator* iter;
 };
 
 /*

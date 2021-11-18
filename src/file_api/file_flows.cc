@@ -35,6 +35,7 @@
 #include "managers/inspector_manager.h"
 #include "packet_tracer/packet_tracer.h"
 #include "protocols/packet.h"
+#include "main/snort_debug.h"
 
 #include "file_cache.h"
 #include "file_config.h"
@@ -74,30 +75,44 @@ static void populate_trace_data(FileContext* context)
     context->print_file_name(ss);
     std::string file_name = ss.str();
 
-    PacketTracer::daq_log("file+%" PRId64"++File Type[%s]/File ID[%lu] with name[%s] and size[%lu] detected."
-                "File SHA is [%s], with verdict[%s]$",
+    PacketTracer::daq_log("file+%" PRId64"+Matched policy id %u, identification %s, signature %s, capture %s+"
+                "File with ID %lu, name %s, type %s, size %lu, SHA %s detected. Verdict %s.$",
                 TO_NSECS(pt_timer->get()),
-                file_type_name(context->get_file_type()).c_str(),
+                context->get_policy_id(),
+                ((context->is_file_type_enabled() || context->get_file_type() || context->get_file_sig_sha256()) ? "<on>" : "<off>"),
+                ((context->is_file_signature_enabled() || context->get_file_sig_sha256()) ? "<on>" : "<off>"),
+                (context->is_file_capture_enabled() ? "<on>" : "<off>"),
                 context->get_file_id(),
-                file_name.c_str(),
+                (file_name.empty() ? "<empty>" : file_name.c_str()),
+                file_type_name(context->get_file_type()).c_str(),
                 context->get_file_size(),
-                (context->get_file_sig_sha256() ? context->sha_to_string(context->get_file_sig_sha256()).c_str(): "null"),
+                (context->get_file_sig_sha256() ? context->sha_to_string(context->get_file_sig_sha256()).c_str(): "<empty>"),
                 VerdictName[context->verdict].c_str());
 }
 
 void FileFlows::handle_retransmit(Packet* p)
 {
+    FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p ,
+       "handle_retransmit:queried for verdict\n");
     if (file_policy == nullptr)
         return;
 
     FileContext* file = get_file_context(pending_file_id, false);
     if ((file == nullptr) or (file->verdict != FILE_VERDICT_PENDING))
+    {
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, p,
+            "handle_retransmit:context is null or verdict not pending, returning\n");
         return;
+    }
 
     FileVerdict verdict = file_policy->signature_lookup(p, file);
     FileCache* file_cache = FileService::get_file_cache();
     if (file_cache)
+    {
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p,
+            "handle_retransmit:applying file cache verdict %d\n", verdict);
         file_cache->apply_verdict(p, file, verdict, false, file_policy);
+    }
     file->log_file_event(flow, file_policy);
 }
 
@@ -135,7 +150,7 @@ FilePolicyBase* FileFlows::get_file_policy(Flow* flow)
 void FileFlows::set_current_file_context(FileContext* ctx)
 {
     // If we finished processing a file context object last time, delete it
-    if (current_context_delete_pending)
+    if (current_context_delete_pending and (current_context != ctx))
     {
         delete current_context;
         current_context_delete_pending = false;
@@ -187,7 +202,6 @@ FileContext* FileFlows::find_main_file_context(FilePosition pos, FileDirection d
     }
 
     context = new FileContext;
-    context->set_processing_flow(flow);
     main_context = context;
     context->check_policy(flow, dir, file_policy);
 
@@ -225,6 +239,8 @@ FileContext* FileFlows::get_file_context(
         FileCache* file_cache = FileService::get_file_cache();
         assert(file_cache);
         context = file_cache->get_file(flow, file_id, false);
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
+            "get_file_context:trying to get context from cache\n");
     }
 
     // If we haven't found the context, create it and store it on the file flows object
@@ -234,15 +250,17 @@ FileContext* FileFlows::get_file_context(
         FileConfig* fc = get_file_config(SnortConfig::get_conf());
         if (partially_processed_contexts.size() == fc->max_files_per_flow)
         {
+            FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, GET_CURRENT_PACKET,
+               "max file per flow limit reached %lu\n", partially_processed_contexts.size());
             file_counts.files_over_flow_limit_not_processed++;
             events.create_event(EVENT_FILE_DROPPED_OVER_LIMIT);
         }
         else
         {
             context = new FileContext;
-            context->set_processing_flow(flow);
-
             partially_processed_contexts[multi_file_processing_id] = context;
+            FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
+                "get_file_context:creating new context\n"); 
             if (partially_processed_contexts.size() > file_counts.max_concurrent_files_per_flow)
                 file_counts.max_concurrent_files_per_flow = partially_processed_contexts.size();
         }
@@ -296,13 +314,19 @@ bool FileFlows::file_process(Packet* p, uint64_t file_id, const uint8_t* file_da
 
     if ((file_depth < 0) or (offset > (uint64_t)file_depth))
     {
+        FILE_DEBUG(file_trace , DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, p,
+             "file depth less than zero or offset is more than file depth , returning\n"); 
         return false;
     }
 
     FileContext* context = get_file_context(file_id, true, multi_file_processing_id);
 
     if (!context)
+    {
+        FILE_DEBUG(file_trace , DEFAULT_TRACE_OPTION_ID, TRACE_CRITICAL_LEVEL, p,
+            "file_process:context missing, returning \n");
         return false;
+    }
 
     if (PacketTracer::is_daq_activated())
         PacketTracer::pt_timer_start();
@@ -340,6 +364,8 @@ bool FileFlows::file_process(Packet* p, uint64_t file_id, const uint8_t* file_da
         if ((context->get_file_sig_sha256()) || !context->is_file_signature_enabled())
         {
             /* Just check file type and signature */
+            FILE_DEBUG(file_trace , DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p,
+               "calling context processing for position full\n");
             continue_processing = context->process(p, file_data, data_size, SNORT_FILE_FULL,
                     file_policy);
             if (context->processing_complete)
@@ -350,6 +376,9 @@ bool FileFlows::file_process(Packet* p, uint64_t file_id, const uint8_t* file_da
         }
     }
 
+    FILE_DEBUG(file_trace , DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p, 
+       "calling context process data_size %d, offset %lu, position %d\n",
+        data_size, offset, position);
     continue_processing = context->process(p, file_data, data_size, offset, file_policy, position);
     if (context->processing_complete)
         remove_processed_file_context(multi_file_processing_id);
@@ -370,10 +399,18 @@ bool FileFlows::file_process(Packet* p, const uint8_t* file_data, int data_size,
     FileDirection direction = upload ? FILE_UPLOAD : FILE_DOWNLOAD;
     /* if both disabled, return immediately*/
     if (!FileService::is_file_service_enabled())
+    {
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, p,
+           "file_process:file service not enabled, returning\n");
         return false;
+    }
 
     if (position == SNORT_FILE_POSITION_UNKNOWN)
+    {
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, p,
+           "file_process:position of file is unknown, returning\n");
         return false;
+    }
 
     if (PacketTracer::is_daq_activated())
         PacketTracer::pt_timer_start();
@@ -395,7 +432,7 @@ bool FileFlows::file_process(Packet* p, const uint8_t* file_data, int data_size,
  *    false: ignore this file
  */
 bool FileFlows::set_file_name(const uint8_t* fname, uint32_t name_size, uint64_t file_id,
-    uint64_t multi_file_processing_id)
+    uint64_t multi_file_processing_id, const uint8_t* url, uint32_t url_size)
 {
     FileContext* context;
     if (file_id)
@@ -404,6 +441,9 @@ bool FileFlows::set_file_name(const uint8_t* fname, uint32_t name_size, uint64_t
         context = get_current_file_context();
     if ( !context )
         return false;
+
+    if ( !context->is_url_set() )
+        context->set_url((const char*)url, url_size);
 
     if ( !context->is_file_name_set() )
     {

@@ -110,6 +110,9 @@ struct TcpStats
     PegCount partial_flush_bytes;
     PegCount inspector_fallbacks;
     PegCount partial_fallbacks;
+    PegCount max_segs;
+    PegCount max_bytes;
+    PegCount zero_len_tcp_opt;
 };
 
 extern THREAD_LOCAL struct TcpStats tcpStats;

@@ -70,7 +70,6 @@ const uint8_t* service_strstr(const uint8_t* haystack, unsigned haystack_len,
 enum APPID_DISCOVERY_STATE
 {
     APPID_DISCO_STATE_NONE = 0,
-    APPID_DISCO_STATE_DIRECT,
     APPID_DISCO_STATE_STATEFUL,
     APPID_DISCO_STATE_FINISHED
 };
@@ -236,7 +235,8 @@ public:
     static AppIdSession* allocate_session(const snort::Packet*, IpProtocol,
         AppidSessionDirection, AppIdInspector&, OdpContext&);
     static AppIdSession* create_future_session(const snort::Packet*, const snort::SfIp*, uint16_t,
-        const snort::SfIp*, uint16_t, IpProtocol, SnortProtocolId, bool swap_app_direction=false);
+        const snort::SfIp*, uint16_t, IpProtocol, SnortProtocolId, bool swap_app_direction=false,
+        bool bidirectional=false);
     void initialize_future_session(AppIdSession&, uint64_t);
 
     size_t size_of() override
@@ -513,6 +513,16 @@ public:
     void set_client_user(AppId id, const char* username, AppidChangeBits& change_bits)
     {
         api.client.update_user(id, username, change_bits);
+    }
+
+    void set_efp_client_app_id(AppId id)
+    {
+        api.client.set_efp_client_app_id(id);
+    }
+
+    AppId get_efp_client_app_id() const
+    {
+        return api.client.get_efp_client_app_id();
     }
 
     AppId get_payload_id() const

@@ -39,7 +39,8 @@ uint64_t Smb2Mid(const Smb2Hdr* hdr)
 Dce2Smb2FileTracker* Dce2Smb2TreeTracker::open_file(const uint64_t file_id,
     const uint32_t current_flow_key)
 {
-    Dce2Smb2FileTracker* ftracker = new Dce2Smb2FileTracker(file_id, current_flow_key, this);
+    Dce2Smb2FileTracker* ftracker = new Dce2Smb2FileTracker(file_id, current_flow_key, this,
+        this->get_parent()->get_session_id());
     tree_tracker_mutex.lock();
     opened_files.insert(std::make_pair(file_id, ftracker));
     tree_tracker_mutex.unlock();
@@ -526,9 +527,9 @@ void Dce2Smb2TreeTracker::process(uint16_t command, uint8_t command_type,
         remove_request(message_id, current_flow_key);
 }
 
-Dce2Smb2TreeTracker::~Dce2Smb2TreeTracker(void)
+Dce2Smb2TreeTracker::~Dce2Smb2TreeTracker()
 {
-    if (smb_module_is_up)
+    if (smb_module_is_up and (is_packet_thread()))
     {
 	    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
 	        GET_CURRENT_PACKET, "tree tracker %" PRIu32 " terminating\n", tree_id);
@@ -545,14 +546,14 @@ Dce2Smb2TreeTracker::~Dce2Smb2TreeTracker(void)
 
     if (active_requests.size())
     {
-        if (smb_module_is_up)
+        if (smb_module_is_up and (is_packet_thread()))
         {
             SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
 	            GET_CURRENT_PACKET, "cleanup pending requests for below MIDs:\n");
         }
         for (auto it_request : active_requests)
         {
-            if (smb_module_is_up)
+            if (smb_module_is_up and (is_packet_thread()))
             {
 		        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
 		            GET_CURRENT_PACKET, "mid %" PRIu64 "\n", it_request.first.mid);
@@ -562,7 +563,10 @@ Dce2Smb2TreeTracker::~Dce2Smb2TreeTracker(void)
     }
 
     for (auto it_file : opened_files)
+    {
         delete it_file.second;
+        parent_session->decrease_size(sizeof(Dce2Smb2FileTracker));
+    }
 
     tree_tracker_mutex.unlock();
 

@@ -1,3 +1,211 @@
+2021/11/17 - 3.1.17.0
+
+appid: restore the log of reload detectors complete message
+build: remove HAVE_HYPERSCAN conditional from installed header
+detection: add allow_missing_so_rules
+detection: ensure PDUs indicate parent when available
+dnp3: update builtin rule description
+doc: arp_spoof builtins
+doc: back orifice builtin rules
+doc: spell correction
+doc: update builtin alerts description for dnp3
+doc: update builtin alerts description for modbus, HTTP/2
+doc: update builtin alerts description for portscan
+doc: update builtin rule documentation for http_inspect
+doc: update builtin rules documentation for dce_smb, dce_tcp, dce_udp, rpc_decode
+doc: updated builtin rules documentation for ssh.
+http2_inspect: hardening
+http2_inspect: http1_header buffer always created immediately after decode_headers
+http2_inspect: push promise error state check
+http2_inspect: truncated trailers without frame data
+ips_option: Enabling trace for vba_data options and fixing memory leak while extracting vba_data
+main: use dynamic buffer on demand in trace print functions
+u2spewfoo: Fixed incorrect usage line.
+
+2021/11/03 - 3.1.16.0
+
+appid: during initialization, skip loading of Lua detectors that don't have validate function
+appid: in packet threads, skip loading of detectors that don't have validate function on reload
+appid: provide API to give client_app_detection_type
+codec: geneve - ensure injected packets have geneve port in outer udp header
+detection: refactor mpse serialization
+detection: rename PortGroup to the more apt RuleGroup (and related)
+detection: replace PortGroup::alloc/free with ctor/dtor
+doc: add SIP built-in rule documentation
+doc: update built-in rule doc for SMTP, IMAP and POP inspectors
+doc: update built-in rules documentation for dns module
+doc: update built-in rules documentation for ftp-telnet
+doc: updated builtin rules documentation for gtp module
+flow: fix warning in flow_cache.cc
+flow: use the same pkt_type to link and unlink unidirectional flows
+http2_inspect: refactor decoded_headers_buffer for hpack decoding
+http_inspect: eliminate cumulative js data processing
+http_inspect: handle unordered PDUs for inline/external JavaScript normalization
+http_inspect: improve file decompression
+hyperscan: sort patterns for dump / load stability
+ips: correct fast pattern port group counts
+mpse: add md5 check to deserialization
+reload: add logs to track reload process
+reload: move out reload progress flag to reload tracker
+search_engine: support hyperscan serialization
+search_engine: support port group serialization
+sip: track memory for sip sessions
+ssl: disable inspection on alert only at fatal level
+stream_tcp: fix init_wscale() to take into account the DECODE_TCP_WS flag
+tcp: remove the obsolete __GNUC__ block from TcpOption::next()
+tcp: stop on the EOL option in TcpOptIteratorIter::operator++()
+utils: add get methods to peek in internal buffer
+utils: correct Normalizer's output upon the next scan
+wizard: update globbing and max_pattern
+
+2021/10/21 - 3.1.15.0
+
+appid: detect client based on longest matching user agent pattern
+appid: update the name of the lua API function that adds process name to client app mappings
+build: fix in CodeCoverage.cmake to generate *.gcda *.o files as needed by gcov
+dce_smb: optimize handling pruning of flows in stress environment
+decompress, http_inspect: add support for processing ole files and for vba_data ips option
+doc: add punctuation to builtin stubs, fix formatting
+doc: builtin rule documentation updates
+http2_inspect: partial header with priority flag set
+http_inspect: add automatic semicolon insertion
+http_inspect: document built-in alerts
+http_inspect: do not normalize JavaScript built-in identifiers
+http_inspect: hardening
+http_inspect: implement JIT (just-in-time) for JavaScript normalization
+http_inspect, ips_option: decouple the vba_data ips option from http_inspect and add the trace debug option to vba_data
+policy: update policy clone code to avoid corrupting active configuration
+protocols: prevent infinite loop over tcp options
+rna: call set_smb_fp_processor function in reload tuner
+rna: do not do service discovery for future flows
+
+2021/10/07 - 3.1.14.0
+
+appid: enhance RPC service detector to handle RPC Bind version 3
+appid: fix update_allocations signature in unit test
+appid: log appid daq trace first followed by subscriber modules
+appid: provide api for Lua detectors to map process name to client app
+doc: add descriptions for 119:265-271 builtin alerts
+doc: update builtin stub rule reference strings
+file: add file policy id and other config data as part of packet tracer command under File phase
+file_api: add decompress_buffer_size
+flow: add total flow latency to flowstats
+http2_inspect: compare scanned bytes to total received during reassemble
+http2_inspect: protect against reassemble with more than MAX_OCTETS
+http_inspect: change format of normalized JS identifiers
+ips_options: rename script_data buffer to js_data
+latency: add configuration for implicit enable
+lua: fix Talos tweak snaplen
+rna: support CPE new os RNA event
+snort_config: adding api for enabling latency module
+utils: add custom i/o stream buffers to JS normalizer
+utils: adjust output streambuffer expanding strategy and reserved memory
+utils: fix compilation error of js_identifier_ctx_test for clang
+
+2021/09/22 - 3.1.13.0
+
+appid: prioritize appid's client detection over third-party
+appid: stay in success state after RPC is detected.
+builtins: add --dump-builtin-options
+catch: enable benchmarking
+cip, iec104: update stub rule messages for consistent format
+control: explicitly include ctime header in control.h
+detection: add fast patterns only once per service group
+doc: add support for details on builtin rules in the reference
+doc: update reference for 2:1 and 129:13
+doc: update the documentation of "replace" option and "rewrite" action
+doc: update user tutorial with '--enable-benchmark-tests' option
+file_api: new api added for url
+file_api: revert store processing flow in context
+flow: don't do memcap pruning if pruning is in progress
+host_cache: Avoid data race in cache size access
+host_tracker: Removing unused methods
+http_inspect: http_raw_trailer fast pattern
+http_inspect: pass file_api the uri with the filename and extract the filename from the uri path
+http_inspect: remove memrchr for portability
+netflow: use device ip and template id to ensure that the template cache keys are unique
+output: adopt the orphaned tag alert (2:1)
+rna: Avoid data races in vlan and mac address
+rna: Avoid infinite loop in ICMPv6 options
+smb: added a null check when current_flow is not present
+snort2lua: Fixed version output (issue #213). Thanks to A-Pisani for the fix.
+stream: change session_timeout default for tcp, ip, icmp and user
+stream: fix session timeout of expired flows
+trough: Avoid data race in file count
+utils: add benchmark tests for JSNormalizer
+utils: add reference and description for ClamAV test cases
+utils: avoid using pubsetbuf which is STL implementation dependent
+utils: fix typo in js_normalizer_test
+
+2021/09/08 - 3.1.12.0
+
+decoder: icmp6 - use source and destination addresses from packet to compute icmp6 checksum when NAT is in effect
+http_inspect: enable traces for JS Normalizer
+http_inspect: include cookies in http_raw_header
+http_inspect: reduce void space in HttpFlowData
+stream_tcp: add pegs for maximum observed queue size
+stream_tcp: normalize data when queue limits are enabled
+stream_tcp: only update window on right edge acks
+stream_tcp: set sequence number in trimmed packets up to the queue limit and increase defaults
+
+2021/08/26 - 3.1.11.0
+
+build: update help for --enable-tsc-clock to include arm. Thanks to liangxwa01 for reporting the issue.
+codec: geneve: fix incorrect parsing of option header length
+data_bus: support ordered call of handlers
+dns, ssh: remove obsolete stream insert checks
+doc: Add js_norm_max_template_nesting description
+flow: introduce bidirectional flag for expected session.
+flow: set the client initiated flag before publishing the flow state setup event
+framework: update base API version to 8
+framework: version rollback
+http_inspect: add builtin rule for consecutive commas in accept-encoding header
+http_inspect: Add JavaScript template literals normalization
+http_inspect: check if Normalizer has consumed input
+http_inspect: hard-code infraction enum numbers
+http_inspect: http_raw_header, http_raw_trailer field support
+http_inspect: refactor NormalizedHeader
+http_inspect: support more infractions and events
+http_inspect: two new built-in rules
+inspection: process wizard matches on defragged packets
+ips: add action_map table to map rule types, eg block -> alert
+ips: add action_override which applies to all rules
+lua: update comments in the default config
+modbus: check record length for write file record command
+normalize: remove tcp.trim config
+payload_injector: check if stream is established on flow rather than the packet flag to handle retries
+policy: put inspection policy accessors in public space
+policy: reorganize for sanity
+README: mention vars in default config
+sip: deprecate max_requestName_len in favor of max_request_name_len
+smb: Invoke SMB debug in destructor when packet thread available
+stream_tcp: update API called by payload_injector to check for unflushed queued TCP segments
+style: remove crufty comments
+style: remove C style (void) arglists
+style: remove or update crufty preprocessor comments
+utils: address compiler warning
+utils: support streamed processing of JS text
+wizard: support more HTTP and SIP methods
+
+2021/08/11 - 3.1.10.0
+
+appid: update netbios-ss (SMB) detector to extract SMB domain from SMBv2, and more intelligently handle payload appid detection
+appid: use packet thread odp context while creating SIP session
+build: install DAQ modules and Snort plugins in separate folders
+dce_smb: restore file tracker size post deletion
+dns: add DNS splitter
+doc: update user manual for identifier normalization
+file_api: add infra and file debugs to existing debugging framework
+ftp: remove unused defines and crufty comments
+http_inspect: add JavaScript identifiers normalization
+http_inspect: change the default value of request_body_app_detection config parameter to true
+smtp: remove unused defines
+ssh: handle traffic with invalid version string
+ssh: handle version string packets that also contain key exchange data
+stream_tcp: skip unordered segments if last flushed position already moved past
+telnet: correct help for ayt_attack_thresh
+wizard: add wizard max_pattern option and update HTTP/SIP aware methods patterns
+
 2021/07/28 - 3.1.9.0
 
 actions: allow session data to stay accessible for loggers for reject rule action

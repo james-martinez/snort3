@@ -24,7 +24,9 @@
 #include "http_flow_data.h"
 
 #include "decompress/file_decomp.h"
+#include "main/snort_debug.h"
 #include "service_inspectors/http2_inspect/http2_flow_data.h"
+#include "utils/js_identifier_ctx.h"
 #include "utils/js_normalizer.h"
 
 #include "http_cutter.h"
@@ -91,10 +93,21 @@ HttpFlowData::~HttpFlowData()
         HttpModule::decrement_peg_counts(PEG_CONCURRENT_SESSIONS);
 
 #ifndef UNIT_TEST_BUILD
+    if (js_ident_ctx)
+    {
+        update_deallocations(js_ident_ctx->size());
+        delete js_ident_ctx;
+
+        debug_log(4, http_trace, TRACE_JS_PROC, nullptr,
+            "js_ident_ctx deleted\n");
+    }
     if (js_normalizer)
     {
         update_deallocations(JSNormalizer::size());
         delete js_normalizer;
+
+        debug_log(4, http_trace, TRACE_JS_PROC, nullptr,
+            "js_normalizer deleted\n");
     }
 #endif
 
@@ -107,8 +120,6 @@ HttpFlowData::~HttpFlowData()
         update_deallocations(partial_buffer_length[k]);
         delete[] partial_detect_buffer[k];
         update_deallocations(partial_detect_length[k]);
-        delete[] js_detect_buffer[k];
-        update_deallocations(js_detect_length[k]);
         HttpTransaction::delete_transaction(transaction[k], nullptr);
         delete cutter[k];
         if (compress_stream[k] != nullptr)
@@ -231,28 +242,75 @@ void HttpFlowData::garbage_collect()
 }
 
 #ifndef UNIT_TEST_BUILD
-snort::JSNormalizer& HttpFlowData::acquire_js_ctx()
+void HttpFlowData::reset_js_pdu_idx()
+{
+    js_pdu_idx = pdu_idx = 0;
+    js_data_lost_once = false;
+}
+
+void HttpFlowData::reset_js_ident_ctx()
+{
+    if (js_ident_ctx)
+    {
+        js_ident_ctx->reset();
+        debug_log(4, http_trace, TRACE_JS_PROC, nullptr,
+            "js_ident_ctx reset\n");
+    }
+}
+
+snort::JSNormalizer& HttpFlowData::acquire_js_ctx(int32_t ident_depth, size_t norm_depth,
+    uint8_t max_template_nesting, uint32_t max_scope_depth,
+    const std::unordered_set<std::string>& built_in_ident)
 {
     if (js_normalizer)
         return *js_normalizer;
 
-    js_normalizer = new JSNormalizer();
+    if (!js_ident_ctx)
+    {
+        js_ident_ctx = new JSIdentifierCtx(ident_depth, built_in_ident);
+        update_allocations(js_ident_ctx->size());
+
+        debug_logf(4, http_trace, TRACE_JS_PROC, nullptr,
+            "js_ident_ctx created (ident_depth %d)\n", ident_depth);
+    }
+
+    js_normalizer = new JSNormalizer(*js_ident_ctx, norm_depth,
+        max_template_nesting, max_scope_depth);
     update_allocations(JSNormalizer::size());
+
+    debug_logf(4, http_trace, TRACE_JS_PROC, nullptr,
+        "js_normalizer created (norm_depth %zd, max_template_nesting %d)\n",
+        norm_depth, max_template_nesting);
 
     return *js_normalizer;
 }
 
+bool HttpFlowData::is_pdu_missed()
+{
+    bool pdu_missed = ((pdu_idx - js_pdu_idx) > 1);
+    js_pdu_idx = pdu_idx;
+    return pdu_missed;
+}
+
 void HttpFlowData::release_js_ctx()
 {
+    js_continue = false;
+
     if (!js_normalizer)
         return;
 
     update_deallocations(JSNormalizer::size());
     delete js_normalizer;
     js_normalizer = nullptr;
+
+    debug_log(4, http_trace, TRACE_JS_PROC, nullptr,
+        "js_normalizer deleted\n");
 }
 #else
-snort::JSNormalizer& HttpFlowData::acquire_js_ctx() { return *js_normalizer; }
+void HttpFlowData::reset_js_ident_ctx() {}
+snort::JSNormalizer& HttpFlowData::acquire_js_ctx(int32_t, size_t, uint8_t, uint32_t,
+    const std::unordered_set<std::string>&)
+{ return *js_normalizer; }
 void HttpFlowData::release_js_ctx() {}
 #endif
 

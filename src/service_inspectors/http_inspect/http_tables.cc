@@ -197,174 +197,71 @@ const StrCode HttpMsgHeadShared::transfer_encoding_list[] =
     { 0,                     nullptr }
 };
 
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_BASIC
-    { EVENT__NONE, INF__NONE, false, nullptr, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_HOST
-    { EVENT_MULTIPLE_HOST_HDRS, INF_MULTIPLE_HOST_HDRS, false, nullptr, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_CASE_INSENSITIVE
-    { EVENT__NONE, INF__NONE, false, norm_to_lower, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_NUMBER
-    { EVENT_REPEATED_HEADER, INF_REPEATED_HEADER, false, norm_remove_lws, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_TOKEN_LIST
-    { EVENT__NONE, INF__NONE, false, norm_remove_lws, norm_to_lower, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_METHOD_LIST
-    { EVENT__NONE, INF__NONE, false, norm_remove_lws, nullptr, nullptr };
-
-// FIXIT-L implement a date normalization function that converts the three legal formats into a
-// single standard format. For now we do nothing special for dates. This object is a placeholder
-// to keep track of which headers have date values.
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_DATE
-    { EVENT__NONE, INF__NONE, false, nullptr, nullptr, nullptr };
-
-// FIXIT-M implement a URI normalization function, probably by extending existing URI capabilities
-// to cover relative formats
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_URI
-    { EVENT__NONE, INF__NONE, false, nullptr, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_CONTENT_LENGTH
-    { EVENT_MULTIPLE_CONTLEN, INF_MULTIPLE_CONTLEN, true, norm_remove_lws, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_CHARSET
-    { EVENT__NONE, INF__NONE, false, norm_remove_quotes_lws, norm_to_lower, nullptr };
-
-const HeaderNormalizer* const HttpMsgHeadShared::header_norms[HEAD__MAX_VALUE + MAX_CUSTOM_HEADERS + 1] = {
-    &NORMALIZER_BASIC,      // 0
-    &NORMALIZER_BASIC,      // HEAD__OTHER
-    &NORMALIZER_TOKEN_LIST, // HEAD_CACHE_CONTROL
-    &NORMALIZER_TOKEN_LIST, // HEAD_CONNECTION
-    &NORMALIZER_DATE,       // HEAD_DATE
-    &NORMALIZER_TOKEN_LIST, // HEAD_PRAGMA
-    &NORMALIZER_TOKEN_LIST, // HEAD_TRAILER
-    &NORMALIZER_BASIC,      // HEAD_COOKIE
-    &NORMALIZER_BASIC,      // HEAD_SET_COOKIE
-    &NORMALIZER_TOKEN_LIST, // HEAD_TRANSFER_ENCODING
-    &NORMALIZER_TOKEN_LIST, // HEAD_UPGRADE
-    &NORMALIZER_BASIC,      // HEAD_VIA
-    &NORMALIZER_BASIC,      // HEAD_WARNING
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT_CHARSET
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT_ENCODING
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT_LANGUAGE
-    &NORMALIZER_BASIC,      // HEAD_AUTHORIZATION
-    &NORMALIZER_CASE_INSENSITIVE, // HEAD_EXPECT
-    &NORMALIZER_BASIC,      // HEAD_FROM
-    &NORMALIZER_HOST,       // HEAD_HOST
-    &NORMALIZER_BASIC,      // HEAD_IF_MATCH
-    &NORMALIZER_DATE,       // HEAD_IF_MODIFIED_SINCE
-    &NORMALIZER_BASIC,      // HEAD_IF_NONE_MATCH
-    &NORMALIZER_BASIC,      // HEAD_IF_RANGE
-    &NORMALIZER_DATE,       // HEAD_IF_UNMODIFIED_SINCE
-    &NORMALIZER_BASIC,      // HEAD_MAX_FORWARDS
-    &NORMALIZER_BASIC,      // HEAD_PROXY_AUTHORIZATION
-    &NORMALIZER_BASIC,      // HEAD_RANGE
-    &NORMALIZER_URI,        // HEAD_REFERER
-    &NORMALIZER_TOKEN_LIST, // HEAD_TE
-    &NORMALIZER_BASIC,      // HEAD_USER_AGENT
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT_RANGES
-    &NORMALIZER_NUMBER,     // HEAD_AGE
-    &NORMALIZER_BASIC,      // HEAD_ETAG
-    &NORMALIZER_URI,        // HEAD_LOCATION
-    &NORMALIZER_BASIC,      // HEAD_PROXY_AUTHENTICATE
-    &NORMALIZER_BASIC,      // HEAD_RETRY_AFTER, may be date or number
-    &NORMALIZER_BASIC,      // HEAD_SERVER
-    &NORMALIZER_TOKEN_LIST, // HEAD_VARY
-    &NORMALIZER_BASIC,      // HEAD_WWW_AUTHENTICATE
-    &NORMALIZER_METHOD_LIST, // HEAD_ALLOW
-    &NORMALIZER_TOKEN_LIST, // HEAD_CONTENT_ENCODING
-    &NORMALIZER_TOKEN_LIST, // HEAD_CONTENT_LANGUAGE
-    &NORMALIZER_CONTENT_LENGTH, // HEAD_CONTENT_LENGTH
-    &NORMALIZER_URI,        // HEAD_CONTENT_LOCATION
-    &NORMALIZER_BASIC,      // HEAD_CONTENT_MD5
-    &NORMALIZER_BASIC,      // HEAD_CONTENT_RANGE
-    &NORMALIZER_CHARSET,    // HEAD_CONTENT_TYPE
-    &NORMALIZER_DATE,       // HEAD_EXPIRES
-    &NORMALIZER_DATE,       // HEAD_LAST_MODIFIED
-    &NORMALIZER_BASIC,      // HEAD_X_FORWARDED_FOR
-    &NORMALIZER_BASIC,      // HEAD_TRUE_CLIENT_IP
-    &NORMALIZER_BASIC,      // HEAD_X_WORKING_WITH
-    &NORMALIZER_TOKEN_LIST, // HEAD_CONTENT_TRANSFER_ENCODING
-    &NORMALIZER_BASIC,      // HEAD_MIME_VERSION
-    &NORMALIZER_BASIC,      // HEAD_PROXY_AGENT
-    &NORMALIZER_BASIC,      // HEAD_CONTENT_DISPOSITION
-    &NORMALIZER_TOKEN_LIST, // HEAD_HTTP2_SETTINGS
-    &NORMALIZER_BASIC,      // HEAD__MAX_VALUE
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-};
-
 const RuleMap HttpModule::http_events[] =
 {
-    { EVENT_ASCII,                      "ascii encoding" },
-    { EVENT_DOUBLE_DECODE,              "double decoding attack" },
-    { EVENT_U_ENCODE,                   "u encoding" },
-    { EVENT_BARE_BYTE,                  "bare byte unicode encoding" },
-    // { EVENT_OBSOLETE_BASE_36,           "obsolete event--deleted" },
-    { EVENT_UTF_8,                      "UTF-8 encoding" },
-    { EVENT_CODE_POINT_IN_URI,          "unicode map code point encoding in URI" },
-    { EVENT_MULTI_SLASH,                "multi_slash encoding" },
-    { EVENT_BACKSLASH_IN_URI,           "backslash used in URI path" },
-    { EVENT_SELF_DIR_TRAV,              "self directory traversal" },
-    { EVENT_DIR_TRAV,                   "directory traversal" },
-    { EVENT_APACHE_WS,                  "apache whitespace (tab)" },
-    { EVENT_LF_WITHOUT_CR,              "HTTP header line terminated by LF without a CR" },
-    { EVENT_NON_RFC_CHAR,               "non-RFC defined char" },
-    { EVENT_OVERSIZE_DIR,               "oversize request-uri directory" },
-    // { EVENT_LARGE_CHUNK,                "oversize chunk encoding" },
-    // { EVENT_PROXY_USE,                  "unauthorized proxy use detected" },
-    { EVENT_WEBROOT_DIR,                "webroot directory traversal" },
-    { EVENT_LONG_HDR,                   "long header" },
-    { EVENT_MAX_HEADERS,                "max header fields" },
-    { EVENT_MULTIPLE_CONTLEN,           "multiple content length" },
-    // { EVENT_OBSOLETE_CHUNK_SIZE_MISMATCH, "obsolete event--deleted" },
-    // { EVENT_INVALID_TRUEIP,             "invalid IP in true-client-IP/XFF header" },
+    { EVENT_ASCII,                      "URI has percent-encoding of an unreserved character" },
+    { EVENT_DOUBLE_DECODE,              "URI is percent encoded and the result is percent encoded "
+                                        "again" },
+    { EVENT_U_ENCODE,                   "URI has non-standard %u-style Unicode encoding" },
+    { EVENT_BARE_BYTE,                  "URI has Unicode encodings containing bytes that were not "
+                                        "percent-encoded" },
+    { EVENT_UTF_8,                      "URI has two-byte or three-byte UTF-8 encoding" },
+    { EVENT_CODE_POINT_IN_URI,          "URI has unicode map code point encoding" },
+    { EVENT_MULTI_SLASH,                "URI path contains consecutive slash characters" },
+    { EVENT_BACKSLASH_IN_URI,           "backslash character appears in the path portion of a URI."
+                                        },
+    { EVENT_SELF_DIR_TRAV,              "URI path contains /./ pattern repeating the current "
+                                        "directory" },
+    { EVENT_DIR_TRAV,                   "URI path contains /../ pattern moving up a directory" },
+    { EVENT_APACHE_WS,                  "Tab character in HTTP start line" },
+    { EVENT_LF_WITHOUT_CR,              "HTTP start line or header line terminated by LF without "
+                                        "a CR" },
+    { EVENT_NON_RFC_CHAR,               "Normalized URI includes character from bad_characters "
+                                        "list" },
+    { EVENT_OVERSIZE_DIR,               "URI path contains a segment that is longer than the "
+                                        "oversize_dir_length parameter" },
+    { EVENT_LARGE_CHUNK,                "chunk length exceeds configured maximum_chunk_length" },
+    { EVENT_WEBROOT_DIR,                "URI path includes /../ that goes above the root directory"
+                                        },
+    { EVENT_LONG_HDR,                   "HTTP header line exceeds 4096 bytes" },
+    { EVENT_MAX_HEADERS,                "HTTP message has more than 200 header fields" },
+    { EVENT_MULTIPLE_CONTLEN,           "HTTP message has more than one Content-Length header "
+                                        "value" },
     { EVENT_MULTIPLE_HOST_HDRS,         "Host header field appears more than once or has multiple "
                                         "values" },
-    // { EVENT_LONG_HOSTNAME,              "hostname exceeds 255 characters" },
-    // { EVENT_EXCEEDS_SPACES,             "too much whitespace in header (not implemented yet)" },
-    // { EVENT_CONSECUTIVE_SMALL_CHUNKS,   "client consecutive small chunk sizes" },
-    { EVENT_UNBOUNDED_POST,             "POST or PUT w/o content-length or chunks" },
-    // { EVENT_MULTIPLE_TRUEIP_IN_SESSION, "multiple true ips in a session" },
-    // { EVENT_BOTH_TRUEIP_XFF_HDRS,       "both true-client-IP and XFF hdrs present" },
-    { EVENT_UNKNOWN_METHOD,             "unknown method" },
-    { EVENT_SIMPLE_REQUEST,             "simple request" },
-    { EVENT_UNESCAPED_SPACE_URI,        "unescaped space in HTTP URI" },
-    { EVENT_PIPELINE_MAX,               "too many pipelined requests" },
-    // { EVENT_OBSOLETE_ANOM_SERVER,       "obsolete event--deleted" },
+    { EVENT_LONG_HOSTNAME,              "length of HTTP Host header field value exceeds "
+                                        "maximum_host_length option" },
+    { EVENT_UNBOUNDED_POST,             "HTTP POST or PUT request without content-length or chunks"
+                                        },
+    { EVENT_UNKNOWN_METHOD,             "HTTP request method is not known to Snort" },
+    { EVENT_SIMPLE_REQUEST,             "HTTP request uses primitive HTTP format known as HTTP/0.9"
+                                        },
+    { EVENT_UNESCAPED_SPACE_URI,        "HTTP request URI has space character that is not "
+                                        "percent-encoded" },
+    { EVENT_PIPELINE_MAX,               "HTTP connection has more than 100 simultaneous pipelined "
+                                        "requests that have not been answered" },
     { EVENT_INVALID_STATCODE,           "invalid status code in HTTP response" },
-    // { EVENT_UNUSED_1,                   "unused event number--should not appear" },
-    { EVENT_UTF_NORM_FAIL,              "HTTP response has UTF charset that failed to normalize" },
-    { EVENT_UTF7,                       "HTTP response has UTF-7 charset" },
-    // { EVENT_DECOMPR_FAILED,             "HTTP response gzip decompression failed" },
-    // { EVENT_CONSECUTIVE_SMALL_CHUNKS_S, "server consecutive small chunk sizes" },
-    // { EVENT_UNUSED_2,                   "unused event number--should not appear" },
-    { EVENT_JS_OBFUSCATION_EXCD,        "javascript obfuscation levels exceeds 1" },
-    { EVENT_JS_EXCESS_WS,               "javascript whitespaces exceeds max allowed" },
-    { EVENT_MIXED_ENCODINGS,            "multiple encodings within javascript obfuscated data" },
+    { EVENT_UTF_NORM_FAIL,              "HTTP response has UTF character set that failed to "
+                                        "normalize" },
+    { EVENT_UTF7,                       "HTTP response has UTF-7 character set" },
+    { EVENT_JS_OBFUSCATION_EXCD,        "more than one level of JavaScript obfuscation" },
+    { EVENT_JS_EXCESS_WS,               "consecutive JavaScript whitespaces exceed maximum allowed"
+                                        },
+    { EVENT_MIXED_ENCODINGS,            "multiple encodings within JavaScript obfuscated data" },
     { EVENT_SWF_ZLIB_FAILURE,           "SWF file zlib decompression failure" },
     { EVENT_SWF_LZMA_FAILURE,           "SWF file LZMA decompression failure" },
     { EVENT_PDF_DEFL_FAILURE,           "PDF file deflate decompression failure" },
     { EVENT_PDF_UNSUP_COMP_TYPE,        "PDF file unsupported compression type" },
-    { EVENT_PDF_CASC_COMP,              "PDF file cascaded compression" },
+    { EVENT_PDF_CASC_COMP,              "PDF file with more than one compression applied" },
     { EVENT_PDF_PARSE_FAILURE,          "PDF file parse failure" },
-    { EVENT_LOSS_OF_SYNC,               "not HTTP traffic" },
+    { EVENT_LOSS_OF_SYNC,               "not HTTP traffic or unrecoverable HTTP protocol error" },
     { EVENT_CHUNK_ZEROS,                "chunk length has excessive leading zeros" },
-    { EVENT_WS_BETWEEN_MSGS,            "white space before or between messages" },
+    { EVENT_WS_BETWEEN_MSGS,            "white space before or between HTTP messages" },
     { EVENT_URI_MISSING,                "request message without URI" },
-    { EVENT_CTRL_IN_REASON,             "control character in reason phrase" },
+    { EVENT_CTRL_IN_REASON,             "control character in HTTP response reason phrase" },
     { EVENT_IMPROPER_WS,                "illegal extra whitespace in start line" },
     { EVENT_BAD_VERS,                   "corrupted HTTP version" },
-    { EVENT_UNKNOWN_VERS,               "unknown HTTP version" },
+    { EVENT_UNKNOWN_VERS,               "HTTP version in start line is not HTTP/1.0 or 1.1" },
     { EVENT_BAD_HEADER,                 "format error in HTTP header" },
     { EVENT_CHUNK_OPTIONS,              "chunk header options present" },
     { EVENT_URI_BAD_FORMAT,             "URI badly formatted" },
@@ -432,6 +329,11 @@ const RuleMap HttpModule::http_events[] =
     { EVENT_JS_CLOSING_TAG,             "unexpected script closing tag in JavaScript" },
     { EVENT_JS_CODE_IN_EXTERNAL,        "JavaScript code under the external script tags" },
     { EVENT_JS_SHORTENED_TAG,           "script opening tag in a short form" },
+    { EVENT_JS_IDENTIFIER_OVERFLOW,     "max number of unique JavaScript identifiers reached" },
+    { EVENT_JS_SCOPE_NEST_OVFLOW,       "JavaScript scope nesting is over capacity" },
+    { EVENT_ACCEPT_ENCODING_CONSECUTIVE_COMMAS, "Consecutive commas in HTTP Accept-Encoding "
+                                        "header" },
+    { EVENT_JS_PDU_MISS,                "missed PDUs during JavaScript normalization" },
     { 0, nullptr }
 };
 
@@ -471,6 +373,9 @@ const PegInfo HttpModule::peg_names[PEG_COUNT_MAX+1] =
     { CountType::SUM, "js_inline_scripts", "total number of inline JavaScripts processed" },
     { CountType::SUM, "js_external_scripts", "total number of external JavaScripts processed" },
     { CountType::SUM, "js_bytes", "total number of JavaScript bytes processed" },
+    { CountType::SUM, "js_identifiers", "total number of unique JavaScript identifiers processed" },
+    { CountType::SUM, "js_identifier_overflows", "total number of unique JavaScript identifier "
+        "limit overflows" },
     { CountType::END, nullptr, nullptr }
 };
 

@@ -27,6 +27,7 @@
 #include <mutex>
 
 #include "detection/detection_engine.h"
+#include "flow/flow_cache.h"
 #include "flow/flow_control.h"
 #include "flow/flow_key.h"
 #include "flow/ha.h"
@@ -251,7 +252,7 @@ void Stream::stop_inspection(
 {
     assert(flow && flow->session);
 
-    debug_logf(stream_trace, p, "stop inspection on flow, dir %s \n",
+    debug_logf(stream_trace, TRACE_BASE, p, "stop inspection on flow, dir %s \n",
         dir == SSN_DIR_BOTH ? "BOTH" :
         ((dir == SSN_DIR_FROM_CLIENT) ? "FROM_CLIENT" : "FROM_SERVER"));
 
@@ -374,7 +375,7 @@ void Stream::handle_timeouts(bool idle)
 
 void Stream::prune_flows()
 {
-    if ( flow_con )
+    if ( flow_con && !FlowCache::is_pruning_in_progress())
         flow_con->prune_one(PruneReason::MEMCAP, false);
 }
 
@@ -386,13 +387,14 @@ int Stream::set_snort_protocol_id_expected(
     const Packet* ctrlPkt, PktType type, IpProtocol ip_proto,
     const SfIp* srcIP, uint16_t srcPort,
     const SfIp* dstIP, uint16_t dstPort,
-    SnortProtocolId snort_protocol_id, FlowData* fd, bool swap_app_direction, bool expect_multi)
+    SnortProtocolId snort_protocol_id, FlowData* fd, bool swap_app_direction, bool expect_multi,
+    bool bidirectional)
 {
     assert(flow_con);
 
     return flow_con->add_expected(
         ctrlPkt, type, ip_proto, srcIP, srcPort, dstIP, dstPort, snort_protocol_id, fd,
-        swap_app_direction, expect_multi);
+        swap_app_direction, expect_multi, bidirectional);
 }
 
 void Stream::set_snort_protocol_id_from_ha(

@@ -45,7 +45,7 @@ Optional Features:
     --enable-shell          enable command line shell support
     --enable-large-pcap     enable support for pcaps larger than 2 GB
     --enable-stdlog         use file descriptor 3 instead of stdout for alerts
-    --enable-tsc-clock      use timestamp counter register clock (x86 only)
+    --enable-tsc-clock      use timestamp counter register clock (x86 and arm only)
     --enable-debug-msgs     enable debug printing options (bugreports and
                             developers only)
     --enable-debug          enable debugging options (bugreports and developers
@@ -324,6 +324,12 @@ while [ $# -ne 0 ]; do
             ;;
         --disable-unit-tests)
             append_cache_entry ENABLE_UNIT_TESTS        BOOL false
+            ;;
+        --enable-benchmark-tests)
+            append_cache_entry ENABLE_BENCHMARK_TESTS   BOOL true
+            ;;
+        --disable-benchmark-tests)
+            append_cache_entry ENABLE_BENCHMARK_TESTS   BOOL false
             ;;
         --enable-piglet)
             append_cache_entry ENABLE_PIGLET            BOOL true

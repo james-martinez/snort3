@@ -84,6 +84,7 @@ AppIdSession::AppIdSession(IpProtocol proto, const SfIp* ip, uint16_t, AppIdInsp
     OdpContext&, uint16_t) : FlowData(inspector_id, &inspector), config(stub_config),
     protocol(proto), api(*(new AppIdSessionApi(this, *ip))), odp_ctxt(stub_odp_ctxt)
 {
+    this->set_session_flags(APPID_SESSION_DISCOVER_APP | APPID_SESSION_SPECIAL_MONITORED);
     odp_ctxt_version = odp_ctxt.get_version();
     set_service_port(APPID_UT_SERVICE_PORT);
     AppidChangeBits change_bits;
@@ -140,7 +141,16 @@ AppId AppIdSession::pick_ss_misc_app_id() const
 
 AppId AppIdSession::pick_ss_client_app_id() const
 {
-    return get_client_id();
+    if (get_efp_client_app_id() > APP_ID_NONE and get_client_id() <= APP_ID_NONE)
+    {
+        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_TLS_FP);
+        return get_efp_client_app_id();
+    }
+    else
+    {
+        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_APPID);
+        return get_client_id();
+    }
 }
 
 AppId AppIdSession::pick_ss_payload_app_id() const

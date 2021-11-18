@@ -104,7 +104,6 @@ DetectionEngine::DetectionEngine()
     context = Analyzer::get_switcher()->interrupt();
 
     context->file_data = DataPointer(nullptr, 0);
-    context->script_data = DataPointer(nullptr, 0);
 
     reset();
 }
@@ -203,10 +202,11 @@ Packet* DetectionEngine::set_next_packet(Packet* parent, Flow* flow)
         shutdown_active.reset();
     }
 
+    p->reset();
+
     if ( parent )
         p->packet_flags |= PKT_HAS_PARENT;
 
-    p->reset();
     return p;
 }
 
@@ -299,12 +299,6 @@ void DetectionEngine::set_file_data(const DataPointer& dp)
 
 DataPointer& DetectionEngine::get_file_data(IpsContext* c)
 { return c->file_data; }
-
-void DetectionEngine::set_script_data(const DataPointer& dp)
-{ Analyzer::get_switcher()->get_context()->script_data = dp; }
-
-DataPointer& DetectionEngine::get_script_data(IpsContext* c)
-{ return c->script_data; }
 
 void DetectionEngine::set_data(unsigned id, IpsContextData* p)
 { Analyzer::get_switcher()->get_context()->set_context_data(id, p); }
@@ -714,8 +708,8 @@ static int log_events(void* event, void* user)
 /*
 **  We return whether we logged events or not.  We've add a eventq user
 **  structure so we can track whether the events logged were rule events
-**  or preprocessor/decoder events.  The reason being that we don't want
-**  to flush a TCP stream for preprocessor/decoder events, and cause
+**  or builtin events.  The reason being that we don't want
+**  to flush a TCP stream for builtin events, and cause
 **  early flushing of the stream.
 */
 int DetectionEngine::log_events(Packet* p)

@@ -20,8 +20,9 @@
 #ifndef HTTP_MODULE_H
 #define HTTP_MODULE_H
 
-#include <string>
 #include <bitset>
+#include <string>
+#include <unordered_set>
 
 #include "framework/module.h"
 #include "helpers/literal_search.h"
@@ -33,6 +34,14 @@
 #define HTTP_NAME "http_inspect"
 #define HTTP_HELP "HTTP inspector"
 
+namespace snort
+{
+class Trace;
+struct SnortConfig;
+}
+
+extern THREAD_LOCAL const snort::Trace* http_trace;
+
 struct HttpParaList
 {
 public:
@@ -42,20 +51,26 @@ public:
 
     bool unzip = true;
     bool normalize_utf = true;
+    int64_t maximum_host_length = -1;
+    int64_t maximum_chunk_length = 0xFFFFFFFF;
     bool decompress_pdf = false;
     bool decompress_swf = false;
     bool decompress_zip = false;
+    bool decompress_vba = false;
     bool script_detection = false;
     snort::LiteralSearch::Handle* script_detection_handle = nullptr;
-    bool publish_request_body = false;
+    bool publish_request_body = true;
 
     struct JsNormParam
     {
     public:
         ~JsNormParam();
         bool normalize_javascript = false;
-        bool is_javascript_normalization = false;
-        int64_t js_normalization_depth = 0;
+        int64_t js_normalization_depth = -1;
+        int32_t js_identifier_depth = 0;
+        uint8_t max_template_nesting = 32;
+        uint32_t max_scope_depth = 256;
+        std::unordered_set<std::string> built_in_ident;
         int max_javascript_whitespaces = 200;
         class HttpJsNorm* js_norm = nullptr;
     };
@@ -167,6 +182,9 @@ public:
 
     bool is_bindable() const override
     { return true; }
+
+    void set_trace(const snort::Trace*) const override;
+    const snort::TraceOption* get_trace_options() const override;
 
 #ifdef REG_TEST
     static const PegInfo* get_peg_names() { return peg_names; }

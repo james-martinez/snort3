@@ -209,13 +209,20 @@ static inline PktType get_pkt_type_from_ip_proto(IpProtocol proto)
 
 AppIdSession* AppIdSession::create_future_session(const Packet* ctrlPkt, const SfIp* cliIp,
     uint16_t cliPort, const SfIp* srvIp, uint16_t srvPort, IpProtocol proto,
-    SnortProtocolId snort_protocol_id, bool swap_app_direction)
+    SnortProtocolId snort_protocol_id, bool swap_app_direction, bool bidirectional)
 {
-    char src_ip[INET6_ADDRSTRLEN];
-    char dst_ip[INET6_ADDRSTRLEN];
     enum PktType type = get_pkt_type_from_ip_proto(proto);
 
-    assert(type != PktType::NONE);
+    if (type == PktType::NONE)
+    {
+        if (appidDebug->is_active())
+            LogMessage("AppIdDbg %s Failed to create a related flow - invalid protocol %u\n",
+                appidDebug->get_debug_session(), (unsigned)proto);
+        return nullptr;
+    }
+
+    char src_ip[INET6_ADDRSTRLEN];
+    char dst_ip[INET6_ADDRSTRLEN];
 
     AppIdInspector* inspector = (AppIdInspector*)ctrlPkt->flow->flow_data->get_handler();
     if ((inspector == nullptr) || strcmp(inspector->get_name(), MOD_NAME))
@@ -228,7 +235,7 @@ AppIdSession* AppIdSession::create_future_session(const Packet* ctrlPkt, const S
     is_session_monitored(asd->flags, ctrlPkt, *inspector);
 
     if (Stream::set_snort_protocol_id_expected(ctrlPkt, type, proto, cliIp,
-        cliPort, srvIp, srvPort, snort_protocol_id, asd, swap_app_direction))
+        cliPort, srvIp, srvPort, snort_protocol_id, asd, swap_app_direction, false, bidirectional))
     {
         if (appidDebug->is_active())
         {
@@ -323,7 +330,7 @@ void AppIdSession::sync_with_snort_protocol_id(AppId newAppId, Packet* p)
     if (newAppId  <= APP_ID_NONE or newAppId >= SF_APPID_MAX)
         return;
 
-    // Certain AppIds are not useful to identifying snort preprocessor choices
+    // Certain AppIds are not useful to identifying snort inspector choices
     switch (newAppId)
     {
     case APP_ID_FTPS:
@@ -847,11 +854,26 @@ AppId AppIdSession::pick_ss_client_app_id() const
     if (!api.hsessions.empty())
         tmp_id = api.hsessions[0]->client.get_id();
     if (tmp_id > APP_ID_NONE)
+    {
+        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_APPID);
         return tmp_id;
+    }
+
+    if (api.client.get_efp_client_app_id() > APP_ID_NONE and
+        (api.client.get_id() == APP_ID_SSL_CLIENT or
+            api.client.get_id() <= APP_ID_NONE))
+    {
+        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_TLS_FP);
+        return api.client.get_efp_client_app_id();
+    }
 
     if (api.client.get_id() > APP_ID_NONE)
+    {
+        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_APPID);
         return api.client.get_id();
+    }
 
+    api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_APPID);
     return encrypted.client_id;
 }
 

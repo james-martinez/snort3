@@ -3,7 +3,7 @@ project (snort CXX C)
 
 set (VERSION_MAJOR 3)
 set (VERSION_MINOR 1)
-set (VERSION_PATCH 9)
+set (VERSION_PATCH 17)
 set (VERSION_SUBLEVEL 0)
 set (VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_SUBLEVEL}")
 
@@ -32,7 +32,8 @@ include (${CMAKE_MODULE_PATH}/sanity_checks.cmake)
 
 set (INSTALL_SUFFIX "${CMAKE_PROJECT_NAME}")
 set (INCLUDE_INSTALL_PATH "${CMAKE_INSTALL_INCLUDEDIR}/${INSTALL_SUFFIX}")
-set (PLUGIN_INSTALL_PATH "${CMAKE_INSTALL_LIBDIR}/${INSTALL_SUFFIX}")
+set (LIB_INSTALL_PATH "${CMAKE_INSTALL_LIBDIR}/${INSTALL_SUFFIX}")
+set (PLUGIN_INSTALL_PATH "${LIB_INSTALL_PATH}/plugins")
 
 configure_file (
     "${PROJECT_SOURCE_DIR}/config.cmake.h.in"
@@ -56,8 +57,11 @@ include_directories (${PROJECT_SOURCE_DIR})
 
 if (ENABLE_UNIT_TESTS)
     include(CTest)
-    add_custom_target (check COMMAND ${CMAKE_CTEST_COMMAND})
 endif (ENABLE_UNIT_TESTS)
+
+if (ENABLE_UNIT_TESTS OR ENABLE_BENCHMARK_TESTS)
+    add_custom_target (check COMMAND ${CMAKE_CTEST_COMMAND})
+endif (ENABLE_UNIT_TESTS OR ENABLE_BENCHMARK_TESTS)
 
 add_subdirectory (src)
 add_subdirectory (tools)

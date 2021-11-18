@@ -29,9 +29,11 @@
 #include "hash/zhash.h"
 #include "helpers/flag_context.h"
 #include "ips_options/ips_flowbits.h"
+#include "main/snort_debug.h"
 #include "memory/memory_cap.h"
 #include "packet_io/active.h"
 #include "packet_tracer/packet_tracer.h"
+#include "stream/base/stream_module.h"
 #include "time/packet_time.h"
 #include "utils/stats.h"
 
@@ -52,6 +54,9 @@ static const unsigned ALL_FLOWS = 3;
 //-------------------------------------------------------------------------
 // FlowCache stuff
 //-------------------------------------------------------------------------
+
+THREAD_LOCAL bool FlowCache::pruning_in_progress = false;
+extern THREAD_LOCAL const snort::Trace* stream_trace;
 
 FlowCache::FlowCache(const FlowCacheConfig& cfg) : config(cfg)
 {
@@ -108,19 +113,43 @@ Flow* FlowCache::find(const FlowKey* key)
 // always prepend
 void FlowCache::link_uni(Flow* flow)
 {
-    if ( flow->pkt_type == PktType::IP )
+    if ( flow->key->pkt_type == PktType::IP )
+    {
+        debug_logf(stream_trace, TRACE_FLOW, nullptr, 
+            "linking unidirectional flow (IP) to list of size: %u\n", 
+            uni_ip_flows->get_count());
         uni_ip_flows->link_uni(flow);
+    }
     else
+    {
+        debug_logf(stream_trace, TRACE_FLOW, nullptr, 
+            "linking unidirectional flow (non-IP) to list of size: %u\n", 
+            uni_flows->get_count());
         uni_flows->link_uni(flow);
+    }
 }
 
 // but remove from any point
 void FlowCache::unlink_uni(Flow* flow)
 {
-    if ( flow->pkt_type == PktType::IP )
-        uni_ip_flows->unlink_uni(flow);
+    if ( flow->key->pkt_type == PktType::IP )
+    {
+        if ( uni_ip_flows->unlink_uni(flow) )
+        {
+            debug_logf(stream_trace, TRACE_FLOW, nullptr, 
+                "unlinked unidirectional flow (IP) from list, size: %u\n", 
+                uni_ip_flows->get_count());
+        }
+    }
     else
-        uni_flows->unlink_uni(flow);
+    {
+        if ( uni_flows->unlink_uni(flow) )
+        {
+            debug_logf(stream_trace, TRACE_FLOW, nullptr, 
+                "unlinked unidirectional flow (non-IP) from list, size: %u\n",
+                uni_flows->get_count());
+        }
+    }
 }
 
 Flow* FlowCache::allocate(const FlowKey* key)
@@ -162,8 +191,7 @@ Flow* FlowCache::allocate(const FlowKey* key)
 
 void FlowCache::remove(Flow* flow)
 {
-    if ( flow->next )
-        unlink_uni(flow);
+    unlink_uni(flow);
 
     // FIXIT-M This check is added for offload case where both Flow::reset
     // and Flow::retire try remove the flow from hash. Flow::reset should
@@ -174,12 +202,16 @@ void FlowCache::remove(Flow* flow)
 
 bool FlowCache::release(Flow* flow, PruneReason reason, bool do_cleanup)
 {
+    assert(!pruning_in_progress);
+    pruning_in_progress = true;
+
     if ( !flow->was_blocked() )
     {
         flow->flush(do_cleanup);
         if ( flow->ssn_state.session_flags & SSNFLAG_KEEP_FLOW )
         {
             flow->ssn_state.session_flags &= ~SSNFLAG_KEEP_FLOW;
+            pruning_in_progress = false;
             return false;
         }
     }
@@ -187,6 +219,7 @@ bool FlowCache::release(Flow* flow, PruneReason reason, bool do_cleanup)
     flow->reset(do_cleanup);
     prune_stats.update(reason);
     remove(flow);
+    pruning_in_progress = false;
     return true;
 }
 
@@ -416,8 +449,7 @@ unsigned FlowCache::delete_active_flows(unsigned mode, unsigned num_to_delete, u
         }
 
         // we have a winner...
-        if ( flow->next )
-            unlink_uni(flow);
+        unlink_uni(flow);
 
         if ( flow->was_blocked() )
             delete_stats.update(FlowDeleteState::BLOCKED);
@@ -482,12 +514,14 @@ unsigned FlowCache::purge()
     FlagContext<decltype(flags)>(flags, SESSION_CACHE_FLAG_PURGING);
 
     unsigned retired = 0;
-
+    assert(!pruning_in_progress);
+    pruning_in_progress = true;
     while ( auto flow = static_cast<Flow*>(hash_table->lru_first()) )
     {
         retire(flow);
         ++retired;
     }
+    pruning_in_progress = false;
 
     while ( Flow* flow = (Flow*)hash_table->pop() )
     {

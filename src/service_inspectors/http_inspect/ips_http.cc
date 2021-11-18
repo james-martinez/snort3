@@ -61,7 +61,6 @@ bool HttpCursorModule::begin(const char*, int, SnortConfig*)
     case HTTP_BUFFER_PARAM:
     case HTTP_BUFFER_RAW_COOKIE:
     case HTTP_BUFFER_RAW_HEADER:
-    case HTTP_BUFFER_RAW_HEADER_COMPLETE:
     case HTTP_BUFFER_RAW_REQUEST:
     case HTTP_BUFFER_RAW_URI:
     case HTTP_BUFFER_TRUE_IP:
@@ -71,6 +70,7 @@ bool HttpCursorModule::begin(const char*, int, SnortConfig*)
         break;
     case HTTP_BUFFER_CLIENT_BODY:
     case HTTP_BUFFER_RAW_BODY:
+    case BUFFER_JS_DATA:
         inspect_section = IS_BODY;
         break;
     case HTTP_BUFFER_RAW_TRAILER:
@@ -618,6 +618,8 @@ static const IpsApi raw_cookie_api =
 
 static const Parameter http_raw_header_params[] =
 {
+    { "field", Parameter::PT_STRING, nullptr, nullptr,
+        "restrict to given header. Header name is case insensitive." },
     { "request", Parameter::PT_IMPLIED, nullptr, nullptr,
         "match against the headers from the request message even when examining the response" },
     { "with_header", Parameter::PT_IMPLIED, nullptr, nullptr,
@@ -652,59 +654,6 @@ static const IpsApi raw_header_api =
         IPS_OPT,
         IPS_HELP,
         raw_header_mod_ctor,
-        HttpCursorModule::mod_dtor
-    },
-    OPT_TYPE_DETECTION,
-    0, PROTO_BIT__TCP,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    HttpIpsOption::opt_ctor,
-    HttpIpsOption::opt_dtor,
-    nullptr
-};
-
-//-------------------------------------------------------------------------
-// http_raw_header_complete
-//-------------------------------------------------------------------------
-
-static const Parameter http_raw_header_complete_params[] =
-{
-    { "request", Parameter::PT_IMPLIED, nullptr, nullptr,
-        "match against the headers from the request message even when examining the response" },
-    { "with_header", Parameter::PT_IMPLIED, nullptr, nullptr,
-        "this rule is limited to examining HTTP message headers" },
-    { "with_body", Parameter::PT_IMPLIED, nullptr, nullptr,
-        "parts of this rule examine HTTP message body" },
-    { "with_trailer", Parameter::PT_IMPLIED, nullptr, nullptr,
-        "parts of this rule examine HTTP message trailers" },
-    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
-};
-
-#undef IPS_OPT
-#define IPS_OPT "http_raw_header_complete"
-#undef IPS_HELP
-#define IPS_HELP "rule option to set the detection cursor to the unnormalized headers including cookies"
-
-static Module* raw_header_complete_mod_ctor()
-{
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_HEADER_COMPLETE,
-	CAT_SET_OTHER, PSI_RAW_HEADER_COMPLETE, http_raw_header_complete_params);
-}
-
-static const IpsApi raw_header_complete_api =
-{
-    {
-        PT_IPS_OPTION,
-        sizeof(IpsApi),
-        IPSAPI_VERSION,
-        1,
-        API_RESERVED,
-        API_OPTIONS,
-        IPS_OPT,
-        IPS_HELP,
-        raw_header_complete_mod_ctor,
         HttpCursorModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
@@ -824,6 +773,8 @@ static const IpsApi raw_status_api =
 
 static const Parameter http_raw_trailer_params[] =
 {
+    { "field", Parameter::PT_STRING, nullptr, nullptr,
+        "restrict to given trailer. Trailer name is case insensitive." },
     { "request", Parameter::PT_IMPLIED, nullptr, nullptr,
         "match against the trailers from the request message even when examining the response" },
     { "with_header", Parameter::PT_IMPLIED, nullptr, nullptr,
@@ -841,7 +792,7 @@ static const Parameter http_raw_trailer_params[] =
 
 static Module* raw_trailer_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_TRAILER, CAT_SET_OTHER,
+    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_TRAILER, CAT_SET_RAW_HEADER,
         PSI_RAW_TRAILER, http_raw_trailer_params);
 }
 
@@ -1252,6 +1203,46 @@ static const IpsApi version_api =
 };
 
 //-------------------------------------------------------------------------
+// js_data
+//-------------------------------------------------------------------------
+//
+
+#undef IPS_OPT
+#define IPS_OPT "js_data"
+#undef IPS_HELP
+#define IPS_HELP "rule option to set detection cursor to normalized JavaScript data"
+static Module* js_data_mod_ctor()
+{
+    return new HttpCursorModule(IPS_OPT, IPS_HELP, BUFFER_JS_DATA, CAT_SET_JS_DATA,
+        PSI_JS_DATA);
+}
+
+static const IpsApi js_data_api =
+{
+    {
+        PT_IPS_OPTION,
+        sizeof(IpsApi),
+        IPSAPI_VERSION,
+        1,
+        API_RESERVED,
+        API_OPTIONS,
+        IPS_OPT,
+        IPS_HELP,
+        js_data_mod_ctor,
+        HttpCursorModule::mod_dtor
+    },
+    OPT_TYPE_DETECTION,
+    0, PROTO_BIT__TCP,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    HttpIpsOption::opt_ctor,
+    HttpIpsOption::opt_dtor,
+    nullptr
+};
+
+//-------------------------------------------------------------------------
 // plugins
 //-------------------------------------------------------------------------
 
@@ -1263,7 +1254,6 @@ const BaseApi* ips_http_param = &param_api.base;
 const BaseApi* ips_http_raw_body = &raw_body_api.base;
 const BaseApi* ips_http_raw_cookie = &raw_cookie_api.base;
 const BaseApi* ips_http_raw_header = &raw_header_api.base;
-const BaseApi* ips_http_raw_header_complete = &raw_header_complete_api.base;
 const BaseApi* ips_http_raw_request = &raw_request_api.base;
 const BaseApi* ips_http_raw_status = &raw_status_api.base;
 const BaseApi* ips_http_raw_trailer = &raw_trailer_api.base;
@@ -1274,4 +1264,5 @@ const BaseApi* ips_http_trailer = &trailer_api.base;
 const BaseApi* ips_http_true_ip = &true_ip_api.base;
 const BaseApi* ips_http_uri = &uri_api.base;
 const BaseApi* ips_http_version = &version_api.base;
+const BaseApi* ips_js_data = &js_data_api.base;
 

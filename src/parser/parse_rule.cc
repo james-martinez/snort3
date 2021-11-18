@@ -746,6 +746,16 @@ void parse_rule_print()
 
 void parse_rule_type(SnortConfig* sc, const char* s, RuleTreeNode& rtn)
 {
+    IpsPolicy* p = get_ips_policy();
+
+    if ( !p->action_override.empty() )
+        s = p->action_override.c_str();
+
+    auto it = p->action_map.find(s);
+
+    if ( it != p->action_map.end() )
+        s = it->second.c_str();
+
     s_type = s;
     rtn = RuleTreeNode();
 
@@ -1093,7 +1103,11 @@ void parse_rule_close(SnortConfig* sc, RuleTreeNode& rtn, OptTreeNode* otn)
 
         if ( !rule )
         {
-            ParseError("SO rule %s not loaded.", otn->soid);
+            if ( sc->allow_missing_so_rules )
+                ParseWarning(WARN_RULES, "SO rule %s not loaded.", otn->soid);
+            else
+                ParseError("SO rule %s not loaded.", otn->soid);
+
             FreeRuleTreeNode(&rtn);
         }
         else

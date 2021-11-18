@@ -57,7 +57,6 @@ const char* HttpApi::classic_buffer_names[] =
     "http_raw_body",
     "http_raw_cookie",
     "http_raw_header",
-    "http_raw_header_complete",
     "http_raw_request",
     "http_raw_status",
     "http_raw_trailer",
@@ -68,6 +67,8 @@ const char* HttpApi::classic_buffer_names[] =
     "http_true_ip",
     "http_uri",
     "http_version",
+    "js_data",
+    "vba_data",
     nullptr
 };
 
@@ -107,7 +108,6 @@ extern const BaseApi* ips_http_param;
 extern const BaseApi* ips_http_raw_body;
 extern const BaseApi* ips_http_raw_cookie;
 extern const BaseApi* ips_http_raw_header;
-extern const BaseApi* ips_http_raw_header_complete;
 extern const BaseApi* ips_http_raw_request;
 extern const BaseApi* ips_http_raw_status;
 extern const BaseApi* ips_http_raw_trailer;
@@ -118,6 +118,7 @@ extern const BaseApi* ips_http_trailer;
 extern const BaseApi* ips_http_true_ip;
 extern const BaseApi* ips_http_uri;
 extern const BaseApi* ips_http_version;
+extern const BaseApi* ips_js_data;
 
 #ifdef BUILDING_SO
 SO_PUBLIC const BaseApi* snort_plugins[] =
@@ -134,7 +135,6 @@ const BaseApi* sin_http[] =
     ips_http_raw_body,
     ips_http_raw_cookie,
     ips_http_raw_header,
-    ips_http_raw_header_complete,
     ips_http_raw_request,
     ips_http_raw_status,
     ips_http_raw_trailer,
@@ -145,6 +145,7 @@ const BaseApi* sin_http[] =
     ips_http_true_ip,
     ips_http_uri,
     ips_http_version,
+    ips_js_data,
     nullptr
 };
 

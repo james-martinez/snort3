@@ -56,7 +56,10 @@ StreamSplitter::Status Http2StreamSplitter::scan(Packet* pkt, const uint8_t* dat
         AssistantGadgetEvent event(pkt, "http");
         DataBus::publish(FLOW_ASSISTANT_GADGET_EVENT, event, pkt->flow);
         if (pkt->flow->assistant_gadget == nullptr)
+        {
+            // http_inspect is not configured
             return HttpStreamSplitter::status_value(StreamSplitter::ABORT, true);
+        }
         pkt->flow->set_flow_data(session_data = new Http2FlowData(pkt->flow));
         Http2Module::increment_peg_counts(PEG_FLOW);
     }
@@ -97,6 +100,9 @@ StreamSplitter::Status Http2StreamSplitter::scan(Packet* pkt, const uint8_t* dat
     const StreamSplitter::Status ret_val =
         implement_scan(session_data, data, length, flush_offset, source_id);
 
+    session_data->bytes_scanned[source_id] += (ret_val == StreamSplitter::FLUSH)?
+        *flush_offset : length;
+
     if (ret_val == StreamSplitter::ABORT)
         session_data->abort_flow[source_id] = true;
 
@@ -116,17 +122,21 @@ const StreamBuffer Http2StreamSplitter::reassemble(Flow* flow, unsigned total, u
     Profile profile(Http2Module::get_profile_stats());
 
     copied = len;
+    StreamBuffer frame_buf { nullptr, 0 };
 
     Http2FlowData* session_data = (Http2FlowData*)flow->get_flow_data(Http2FlowData::inspector_id);
-    assert(session_data != nullptr);
+    if (session_data == nullptr)
+    {
+        assert(false);
+        return frame_buf;
+    }
 
 #ifdef REG_TEST
     if (HttpTestManager::use_test_input(HttpTestManager::IN_HTTP2))
     {
-        StreamBuffer http_buf { nullptr, 0 };
         if (!(flags & PKT_PDU_TAIL))
         {
-            return http_buf;
+            return frame_buf;
         }
         bool tcp_close;
         uint8_t* test_buffer;
@@ -140,21 +150,27 @@ const StreamBuffer Http2StreamSplitter::reassemble(Flow* flow, unsigned total, u
         {
             // Source ID does not match test data, no test data was flushed, preparing for a TCP
             // connection close, or there is no more test data
-            return http_buf;
+            return frame_buf;
         }
         data = test_buffer;
     }
 #endif
 
-    assert(!session_data->abort_flow[source_id]);
+    if (session_data->abort_flow[source_id])
+    {
+        assert(false);
+        return frame_buf;
+    }
 
     // FIXIT-P: scan uses this to discard bytes until StreamSplitter:DISCARD
     // is implemented
     if (session_data->payload_discard[source_id])
     {
-        StreamBuffer frame_buf { nullptr, 0 };
         if (flags & PKT_PDU_TAIL)
+        {
             session_data->payload_discard[source_id] = false;
+            session_data->bytes_scanned[source_id] = 0;
+        }
 
 #ifdef REG_TEST
         if (HttpTestManager::use_test_output(HttpTestManager::IN_HTTP2))
@@ -188,9 +204,20 @@ bool Http2StreamSplitter::finish(Flow* flow)
 
     Http2FlowData* session_data = (Http2FlowData*)flow->get_flow_data(Http2FlowData::inspector_id);
     if (!session_data)
+    {
+        // assert(false); // FIXIT-M this should not be possible but currently it may be
         return false;
+    }
     if (session_data->abort_flow[source_id])
         return false;
+
+    if (session_data->tcp_close[source_id])
+    {
+        // assert(false); // FIXIT-M this should not happen but it does
+        session_data->abort_flow[source_id] = true;
+        return false;
+    }
+    session_data->tcp_close[source_id] = true;
 
 #ifdef REG_TEST
     if (HttpTestManager::use_test_output(HttpTestManager::IN_HTTP2))
@@ -251,7 +278,6 @@ bool Http2StreamSplitter::finish(Flow* flow)
 #endif
         }
         session_data->stream_in_hi = NO_STREAM_ID;
-
     }
 
     return need_reassemble;

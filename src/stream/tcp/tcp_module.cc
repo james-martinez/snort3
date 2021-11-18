@@ -112,6 +112,9 @@ const PegInfo tcp_pegs[] =
     { CountType::SUM, "partial_flush_bytes", "partial flush total bytes" },
     { CountType::SUM, "inspector_fallbacks", "count of fallbacks from assigned service inspector" },
     { CountType::SUM, "partial_fallbacks", "count of fallbacks from assigned service stream splitter" },
+    { CountType::MAX, "max_segs", "maximum number of segments queued in any flow" },
+    { CountType::MAX, "max_bytes", "maximum number of bytes queued in any flow" },
+    { CountType::SUM, "zero_len_tcp_opt", "number of zero length tcp options" },
     { CountType::END, nullptr, nullptr }
 };
 
@@ -171,11 +174,11 @@ static const Parameter stream_tcp_small_params[] =
 
 static const Parameter stream_queue_limit_params[] =
 {
-    { "max_bytes", Parameter::PT_INT, "0:max32", "1048576",
-      "don't queue more than given bytes per session and direction" },
+    { "max_bytes", Parameter::PT_INT, "0:max32", "4194304",
+      "don't queue more than given bytes per session and direction, 0 = unlimited" },
 
-    { "max_segments", Parameter::PT_INT, "0:max32", "2621",
-      "don't queue more than given segments per session and direction" },
+    { "max_segments", Parameter::PT_INT, "0:max32", "3072",
+      "don't queue more than given segments per session and direction, 0 = unlimited" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -215,7 +218,7 @@ static const Parameter s_params[] =
     { "small_segments", Parameter::PT_TABLE, stream_tcp_small_params, nullptr,
       "limit number of small segments queued" },
 
-    { "session_timeout", Parameter::PT_INT, "1:max31", "30",
+    { "session_timeout", Parameter::PT_INT, "1:max31", "180",
       "session tracking timeout" },
 
     { "track_only", Parameter::PT_BOOL, nullptr, "false",

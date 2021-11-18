@@ -27,6 +27,7 @@
 #include "events/event_queue.h"
 #include "log/messages.h"
 #include "managers/inspector_manager.h"
+#include "memory/memory_cap.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "stream/stream_splitter.h"
@@ -58,11 +59,13 @@ SipFlowData::~SipFlowData()
     FreeSipData(&session);
     assert(sip_stats.concurrent_sessions > 0);
     sip_stats.concurrent_sessions--;
+    memory::MemoryCap::update_deallocations(sizeof(SipFlowData));
 }
 
 static SIPData* SetNewSIPData(Packet* p)
 {
     SipFlowData* fd = new SipFlowData;
+    memory::MemoryCap::update_allocations(sizeof(SipFlowData));
     p->flow->set_flow_data(fd);
     return &fd->session;
 }
@@ -146,16 +149,8 @@ static inline int SIP_Process(Packet* p, SIPData* sessp, SIP_PROTO_CONF* config)
     return status;
 }
 
-/* Main runtime entry point for SIP preprocessor.
- * Analyzes SIP packets for anomalies/exploits.
- *
- * PARAMETERS:
- *
- * p:    Pointer to current packet to process.
- * contextp:    Pointer to context block, not used.
- *
- * RETURNS:     Nothing.
- */
+// Main runtime entry point for SIP inspector.
+
 static void snort_sip(SIP_PROTO_CONF* config, Packet* p)
 {
     Profile profile(sipPerfStats);
@@ -233,7 +228,7 @@ void Sip::show(const SnortConfig*) const
     ConfigLogger::log_value("max_content_len", config->maxContentLen);
     ConfigLogger::log_value("max_dialogs", config->maxNumDialogsInSession);
     ConfigLogger::log_value("max_from_len", config->maxFromLen);
-    ConfigLogger::log_value("max_requestName_len", config->maxRequestNameLen);
+    ConfigLogger::log_value("max_request_name_len", config->maxRequestNameLen);
     ConfigLogger::log_value("max_to_len", config->maxToLen);
     ConfigLogger::log_value("max_uri_len", config->maxUriLen);
     ConfigLogger::log_value("max_via_len", config->maxViaLen);
