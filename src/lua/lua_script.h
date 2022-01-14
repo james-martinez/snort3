@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -15,26 +15,26 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
+// lua_script.h author Joel Cornett <jocornet@cisco.com>
 
-// appid_pegs.h author Silviu Minut <sminut@cisco.com>
+#ifndef LUA_SCRIPT_H
+#define LUA_SCRIPT_H
 
-#ifndef APPID_PEGS_H
-#define APPID_PEGS_H
+#include <string>
 
-#include "framework/counts.h"
+#include <lua.hpp>
 
-struct AppIdStats
+#define LUA_DIR_SEP '/'
+#define SCRIPT_DIR_VARNAME "SCRIPT_DIR"
+
+namespace Lua
 {
-    PegCount packets;
-    PegCount processed_packets;
-    PegCount ignored_packets;
-    PegCount total_sessions;
-    PegCount appid_unknown;
-    PegCount service_cache_prunes;
-    PegCount service_cache_adds;
-    PegCount service_cache_removes;
-    PegCount odp_reload_ignored_pkts;
-    PegCount tp_reload_ignored_pkts;
-};
-
+inline void set_script_dir(
+    lua_State* L, const std::string& varname, const std::string& path)
+{
+    std::string dir = path.substr(0, path.rfind(LUA_DIR_SEP));
+    lua_pushlstring(L, dir.c_str(), dir.size());
+    lua_setglobal(L, varname.c_str());
+}
+}
 #endif

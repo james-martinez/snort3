@@ -41,9 +41,7 @@ using namespace snort;
 
 AppIdHttpSession::AppIdHttpSession(AppIdSession& asd, uint32_t http2_stream_id)
     : asd(asd), http2_stream_id(http2_stream_id)
-{
-    memory::MemoryCap::update_allocations(sizeof(AppIdHttpSession));
-}
+{ }
 
 AppIdHttpSession::~AppIdHttpSession()
 {
@@ -51,7 +49,6 @@ AppIdHttpSession::~AppIdHttpSession()
         delete meta_data[i];
     if (tun_dest)
         delete tun_dest;
-    memory::MemoryCap::update_deallocations(sizeof(AppIdHttpSession));
 }
 
 void AppIdHttpSession::free_chp_matches(ChpMatchDescriptor& cmd, unsigned num_matches)
@@ -445,6 +442,9 @@ void AppIdHttpSession::set_client(AppId app_id, AppidChangeBits& change_bits,
     assert(asd.flow);
     if (asd.flow->ha_state)
         asd.flow->ha_state->add(FlowHAState::MODIFIED | FlowHAState::MAJOR);
+    if (asd.get_service_id() == APP_ID_HTTP2)
+        AppIdPegCounts::inc_client_count(app_id);
+
     if (version)
     {
         client.set_version(version);
@@ -470,6 +470,8 @@ void AppIdHttpSession::set_payload(AppId app_id, AppidChangeBits& change_bits,
     assert(asd.flow);
     if (asd.flow->ha_state)
         asd.flow->ha_state->add(FlowHAState::MODIFIED | FlowHAState::MAJOR);
+    if (asd.get_service_id() == APP_ID_HTTP2)
+        AppIdPegCounts::inc_payload_count(app_id);
     payload.set_version(version);
 
     if (appidDebug->is_active())
@@ -490,6 +492,8 @@ void AppIdHttpSession::set_referred_payload(AppId app_id, AppidChangeBits& chang
         return;
 
     referred_payload_app_id = app_id;
+    if (asd.get_service_id() == APP_ID_HTTP2)
+        AppIdPegCounts::inc_referred_count(app_id);
     change_bits.set(APPID_REFERRED_BIT);
 
     if (appidDebug->is_active())

@@ -106,13 +106,10 @@ class TlsSession
 {
 public:
     TlsSession()
-    {
-        memory::MemoryCap::update_allocations(sizeof(*this));
-    }
+    { }
 
     ~TlsSession()
     {
-        memory::MemoryCap::update_deallocations(sizeof(*this));
         if (tls_host)
             snort_free(tls_host);
         if (tls_first_alt_name)
@@ -239,9 +236,6 @@ public:
         bool bidirectional=false);
     void initialize_future_session(AppIdSession&, uint64_t);
 
-    size_t size_of() override
-    { return sizeof(*this); }
-
     snort::Flow* flow = nullptr;
     AppIdConfig& config;
     std::unordered_map<unsigned, AppIdFlowData*> flow_data;
@@ -340,6 +334,7 @@ public:
     void set_ss_application_ids(AppId service, AppId client, AppId payload, AppId misc,
         AppId referred, AppidChangeBits& change_bits);
     void set_ss_application_ids(AppId client, AppId payload, AppidChangeBits& change_bits);
+    void set_ss_application_ids_payload(AppId payload, AppidChangeBits& change_bits);
     void set_application_ids_service(AppId service_id, AppidChangeBits& change_bits);
 
     void examine_ssl_metadata(AppidChangeBits& change_bits);
@@ -629,6 +624,26 @@ public:
         consumed_ha_data = val;
     }
 
+    bool has_no_service_candidate() const
+    {
+        return no_service_candidate;
+    }
+
+    void set_no_service_candidate()
+    {
+        no_service_candidate = true;
+    }
+
+    bool has_no_service_inspector() const
+    {
+        return no_service_inspector;
+    }
+
+    void set_no_service_inspector()
+    {
+        no_service_inspector = true;
+    }
+
 private:
     uint16_t prev_http2_raw_packet = 0;
 
@@ -649,6 +664,8 @@ private:
     uint32_t odp_ctxt_version;
     ThirdPartyAppIdContext* tp_appid_ctxt = nullptr;
     bool consumed_ha_data = false;
+    bool no_service_candidate = false;
+    bool no_service_inspector = false;
 };
 
 #endif

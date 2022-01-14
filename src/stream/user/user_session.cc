@@ -57,7 +57,6 @@ UserSegment* UserSegment::init(const uint8_t* p, unsigned n)
     unsigned bucket = (n > BUCKET) ? n : BUCKET;
     unsigned size = sizeof(UserSegment) + bucket -1;
 
-    memory::MemoryCap::update_allocations(size);
     UserSegment* us = (UserSegment*)snort_alloc(size);
 
     us->size = size;
@@ -71,7 +70,6 @@ UserSegment* UserSegment::init(const uint8_t* p, unsigned n)
 
 void UserSegment::term(UserSegment* us)
 {
-    memory::MemoryCap::update_deallocations(us->size);
     snort_free(us);
 }
 
@@ -161,6 +159,7 @@ void UserTracker::detect(
 
     up->proto_bits = p->proto_bits;
     up->pseudo_type = PSEUDO_PKT_USER;
+    up->ptrs.set_pkt_type(PktType::PDU);
 
     up->packet_flags = flags | PKT_REBUILT_STREAM | PKT_PSEUDO;
     up->packet_flags |= (p->packet_flags & (PKT_FROM_CLIENT|PKT_FROM_SERVER));
@@ -423,10 +422,10 @@ void UserSession::restart(Packet* p)
 //-------------------------------------------------------------------------
 
 UserSession::UserSession(Flow* f) : Session(f)
-{ memory::MemoryCap::update_allocations(sizeof(*this)); }
+{ }
 
 UserSession::~UserSession()
-{ memory::MemoryCap::update_deallocations(sizeof(*this)); }
+{ }
 
 bool UserSession::setup(Packet*)
 {

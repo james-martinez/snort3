@@ -146,9 +146,9 @@ void HttpInspect::show(const SnortConfig*) const
     auto bad_chars = GetBadChars(params->uri_param.bad_characters);
     auto xff_headers = GetXFFHeaders(params->xff_headers);
 
-    std::string js_built_in_ident;
-    for (auto s : params->js_norm_param.built_in_ident)
-        js_built_in_ident += s + " ";
+    std::string js_norm_ident_ignore;
+    for (auto s : params->js_norm_param.ignored_ids)
+        js_norm_ident_ignore += s + " ";
 
     ConfigLogger::log_limit("request_depth", params->request_depth, -1LL);
     ConfigLogger::log_limit("response_depth", params->response_depth, -1LL);
@@ -162,12 +162,13 @@ void HttpInspect::show(const SnortConfig*) const
     ConfigLogger::log_flag("normalize_javascript", params->js_norm_param.normalize_javascript);
     ConfigLogger::log_value("max_javascript_whitespaces",
         params->js_norm_param.max_javascript_whitespaces);
-    ConfigLogger::log_value("js_normalization_depth", params->js_norm_param.js_normalization_depth);
+    ConfigLogger::log_value("js_norm_bytes_depth", params->js_norm_param.js_norm_bytes_depth);
     ConfigLogger::log_value("js_norm_identifier_depth", params->js_norm_param.js_identifier_depth);
     ConfigLogger::log_value("js_norm_max_tmpl_nest", params->js_norm_param.max_template_nesting);
+    ConfigLogger::log_value("js_norm_max_bracket_depth", params->js_norm_param.max_bracket_depth);
     ConfigLogger::log_value("js_norm_max_scope_depth", params->js_norm_param.max_scope_depth);
-    if (!js_built_in_ident.empty())
-        ConfigLogger::log_list("js_norm_built_in_ident", js_built_in_ident.c_str());
+    if (!js_norm_ident_ignore.empty())
+        ConfigLogger::log_list("js_norm_ident_ignore", js_norm_ident_ignore.c_str());
     ConfigLogger::log_value("bad_characters", bad_chars.c_str());
     ConfigLogger::log_value("ignore_unreserved", unreserved_chars.c_str());
     ConfigLogger::log_flag("percent_u", params->uri_param.percent_u);
@@ -274,14 +275,25 @@ bool HttpInspect::get_buf(unsigned id, Packet* p, InspectionBuffer& b)
 }
 
 const Field& HttpInspect::http_get_buf(Cursor& c, Packet* p,
-    const HttpBufferInfo& buffer_info)
+    const HttpBufferInfo& buffer_info) const
 {
-    HttpMsgSection* current_section = HttpContextData::get_snapshot(p);
+    HttpMsgSection* const current_section = HttpContextData::get_snapshot(p);
 
     if (current_section == nullptr)
         return Field::FIELD_NULL;
 
     return current_section->get_classic_buffer(c, buffer_info);
+}
+
+int32_t HttpInspect::http_get_num_headers(Packet* p,
+    const HttpBufferInfo& buffer_info) const
+{
+    const HttpMsgSection* const current_section = HttpContextData::get_snapshot(p);
+
+    if (current_section == nullptr)
+        return STAT_NOT_COMPUTE;
+
+    return current_section->get_num_headers(buffer_info);
 }
 
 bool HttpInspect::get_fp_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b)
@@ -470,20 +482,22 @@ void HttpInspect::eval(Packet* p)
         return;
     }
 
-    if (!session_data->for_http2)
-        HttpModule::increment_peg_counts(PEG_TOTAL_BYTES, p->dsize);
-
-    // FIXIT-M Workaround for unexpected eval() calls. Convert to asserts when possible.
+    // FIXIT-M Workaround for unexpected eval() calls. Currently asserting when stream_user is in
+    // use due to calls to HttpInspect::eval on the raw stream_user packet
     if ((session_data->section_type[source_id] == SEC__NOT_COMPUTE) ||
         (session_data->type_expected[source_id] == SEC_ABORT)       ||
         (session_data->octets_reassembled[source_id] != p->dsize))
     {
-        // assert(session_data->type_expected[source_id] != SEC_ABORT);
-        // assert(session_data->section_type[source_id] != SEC__NOT_COMPUTE);
-        // assert(session_data->octets_reassembled[source_id] == p->dsize);
+        //assert(session_data->type_expected[source_id] != SEC_ABORT);
+        //assert(session_data->section_type[source_id] != SEC__NOT_COMPUTE);
+        //assert(session_data->octets_reassembled[source_id] == p->dsize);
         session_data->type_expected[source_id] = SEC_ABORT;
         return;
     }
+
+    if (!session_data->for_http2)
+        HttpModule::increment_peg_counts(PEG_TOTAL_BYTES, p->dsize);
+
     session_data->octets_reassembled[source_id] = STAT_NOT_PRESENT;
 
     // Don't make pkt_data for headers available to detection
@@ -640,7 +654,7 @@ void HttpInspect::clear(Packet* p)
 
     if ( current_section == nullptr )
     {
-        // assert(false); // FIXIT-M this happens a lot
+        //assert(false); //FIXIT-M This happens with stream_user
         return;
     }
 

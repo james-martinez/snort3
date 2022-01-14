@@ -66,13 +66,13 @@ private:
     void do_enhanced_js_normalization(const Field& input, Field& output);
     void do_legacy_js_normalization(const Field& input, Field& output);
     void clean_partial(uint32_t& partial_inspected_octets, uint32_t& partial_detect_length,
-        uint8_t*& partial_detect_buffer,  uint32_t& partial_js_detect_length,
-        int32_t detect_length);
+        uint8_t*& partial_detect_buffer,  uint32_t& partial_js_detect_length);
     void bookkeeping_regular_flush(uint32_t& partial_detect_length,
         uint8_t*& partial_detect_buffer, uint32_t& partial_js_detect_length,
         int32_t detect_length);
     void get_file_info( FileDirection dir, const uint8_t*& filename_buffer,
         uint32_t& filename_length, const uint8_t*& uri_buffer, uint32_t& uri_length);
+    void get_ole_data();
 
     // In order of generation
     Field msg_text_new;
@@ -84,6 +84,7 @@ private:
     Field norm_js_data;
     Field classic_client_body;   // URI normalization applied
     Field decompressed_vba_data;
+    Field ole_data;
 
     int32_t publish_length = HttpCommon::STAT_NOT_PRESENT;
 };

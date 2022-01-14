@@ -1,6 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
-// Copyright (C) 2005-2013 Sourcefire, Inc.
+// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -17,19 +16,22 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-// client_app_ssh.h author Sourcefire Inc.
+// memory_allocator.h author Joel Cornett <jocornet@cisco.com>
 
-#ifndef CLIENT_APP_SSH_H
-#define CLIENT_APP_SSH_H
+#ifndef MEMORY_ALLOCATOR_H
+#define MEMORY_ALLOCATOR_H
 
-#include "client_plugins/client_detector.h"
+#include <cstddef>
 
-class SshClientDetector : public ClientDetector
+namespace memory
 {
-public:
-    SshClientDetector(ClientDiscovery*);
 
-    int validate(AppIdDiscoveryArgs&) override;
+struct MemoryAllocator
+{
+    static void* allocate(size_t);
+    static void deallocate(void*);
 };
-#endif
 
+} // namespace memory
+
+#endif

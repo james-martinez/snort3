@@ -164,6 +164,7 @@ const char* Packet::get_type() const
         return "UDP";
 
     case PktType::PDU:
+    case PktType::USER:
     case PktType::FILE:
         if ( proto_bits & PROTO_BIT__TCP )
             return "TCP";
@@ -224,7 +225,7 @@ const char* Packet::get_pseudo_type() const
 }
 
 // Things that are set prior to PDU creation and used after PDU creation
-static inline uint32_t get_session_flags(Packet& p)
+static inline uint32_t get_session_flags(const Packet& p)
 {
     if ( p.ptrs.get_pkt_type() == PktType::PDU )
         return p.context->get_session_flags();

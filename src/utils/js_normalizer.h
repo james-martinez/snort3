@@ -34,7 +34,7 @@ class JSNormalizer
 {
 public:
     JSNormalizer(JSIdentifierCtxBase& js_ident_ctx, size_t depth,
-        uint8_t max_template_nesting, uint32_t max_scope_depth,
+        uint8_t max_template_nesting, uint32_t max_bracket_depth,
         int tmp_cap_size = JSTOKENIZER_BUF_MAX_SIZE);
     ~JSNormalizer();
 
@@ -57,6 +57,13 @@ public:
 
     static size_t size()
     { return sizeof(JSNormalizer) + 16834; /* YY_BUF_SIZE */ }
+
+#ifdef CATCH_TEST_BUILD
+    const char* get_tmp_buf() const
+    { return tmp_buf; }
+    size_t get_tmp_buf_size() const
+    { return tmp_buf_size; }
+#endif
 
 #ifdef BENCHMARK_TEST
     void rewind_output()

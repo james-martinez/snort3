@@ -409,7 +409,7 @@ static inline void process_quic(AppIdSession& asd,
     if ( !asd.tsession )
         asd.tsession = new TlsSession();
 
-    if ( (field=attribute_data.quic_sni()) != nullptr )
+    if ( !asd.tsession->get_tls_host() and (field=attribute_data.quic_sni()) != nullptr )
     {
         if ( appidDebug->is_active() )
             LogMessage("AppIdDbg %s Flow is QUIC\n", appidDebug->get_debug_session());
@@ -556,7 +556,6 @@ bool do_tp_discovery(ThirdPartyAppIdContext& tp_appid_ctxt, AppIdSession& asd, I
             ErrorMessage("Could not allocate asd.tpsession data");
             return false;
         }
-        memory::MemoryCap::update_allocations(asd.tpsession->size_of());
     }
 
     int tp_confidence;

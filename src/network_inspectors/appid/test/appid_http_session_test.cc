@@ -165,9 +165,6 @@ void Profiler::consolidate_stats() { }
 void Profiler::reset_stats() { }
 void Profiler::show_stats() { }
 
-void memory::MemoryCap::update_allocations(size_t) { }
-void memory::MemoryCap::update_deallocations(size_t) { }
-
 OdpContext::OdpContext(const AppIdConfig&, snort::SnortConfig*) { }
 
 AppIdConfig::~AppIdConfig() = default;
@@ -187,6 +184,7 @@ TEST_GROUP(appid_http_session)
         session->flow = &flow;
         mock_hsession = new AppIdHttpSession(*session, 0);
         appidDebug = new AppIdDebug();
+        AppIdPegCounts::init_pegs();
     }
 
     void teardown() override
@@ -194,6 +192,7 @@ TEST_GROUP(appid_http_session)
         delete appidDebug;
         delete mock_hsession;
         delete session;
+        AppIdPegCounts::cleanup_pegs();
     }
 };
 

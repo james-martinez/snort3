@@ -201,6 +201,10 @@ struct dce2SmbStats
     PegCount v2_ioctl_resp_hdr_err;
     PegCount concurrent_sessions;
     PegCount max_concurrent_sessions;
+    PegCount total_smb1_sessions;
+    PegCount total_smb2_sessions;
+    PegCount total_encrypted_sessions;
+    PegCount total_mc_sessions;
 };
 
 enum DCE2_SmbVersion
@@ -282,9 +286,6 @@ public:
 
     static void init()
     { inspector_id = snort::FlowData::create_flow_data_id(); }
-
-    size_t size_of() override
-    { return sizeof(*this); }
 
     Dce2SmbSessionData* get_smb_session_data()
     { return ssd; }

@@ -45,8 +45,6 @@ Http2Stream::Http2Stream(uint32_t stream_id_, Http2FlowData* session_data_) :
 Http2Stream::~Http2Stream()
 {
     delete current_frame;
-    if (hi_flow_data)
-        session_data->deallocate_hi_memory(hi_flow_data);
     delete hi_flow_data;
 }
 
@@ -77,7 +75,6 @@ void Http2Stream::check_and_cleanup_completed()
     {
         if (hi_flow_data != nullptr)
         {
-            session_data->deallocate_hi_memory(hi_flow_data);
             delete hi_flow_data;
             hi_flow_data = nullptr;
         }
@@ -108,7 +105,6 @@ void Http2Stream::set_hi_flow_data(HttpFlowData* flow_data)
 {
     assert(hi_flow_data == nullptr);
     hi_flow_data = flow_data;
-    session_data->allocate_hi_memory(hi_flow_data);
 }
 
 const Field& Http2Stream::get_buf(unsigned id)
@@ -131,6 +127,7 @@ bool Http2Stream::is_open(HttpCommon::SourceId source_id)
     return (state[source_id] == STREAM_EXPECT_BODY) || (state[source_id] == STREAM_BODY);
 }
 
+// Caller must set session_data->stream_in_hi before calling this
 void Http2Stream::finish_msg_body(HttpCommon::SourceId source_id, bool expect_trailers,
     bool clear_partial_buffer)
 {

@@ -29,7 +29,7 @@ using namespace snort;
 using namespace std;
 
 JSNormalizer::JSNormalizer(JSIdentifierCtxBase& js_ident_ctx, size_t norm_depth,
-    uint8_t max_template_nesting, uint32_t max_scope_depth, int tmp_cap_size)
+    uint8_t max_template_nesting, uint32_t max_bracket_depth, int tmp_cap_size)
     : depth(norm_depth),
       rem_bytes(norm_depth),
       unlim(norm_depth == static_cast<size_t>(-1)),
@@ -38,7 +38,7 @@ JSNormalizer::JSNormalizer(JSIdentifierCtxBase& js_ident_ctx, size_t norm_depth,
       tmp_buf_size(0),
       in(&in_buf),
       out(&out_buf),
-      tokenizer(in, out, js_ident_ctx, max_template_nesting, max_scope_depth, tmp_buf, tmp_buf_size, tmp_cap_size)
+      tokenizer(in, out, js_ident_ctx, max_template_nesting, max_bracket_depth, tmp_buf, tmp_buf_size, tmp_cap_size)
 {
 }
 
@@ -51,7 +51,17 @@ JSNormalizer::~JSNormalizer()
 
 JSTokenizer::JSRet JSNormalizer::normalize(const char* src, size_t src_len)
 {
-    if (rem_bytes == 0 && !unlim)
+    assert(src);
+
+    if (src_len == 0)
+    {
+        src_next = src;
+        return JSTokenizer::SCRIPT_CONTINUE;
+    }
+
+    rem_bytes = unlim ? src_len + 1 : rem_bytes;
+
+    if (rem_bytes == 0)
     {
         debug_log(5, http_trace, TRACE_JS_PROC, nullptr,
             "depth limit reached\n");
@@ -60,25 +70,20 @@ JSTokenizer::JSRet JSNormalizer::normalize(const char* src, size_t src_len)
         return JSTokenizer::EOS;
     }
 
-    size_t len = unlim ? src_len :
-        src_len < rem_bytes ? src_len : rem_bytes;
-
     debug_logf(4, http_trace, TRACE_JS_DUMP, nullptr,
         "tmp buffer[%zu]: %.*s\n", tmp_buf_size, static_cast<int>(tmp_buf_size), tmp_buf);
 
+    src_len = min(src_len, rem_bytes);
+
     in_buf.pubsetbuf(nullptr, 0)
         ->pubsetbuf(tmp_buf, tmp_buf_size)
-        ->pubsetbuf(const_cast<char*>(src), len);
+        ->pubsetbuf(const_cast<char*>(src), src_len);
     out_buf.reserve(src_len * BUFF_EXP_FACTOR);
 
-    tokenizer.pre_yylex();
-    JSTokenizer::JSRet ret = static_cast<JSTokenizer::JSRet>(tokenizer.yylex());
-    in.clear();
-    out.clear();
-
     size_t r_bytes = in_buf.last_chunk_offset();
-    if (!unlim)
-        rem_bytes -= r_bytes;
+    auto ret = tokenizer.process(r_bytes);
+
+    rem_bytes -= r_bytes;
     src_next = src + r_bytes;
 
     return rem_bytes ? ret : JSTokenizer::EOS;

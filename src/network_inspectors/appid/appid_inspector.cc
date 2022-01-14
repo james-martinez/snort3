@@ -44,7 +44,9 @@
 #include "appid_http2_req_body_event_handler.h"
 #include "appid_opportunistic_tls_event_handler.h"
 #include "appid_peg_counts.h"
+#include "appid_service_event_handler.h"
 #include "appid_session.h"
+#include "appid_ssh_event_handler.h"
 #include "appid_stats.h"
 #include "client_plugins/client_discovery.h"
 #include "detector_plugins/detector_pattern.h"
@@ -120,24 +122,27 @@ bool AppIdInspector::configure(SnortConfig* sc)
 
     ctxt->init_appid(sc, *this);
 
-    DataBus::subscribe_global(SIP_EVENT_TYPE_SIP_DIALOG_KEY, new SipEventHandler(*this), sc);
+    DataBus::subscribe_network(SIP_EVENT_TYPE_SIP_DIALOG_KEY, new SipEventHandler(*this));
 
-    DataBus::subscribe_global(HTTP_REQUEST_HEADER_EVENT_KEY, new HttpEventHandler(
-        HttpEventHandler::REQUEST_EVENT, *this), sc);
+    DataBus::subscribe_network(HTTP_REQUEST_HEADER_EVENT_KEY, new HttpEventHandler(
+        HttpEventHandler::REQUEST_EVENT, *this));
 
-    DataBus::subscribe_global(HTTP_RESPONSE_HEADER_EVENT_KEY, new HttpEventHandler(
-        HttpEventHandler::RESPONSE_EVENT, *this), sc);
+    DataBus::subscribe_network(HTTP_RESPONSE_HEADER_EVENT_KEY, new HttpEventHandler(
+        HttpEventHandler::RESPONSE_EVENT, *this));
 
-    DataBus::subscribe_global(HTTP2_REQUEST_BODY_EVENT_KEY, new AppIdHttp2ReqBodyEventHandler(),
-        sc);
+    DataBus::subscribe_network(HTTP2_REQUEST_BODY_EVENT_KEY, new AppIdHttp2ReqBodyEventHandler());
 
-    DataBus::subscribe_global(DATA_DECRYPT_EVENT, new DataDecryptEventHandler(), sc);
+    DataBus::subscribe_network(DATA_DECRYPT_EVENT, new DataDecryptEventHandler());
 
-    DataBus::subscribe_global(DCERPC_EXP_SESSION_EVENT_KEY, new DceExpSsnEventHandler(), sc);
+    DataBus::subscribe_network(DCERPC_EXP_SESSION_EVENT_KEY, new DceExpSsnEventHandler());
 
-    DataBus::subscribe_global(OPPORTUNISTIC_TLS_EVENT, new AppIdOpportunisticTlsEventHandler(), sc);
+    DataBus::subscribe_network(OPPORTUNISTIC_TLS_EVENT, new AppIdOpportunisticTlsEventHandler());
 
-    DataBus::subscribe_global(EFP_PROCESS_EVENT, new AppIdEfpProcessEventHandler(), sc);
+    DataBus::subscribe_network(EFP_PROCESS_EVENT, new AppIdEfpProcessEventHandler());
+
+    DataBus::subscribe_network(SSH_EVENT, new SshEventHandler());
+
+    DataBus::subscribe_network(FLOW_NO_SERVICE_EVENT, new AppIdServiceEventHandler(*this));
 
     return true;
 }

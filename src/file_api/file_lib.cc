@@ -92,6 +92,12 @@ char* FileContext::get_UTF8_fname(size_t* converted_len)
 
 FileInfo::~FileInfo ()
 {
+    if (user_file_data)
+    {
+        delete user_file_data;
+        set_file_data(nullptr);
+    }
+
     if (sha256)
         delete[] sha256;
 }
@@ -286,6 +292,16 @@ int64_t FileInfo::get_max_file_capture_size()
     return (file_capture ? file_capture->get_max_file_capture_size() : 0);
 }
 
+void FileInfo::set_file_data(UserFileDataBase* fd)
+{
+    user_file_data = fd;
+}
+
+UserFileDataBase* FileInfo::get_file_data()
+{
+    return user_file_data;
+}
+
 FileContext::FileContext ()
 {
     file_type_context = nullptr;
@@ -342,8 +358,12 @@ void FileContext::log_file_event(Flow* flow, FilePolicyBase* policy)
             break;
         }
 
-        if (policy and log_needed)
+        user_file_data_mutex.lock();
+
+        if (policy and log_needed and user_file_data)
             policy->log_file_action(flow, this, FILE_ACTION_DEFAULT);
+
+        user_file_data_mutex.unlock();
 
         if ( config->trace_type )
             print(std::cout);

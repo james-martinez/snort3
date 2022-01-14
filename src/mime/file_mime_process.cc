@@ -711,6 +711,14 @@ void MimeSession::set_mime_stats(MimeStats* stats)
     mime_stats = stats;
 }
 
+const BufferData& MimeSession::get_vba_inspect_buf()
+{
+    if (!decode_state)
+        return BufferData::buffer_null;
+
+    return decode_state->get_decomp_vba_data();
+}
+
 MailLogState* MimeSession::get_log_state()
 {
     return log_state;
@@ -815,12 +823,10 @@ MimeSession::MimeSession(Packet* p, DecodeConfig* dconf, MailLogConfig* lconf, u
 {
     p->flow->stash->store(STASH_EXTRADATA_MIME, log_state);
     reset_mime_paf_state(&mime_boundary);
-    memory::MemoryCap::update_allocations(sizeof(*this));
 }
 
 MimeSession::~MimeSession()
 {
-    memory::MemoryCap::update_deallocations(sizeof(*this));
     if ( decode_state )
         delete(decode_state);
 }

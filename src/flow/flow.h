@@ -229,7 +229,7 @@ public:
     uint32_t set_session_flags(uint32_t ssn_flags)
     { return ssn_state.session_flags |= ssn_flags; }
 
-    uint32_t get_session_flags()
+    uint32_t get_session_flags() const
     { return ssn_state.session_flags; }
 
     uint32_t clear_session_flags(uint32_t ssn_flags)
@@ -255,6 +255,8 @@ public:
 
     bool is_pdu_inorder(uint8_t dir);
 
+    bool is_direction_aborted(bool from_client) const;
+
     void set_proxied()
     { ssn_state.session_flags |= SSNFLAG_PROXIED; }
 
@@ -262,7 +264,7 @@ public:
     { return (ssn_state.session_flags & SSNFLAG_PROXIED) != 0; }
 
     bool is_stream()
-    { return pkt_type == PktType::TCP or pkt_type == PktType::PDU; }
+    { return pkt_type == PktType::TCP or pkt_type == PktType::USER; }
 
     void block()
     { ssn_state.session_flags |= SSNFLAG_BLOCK; }
@@ -439,10 +441,11 @@ public:  // FIXIT-M privatize if possible
 
     unsigned inspection_policy_id;
     unsigned ips_policy_id;
-    unsigned network_policy_id;
     unsigned reload_id;
 
     uint32_t iplist_monitor_id;
+
+    uint32_t tenant;
 
     uint32_t default_session_timeout;
 
@@ -481,6 +484,7 @@ public:  // FIXIT-M privatize if possible
         bool data_decrypted : 1;    // indicate data in current flow is decrypted TLS application data
         bool snort_proto_id_set_by_ha : 1;
         bool efd_flow : 1;  // Indicate that current flow is an elephant flow
+        bool svc_event_generated : 1; // Set if FLOW_NO_SERVICE_EVENT was generated for this flow
     } flags;
 
     FlowState flow_state;

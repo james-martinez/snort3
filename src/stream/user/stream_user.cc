@@ -21,6 +21,8 @@
 #include "config.h"
 #endif
 
+#include <cassert>
+
 #include "stream_user.h"
 
 #include "log/messages.h"
@@ -69,9 +71,7 @@ StreamUser::~StreamUser()
 
 void StreamUser::show(const SnortConfig*) const
 {
-    if ( !config )
-        return;
-
+    assert(config);
     ConfigLogger::log_value("session_timeout", config->session_timeout);
 }
 
@@ -128,7 +128,7 @@ static const InspectApi user_api =
         mod_dtor
     },
     IT_STREAM,
-    PROTO_BIT__PDU,
+    PROTO_BIT__USER,
     nullptr, // buffers
     nullptr, // service
     nullptr, // pinit

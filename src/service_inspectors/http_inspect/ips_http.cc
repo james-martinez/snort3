@@ -41,14 +41,16 @@ using namespace snort;
 using namespace HttpCommon;
 using namespace HttpEnums;
 
-THREAD_LOCAL std::array<ProfileStats, PSI_MAX> HttpCursorModule::http_ps;
+THREAD_LOCAL std::array<ProfileStats, PSI_MAX> HttpRuleOptModule::http_ps;
 
-bool HttpCursorModule::begin(const char*, int, SnortConfig*)
+const std::string hdrs_num_range = "0:" + std::to_string(HttpMsgHeadShared::MAX_HEADERS);
+
+bool HttpRuleOptModule::begin(const char*, int, SnortConfig*)
 {
     para_list.reset();
     sub_id = 0;
     form = 0;
-    switch (buffer_index)
+    switch (rule_opt_index)
     {
     case HTTP_BUFFER_RAW_STATUS:
     case HTTP_BUFFER_STAT_CODE:
@@ -66,6 +68,8 @@ bool HttpCursorModule::begin(const char*, int, SnortConfig*)
     case HTTP_BUFFER_TRUE_IP:
     case HTTP_BUFFER_URI:
     case HTTP_BUFFER_VERSION:
+    case HTTP_RANGE_NUM_HDRS:
+    case HTTP_VERSION_MATCH:
         inspect_section = IS_FLEX_HEADER;
         break;
     case HTTP_BUFFER_CLIENT_BODY:
@@ -75,6 +79,7 @@ bool HttpCursorModule::begin(const char*, int, SnortConfig*)
         break;
     case HTTP_BUFFER_RAW_TRAILER:
     case HTTP_BUFFER_TRAILER:
+    case HTTP_RANGE_NUM_TRAILERS:
         inspect_section = IS_TRAILER;
         break;
     default:
@@ -83,7 +88,45 @@ bool HttpCursorModule::begin(const char*, int, SnortConfig*)
     return true;
 }
 
-bool HttpCursorModule::set(const char*, Value& v, SnortConfig*)
+static const std::map <std::string, VersionId> VersionStrToEnum =
+{
+    { "malformed", VERS__PROBLEMATIC },
+    { "other", VERS__OTHER },
+    { "1.0", VERS_1_0 },
+    { "1.1", VERS_1_1 },
+    { "2.0", VERS_2_0 },
+    { "0.9", VERS_0_9 }
+};
+
+bool HttpRuleOptModule::parse_version_list(Value& v)
+{
+    v.set_first_token();
+    std::string tok;
+
+    while ( v.get_next_token(tok) )
+    {
+        if (tok[0] == '"')
+            tok.erase(0, 1);
+
+        if (tok.length() == 0)
+            continue;
+
+        if (tok[tok.length()-1] == '"')
+            tok.erase(tok.length()-1, 1);
+
+        auto iter = VersionStrToEnum.find(tok);
+        if (iter == VersionStrToEnum.end())
+        {
+            ParseError("Unrecognized version %s\n", tok.c_str());
+            return false;
+        }
+
+        para_list.version_flags[iter->second - VERS__MIN] = true;
+    }
+    return true;
+}
+
+bool HttpRuleOptModule::set(const char*, Value& v, SnortConfig*)
 {
     if (v.is("field"))
     {
@@ -163,31 +206,35 @@ bool HttpCursorModule::set(const char*, Value& v, SnortConfig*)
         para_list.fragment = true;
         sub_id = UC_FRAGMENT;
     }
-    else
+    else if (v.is("~range"))
     {
-        return false;
+        return para_list.range.validate(v.get_string(), hdrs_num_range.c_str());
+    }
+    else if (v.is("~version_list"))
+    {
+        return parse_version_list(v);
     }
     return true;
 }
 
-bool HttpCursorModule::end(const char*, int, SnortConfig*)
+bool HttpRuleOptModule::end(const char*, int, SnortConfig*)
 {
     // Check for option conflicts
     if (para_list.with_header + para_list.with_body + para_list.with_trailer > 1)
         ParseError("Only specify one with_ option. Use the one that happens last.");
-    if (((buffer_index == HTTP_BUFFER_TRAILER) || (buffer_index == HTTP_BUFFER_RAW_TRAILER)) &&
+    if (((rule_opt_index == HTTP_BUFFER_TRAILER) || (rule_opt_index == HTTP_BUFFER_RAW_TRAILER) || (rule_opt_index == HTTP_RANGE_NUM_TRAILERS)) &&
         (para_list.with_header || para_list.with_body) &&
         !para_list.request)
         ParseError("Trailers with with_ option must also specify request");
     if (para_list.scheme + para_list.host + para_list.port + para_list.path + para_list.query +
           para_list.fragment > 1)
         ParseError("Only specify one part of the URI");
-    if (buffer_index == HTTP_BUFFER_PARAM && para_list.param.length() == 0)
+    if (rule_opt_index == HTTP_BUFFER_PARAM && para_list.param.length() == 0)
         ParseError("Specify parameter name");
     return true;
 }
 
-void HttpCursorModule::HttpRuleParaList::reset()
+void HttpRuleOptModule::HttpRuleParaList::reset()
 {
     field.clear();
     param.clear();
@@ -202,6 +249,8 @@ void HttpCursorModule::HttpRuleParaList::reset()
     path = false;
     query = false;
     fragment = false;
+    range.init();
+    version_flags = 0;
 }
 
 uint32_t HttpIpsOption::hash() const
@@ -210,6 +259,8 @@ uint32_t HttpIpsOption::hash() const
     uint32_t b = (uint32_t)inspect_section;
     uint32_t c = buffer_info.hash();
     mix(a,b,c);
+    a += range.hash();
+    b += (uint32_t)version_flags.to_ulong();
     finalize(a,b,c);
     return c;
 }
@@ -219,7 +270,9 @@ bool HttpIpsOption::operator==(const IpsOption& ips) const
     const HttpIpsOption& hio = static_cast<const HttpIpsOption&>(ips);
     return IpsOption::operator==(ips) &&
            inspect_section == hio.inspect_section &&
-           buffer_info == hio.buffer_info;
+           buffer_info == hio.buffer_info &&
+           range == hio.range &&
+           version_flags == hio.version_flags;
 }
 
 bool HttpIpsOption::retry(Cursor& current_cursor, const Cursor&)
@@ -234,9 +287,23 @@ bool HttpIpsOption::retry(Cursor& current_cursor, const Cursor&)
     return false;
 }
 
+IpsOption::EvalStatus HttpIpsOption::eval_version_match(Packet* p, const Http2FlowData* h2i_flow_data)
+{
+    const HttpFlowData* const flow_data = (h2i_flow_data != nullptr) ?
+        (HttpFlowData*)h2i_flow_data->get_hi_flow_data():
+        (HttpFlowData*)p->flow->get_flow_data(HttpFlowData::inspector_id);
+    const SourceId source_id = p->is_from_client() ? SRC_CLIENT : SRC_SERVER;
+    const VersionId version = flow_data->get_version_id(source_id);
+
+    if (version_flags[version - HttpEnums::VERS__MIN])
+        return MATCH;
+
+    return NO_MATCH;
+}
+
 IpsOption::EvalStatus HttpIpsOption::eval(Cursor& c, Packet* p)
 {
-    RuleProfile profile(HttpCursorModule::http_ps[psi]);
+    RuleProfile profile(HttpRuleOptModule::http_ps[psi]);
 
     if (!p->flow || !p->flow->gadget || (HttpInspect::get_latest_is(p) == IS_NONE))
         return NO_MATCH;
@@ -252,17 +319,32 @@ IpsOption::EvalStatus HttpIpsOption::eval(Cursor& c, Packet* p)
     const Http2FlowData* const h2i_flow_data =
         (Http2FlowData*)p->flow->get_flow_data(Http2FlowData::inspector_id);
 
-    HttpInspect* const hi = (h2i_flow_data != nullptr) ?
+    const HttpInspect* const hi = (h2i_flow_data != nullptr) ?
         (HttpInspect*)(p->flow->assistant_gadget) : (HttpInspect*)(p->flow->gadget);
 
-    const Field& http_buffer = hi->http_get_buf(c, p, buffer_info);
+    if (buffer_info.type <= HTTP__BUFFER_MAX)
+    {
+        const Field& http_buffer = hi->http_get_buf(c, p, buffer_info);
 
-    if (http_buffer.length() <= 0)
+        if (http_buffer.length() <= 0)
+            return NO_MATCH;
+
+        c.set(key, http_buffer.start(), http_buffer.length());
+
+        return MATCH;
+    }
+    else if (buffer_info.type == HTTP_VERSION_MATCH)
+    {
+        return eval_version_match(p, h2i_flow_data);
+    }
+    else
+    {
+        const int32_t num_lines = hi->http_get_num_headers(p, buffer_info);
+        if (num_lines != HttpCommon::STAT_NOT_PRESENT && range.eval(num_lines))
+            return MATCH;
+
         return NO_MATCH;
-
-    c.set(key, http_buffer.start(), http_buffer.length());
-
-    return MATCH;
+    }
 }
 
 //-------------------------------------------------------------------------
@@ -276,7 +358,7 @@ IpsOption::EvalStatus HttpIpsOption::eval(Cursor& c, Packet* p)
 
 static Module* client_body_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_CLIENT_BODY, CAT_SET_BODY,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_CLIENT_BODY, CAT_SET_BODY,
         PSI_CLIENT_BODY);
 }
 
@@ -292,7 +374,7 @@ static const IpsApi client_body_api =
         IPS_OPT,
         IPS_HELP,
         client_body_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -329,7 +411,7 @@ static const Parameter http_cookie_params[] =
 
 static Module* cookie_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_COOKIE, CAT_SET_COOKIE, PSI_COOKIE,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_COOKIE, CAT_SET_COOKIE, PSI_COOKIE,
         http_cookie_params);
 }
 
@@ -345,7 +427,7 @@ static const IpsApi cookie_api =
         IPS_OPT,
         IPS_HELP,
         cookie_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -390,7 +472,7 @@ static const Parameter http_header_params[] =
 
 static Module* header_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_HEADER, CAT_SET_HEADER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_HEADER, CAT_SET_HEADER,
         PSI_HEADER, http_header_params);
 }
 
@@ -406,7 +488,7 @@ static const IpsApi header_api =
         IPS_OPT,
         IPS_HELP,
         header_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -441,7 +523,7 @@ static const Parameter http_method_params[] =
 
 static Module* method_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_METHOD, CAT_SET_METHOD, PSI_METHOD,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_METHOD, CAT_SET_METHOD, PSI_METHOD,
         http_method_params);
 }
 
@@ -457,7 +539,7 @@ static const IpsApi method_api =
         IPS_OPT,
         IPS_HELP,
         method_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -490,7 +572,7 @@ static const Parameter http_param_params[] =
 
 static Module* param_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_PARAM, CAT_SET_OTHER, PSI_PARAM,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_PARAM, CAT_SET_OTHER, PSI_PARAM,
         http_param_params);
 }
 
@@ -506,7 +588,7 @@ static const IpsApi param_api =
         IPS_OPT,
         IPS_HELP,
         param_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -530,7 +612,7 @@ static const IpsApi param_api =
 
 static Module* raw_body_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_BODY, CAT_SET_OTHER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_BODY, CAT_SET_OTHER,
         PSI_RAW_BODY);
 }
 
@@ -546,7 +628,7 @@ static const IpsApi raw_body_api =
         IPS_OPT,
         IPS_HELP,
         raw_body_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -583,7 +665,7 @@ static const Parameter http_raw_cookie_params[] =
 
 static Module* raw_cookie_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_COOKIE, CAT_SET_OTHER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_COOKIE, CAT_SET_OTHER,
         PSI_RAW_COOKIE, http_raw_cookie_params);
 }
 
@@ -599,7 +681,7 @@ static const IpsApi raw_cookie_api =
         IPS_OPT,
         IPS_HELP,
         raw_cookie_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -638,7 +720,7 @@ static const Parameter http_raw_header_params[] =
 
 static Module* raw_header_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_HEADER, CAT_SET_RAW_HEADER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_HEADER, CAT_SET_RAW_HEADER,
         PSI_RAW_HEADER, http_raw_header_params);
 }
 
@@ -654,7 +736,7 @@ static const IpsApi raw_header_api =
         IPS_OPT,
         IPS_HELP,
         raw_header_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -689,7 +771,7 @@ static const Parameter http_raw_request_params[] =
 
 static Module* raw_request_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_REQUEST, CAT_SET_OTHER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_REQUEST, CAT_SET_OTHER,
         PSI_RAW_REQUEST, http_raw_request_params);
 }
 
@@ -705,7 +787,7 @@ static const IpsApi raw_request_api =
         IPS_OPT,
         IPS_HELP,
         raw_request_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -738,7 +820,7 @@ static const Parameter http_raw_status_params[] =
 
 static Module* raw_status_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_STATUS, CAT_SET_OTHER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_STATUS, CAT_SET_OTHER,
         PSI_RAW_STATUS, http_raw_status_params);
 }
 
@@ -754,7 +836,7 @@ static const IpsApi raw_status_api =
         IPS_OPT,
         IPS_HELP,
         raw_status_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -792,7 +874,7 @@ static const Parameter http_raw_trailer_params[] =
 
 static Module* raw_trailer_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_TRAILER, CAT_SET_RAW_HEADER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_TRAILER, CAT_SET_RAW_HEADER,
         PSI_RAW_TRAILER, http_raw_trailer_params);
 }
 
@@ -808,7 +890,7 @@ static const IpsApi raw_trailer_api =
         IPS_OPT,
         IPS_HELP,
         raw_trailer_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -855,7 +937,7 @@ static const Parameter http_raw_uri_params[] =
 
 static Module* raw_uri_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_URI, CAT_SET_RAW_KEY,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_RAW_URI, CAT_SET_RAW_KEY,
         PSI_RAW_URI, http_raw_uri_params);
 }
 
@@ -871,7 +953,7 @@ static const IpsApi raw_uri_api =
         IPS_OPT,
         IPS_HELP,
         raw_uri_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -904,7 +986,7 @@ static const Parameter http_stat_code_params[] =
 
 static Module* stat_code_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_STAT_CODE, CAT_SET_STAT_CODE,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_STAT_CODE, CAT_SET_STAT_CODE,
         PSI_STAT_CODE, http_stat_code_params);
 }
 
@@ -920,7 +1002,7 @@ static const IpsApi stat_code_api =
         IPS_OPT,
         IPS_HELP,
         stat_code_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -953,7 +1035,7 @@ static const Parameter http_stat_msg_params[] =
 
 static Module* stat_msg_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_STAT_MSG, CAT_SET_STAT_MSG,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_STAT_MSG, CAT_SET_STAT_MSG,
         PSI_STAT_MSG, http_stat_msg_params);
 }
 
@@ -969,7 +1051,7 @@ static const IpsApi stat_msg_api =
         IPS_OPT,
         IPS_HELP,
         stat_msg_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -1006,7 +1088,7 @@ static const Parameter http_trailer_params[] =
 
 static Module* trailer_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_TRAILER, CAT_SET_HEADER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_TRAILER, CAT_SET_HEADER,
         PSI_TRAILER, http_trailer_params);
 }
 
@@ -1022,7 +1104,7 @@ static const IpsApi trailer_api =
         IPS_OPT,
         IPS_HELP,
         trailer_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -1057,7 +1139,7 @@ static const Parameter http_true_ip_params[] =
 
 static Module* true_ip_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_TRUE_IP, CAT_SET_OTHER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_TRUE_IP, CAT_SET_OTHER,
         PSI_TRUE_IP, http_true_ip_params);
 }
 
@@ -1073,7 +1155,7 @@ static const IpsApi true_ip_api =
         IPS_OPT,
         IPS_HELP,
         true_ip_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -1120,7 +1202,7 @@ static const Parameter http_uri_params[] =
 
 static Module* uri_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_URI, CAT_SET_KEY, PSI_URI,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_URI, CAT_SET_KEY, PSI_URI,
         http_uri_params);
 }
 
@@ -1136,7 +1218,7 @@ static const IpsApi uri_api =
         IPS_OPT,
         IPS_HELP,
         uri_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -1173,7 +1255,7 @@ static const Parameter http_version_params[] =
 
 static Module* version_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_VERSION, CAT_SET_OTHER,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_VERSION, CAT_SET_OTHER,
         PSI_VERSION, http_version_params);
 }
 
@@ -1189,7 +1271,7 @@ static const IpsApi version_api =
         IPS_OPT,
         IPS_HELP,
         version_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -1213,7 +1295,7 @@ static const IpsApi version_api =
 #define IPS_HELP "rule option to set detection cursor to normalized JavaScript data"
 static Module* js_data_mod_ctor()
 {
-    return new HttpCursorModule(IPS_OPT, IPS_HELP, BUFFER_JS_DATA, CAT_SET_JS_DATA,
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, BUFFER_JS_DATA, CAT_SET_JS_DATA,
         PSI_JS_DATA);
 }
 
@@ -1229,7 +1311,146 @@ static const IpsApi js_data_api =
         IPS_OPT,
         IPS_HELP,
         js_data_mod_ctor,
-        HttpCursorModule::mod_dtor
+        HttpRuleOptModule::mod_dtor
+    },
+    OPT_TYPE_DETECTION,
+    0, PROTO_BIT__TCP,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    HttpIpsOption::opt_ctor,
+    HttpIpsOption::opt_dtor,
+    nullptr
+};
+
+//-------------------------------------------------------------------------
+// num_header_lines
+//-------------------------------------------------------------------------
+#undef IPS_OPT
+#define IPS_OPT "num_headers"
+#undef IPS_HELP
+#define IPS_HELP "rule option to perform range check on number of headers"
+
+static const Parameter http_num_hdrs_params[] =
+{
+    { "~range", Parameter::PT_INTERVAL, hdrs_num_range.c_str(), nullptr,
+        "check that number of headers of current buffer are in given range" },
+    { "request", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against the version from the request message even when examining the response" },
+    { "with_header", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "this rule is limited to examining HTTP message headers" },
+    { "with_body", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "parts of this rule examine HTTP message body" },
+    { "with_trailer", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "parts of this rule examine HTTP message trailers" },
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+static Module* num_hdrs_mod_ctor()
+{
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_RANGE_NUM_HDRS, CAT_SET_OTHER,
+	PSI_RANGE_NUM_HDRS, http_num_hdrs_params);
+}
+
+static const IpsApi num_headers_api =
+{
+    {
+        PT_IPS_OPTION,
+        sizeof(IpsApi),
+        IPSAPI_VERSION,
+        1,
+        API_RESERVED,
+        API_OPTIONS,
+        IPS_OPT,
+        IPS_HELP,
+        num_hdrs_mod_ctor,
+        HttpRuleOptModule::mod_dtor
+    },
+    OPT_TYPE_DETECTION,
+    0, PROTO_BIT__TCP,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    HttpIpsOption::opt_ctor,
+    HttpIpsOption::opt_dtor,
+    nullptr
+};
+
+//-------------------------------------------------------------------------
+// num_trailer_lines
+//-------------------------------------------------------------------------
+#undef IPS_OPT
+#define IPS_OPT "num_trailers"
+#undef IPS_HELP
+#define IPS_HELP "rule option to perform range check on number of trailers"
+
+static Module* num_trailers_mod_ctor()
+{
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_RANGE_NUM_TRAILERS, CAT_SET_OTHER,
+	PSI_RANGE_NUM_TRAILERS, http_num_hdrs_params);
+}
+
+static const IpsApi num_trailers_api =
+{
+    {
+        PT_IPS_OPTION,
+        sizeof(IpsApi),
+        IPSAPI_VERSION,
+        1,
+        API_RESERVED,
+        API_OPTIONS,
+        IPS_OPT,
+        IPS_HELP,
+        num_trailers_mod_ctor,
+        HttpRuleOptModule::mod_dtor
+    },
+    OPT_TYPE_DETECTION,
+    0, PROTO_BIT__TCP,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    HttpIpsOption::opt_ctor,
+    HttpIpsOption::opt_dtor,
+    nullptr
+};
+
+//-------------------------------------------------------------------------
+// http_version_match
+//-------------------------------------------------------------------------
+#undef IPS_OPT
+#define IPS_OPT "http_version_match"
+#undef IPS_HELP
+#define IPS_HELP "rule option to match version to listed values"
+
+static const Parameter version_match_params[] =
+{
+    { "~version_list", Parameter::PT_STRING, nullptr, nullptr,
+        "space-separated list of versions to match" },
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+static Module* version_match_mod_ctor()
+{
+    return new HttpRuleOptModule(IPS_OPT, IPS_HELP, HTTP_VERSION_MATCH, CAT_SET_OTHER,
+        PSI_VERSION_MATCH, version_match_params);
+}
+
+static const IpsApi version_match_api =
+{
+    {
+        PT_IPS_OPTION,
+        sizeof(IpsApi),
+        IPSAPI_VERSION,
+        1,
+        API_RESERVED,
+        API_OPTIONS,
+        IPS_OPT,
+        IPS_HELP,
+        version_match_mod_ctor,
+        HttpRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -1250,6 +1471,8 @@ const BaseApi* ips_http_client_body = &client_body_api.base;
 const BaseApi* ips_http_cookie = &cookie_api.base;
 const BaseApi* ips_http_header = &header_api.base;
 const BaseApi* ips_http_method = &method_api.base;
+const BaseApi* ips_http_num_headers = &num_headers_api.base;
+const BaseApi* ips_http_num_trailers = &num_trailers_api.base;
 const BaseApi* ips_http_param = &param_api.base;
 const BaseApi* ips_http_raw_body = &raw_body_api.base;
 const BaseApi* ips_http_raw_cookie = &raw_cookie_api.base;
@@ -1264,5 +1487,5 @@ const BaseApi* ips_http_trailer = &trailer_api.base;
 const BaseApi* ips_http_true_ip = &true_ip_api.base;
 const BaseApi* ips_http_uri = &uri_api.base;
 const BaseApi* ips_http_version = &version_api.base;
+const BaseApi* ips_http_version_match = &version_match_api.base;
 const BaseApi* ips_js_data = &js_data_api.base;
-
