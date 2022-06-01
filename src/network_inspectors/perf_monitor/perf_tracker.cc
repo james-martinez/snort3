@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,10 +33,6 @@
 #include "utils/util.h"
 #include "utils/util_cstring.h"
 
-#ifdef HAVE_FLATBUFFERS
-#include "fbs_formatter.h"
-#endif
-
 #include "csv_formatter.h"
 #include "json_formatter.h"
 #include "text_formatter.h"
@@ -69,9 +65,6 @@ PerfTracker::PerfTracker(PerfConfig* config, const char* tracker_name)
         case PerfFormat::CSV: formatter = new CSVFormatter(tracker_name); break;
         case PerfFormat::TEXT: formatter = new TextFormatter(tracker_name); break;
         case PerfFormat::JSON: formatter = new JSONFormatter(tracker_name); break;
-#ifdef HAVE_FLATBUFFERS
-        case PerfFormat::FBS: formatter = new FbsFormatter(tracker_name); break;
-#endif
 #ifdef UNIT_TEST
         case PerfFormat::MOCK: formatter = new MockFormatter(tracker_name); break;
 #endif

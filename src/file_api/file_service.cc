@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -59,11 +59,9 @@ void FileService::init()
     FileFlows::init();
 }
 
-void FileService::post_init(const SnortConfig* sc)
+void FileService::post_init()
 {
-    SearchTool::set_conf(sc);
     MimeSession::init();
-    SearchTool::set_conf(nullptr);
 
     const FileConfig* const conf = get_file_config();
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,7 +25,7 @@
 
 #include "framework/module.h"
 #include "main/snort.h"
-#include "main/snort_config.h"
+#include "main/reload_tuner.h"
 
 #include "host_cache.h"
 
@@ -62,6 +62,10 @@ public:
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
     void sum_stats(bool) override;
+
+    // in sum_stats, just populate the counts vector with whatever we have now
+    bool global_stats() const override
+    { return true; }
 
     Usage get_usage() const override
     { return GLOBAL; }

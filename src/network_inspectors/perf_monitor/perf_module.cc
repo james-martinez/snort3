@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -35,12 +35,6 @@
 #include "perf_monitor.h"
 #include "perf_pegs.h"
 #include "perf_reload_tuner.h"
-
-#ifdef HAVE_FLATBUFFERS
-#define FLATBUFFERS_ENUM " | flatbuffers"
-#else
-#define FLATBUFFERS_ENUM
-#endif
 
 using namespace snort;
 
@@ -94,7 +88,7 @@ static const Parameter s_params[] =
     { "modules", Parameter::PT_LIST, module_params, nullptr,
       "gather statistics from the specified modules" },
 
-    { "format", Parameter::PT_ENUM, "csv | text | json" FLATBUFFERS_ENUM, "csv",
+    { "format", Parameter::PT_ENUM, "csv | text | json", "csv",
       "output format for stats" },
 
     { "summary", Parameter::PT_BOOL, nullptr, "false",
@@ -331,7 +325,7 @@ bool PerfMonModule::end(const char* fqn, int idx, SnortConfig* sc)
 {
 
     if ( Snort::is_reloading() && strcmp(fqn, "perf_monitor") == 0 )
-        sc->register_reload_resource_tuner(new PerfMonReloadTuner(config->flowip_memcap));
+        sc->register_reload_handler(new PerfMonReloadTuner(config->flowip_memcap));
 
     if ( idx != 0 && strcmp(fqn, "perf_monitor.modules") == 0 )
         return config->modules.back().confirm_parse();

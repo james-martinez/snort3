@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -35,11 +35,10 @@ namespace snort
 enum DecodeType
 {
     DECODE_NONE = 0,
+    DECODE_BITENC,
     DECODE_B64,
     DECODE_QP,
     DECODE_UU,
-    DECODE_BITENC,
-    DECODE_ALL
 };
 
 struct MimeStats
@@ -57,12 +56,12 @@ struct MimeStats
 class SO_PUBLIC MimeDecode
 {
 public:
-    MimeDecode(snort::DecodeConfig* conf);
+    MimeDecode(const snort::DecodeConfig* conf);
     ~MimeDecode();
 
     // get the decode type from buffer
-    // bool cnt_xf: true if there is transfer encode defined, false otherwise
-    void process_decode_type(const char* start, int length, bool cnt_xf, MimeStats* mime_stats);
+    void process_decode_type(const char* start, int length);
+    void finalize_decoder(MimeStats* mime_stats);
 
     // Main function to decode file data
     DecodeResult decode_data(const uint8_t* start, const uint8_t* end);
@@ -82,6 +81,7 @@ public:
 
     DecodeResult decompress_data(const uint8_t* buf_in, uint32_t size_in,
                                  const uint8_t*& buf_out, uint32_t& size_out);
+    const BufferData& _get_ole_buf();
     const BufferData& get_decomp_vba_data();
     void clear_decomp_vba_data();
 
@@ -90,7 +90,7 @@ public:
 private:
     void get_ole_data();
     DecodeType decode_type = DECODE_NONE;
-    snort::DecodeConfig* config;
+    const snort::DecodeConfig* config;
     DataDecode* decoder = nullptr;
     fd_session_t* fd_state = nullptr;
     BufferData ole_data;

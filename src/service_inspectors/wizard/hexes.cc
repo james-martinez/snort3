@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,8 +23,11 @@
 
 #include <cstdlib>
 
+#include "main/snort_config.h"
+
 #include "magic.h"
 
+using namespace snort;
 using namespace std;
 
 #define WILD 0x100
@@ -53,7 +56,7 @@ bool HexBook::translate(const char* in, HexVector& out)
         }
         else if ( in[i] != ' ' )
         {
-            if ( !isxdigit(in[i]) || byte.size() > 1 )
+            if ( !isxdigit(in[i]) or byte.size() > 1 )
                 return false;
 
             byte += in[i];
@@ -61,14 +64,16 @@ bool HexBook::translate(const char* in, HexVector& out)
         else
             push = true;
 
-        if ( push && !byte.empty() )
+        if ( push and !byte.empty() )
         {
             int b = strtol(byte.c_str(), nullptr, 16);
             out.emplace_back((uint8_t)b);
             byte.clear();
         }
+
         ++i;
     }
+
     return true;
 }
 
@@ -90,8 +95,9 @@ void HexBook::add_spell(
         p = t;
         ++i;
     }
+
     p->key = key;
-    p->value = val;
+    p->value = SnortConfig::get_static_name(val);
 }
 
 bool HexBook::add_spell(const char* key, const char*& val)
@@ -101,6 +107,7 @@ bool HexBook::add_spell(const char* key, const char*& val)
     if ( !translate(key, hv) )
     {
         val = nullptr;
+
         return false;
     }
 
@@ -111,7 +118,7 @@ bool HexBook::add_spell(const char* key, const char*& val)
     {
         int c = hv[i];
 
-        if ( c == WILD && p->any )
+        if ( c == WILD and p->any )
             p = p->any;
 
         else if ( p->next[c] )
@@ -124,16 +131,18 @@ bool HexBook::add_spell(const char* key, const char*& val)
     }
     if ( p->key == key )
     {
-        val = p->value.c_str();
+        val = p->value;
+
         return false;
     }
 
     add_spell(key, val, hv, i, p);
+
     return true;
 }
 
 const MagicPage* HexBook::find_spell(
-    const uint8_t* s, unsigned n, const MagicPage* p, unsigned i) const
+    const uint8_t* s, unsigned n, const MagicPage* p, unsigned i, const MagicPage*& bookmark) const
 {
     while ( i < n )
     {
@@ -143,7 +152,7 @@ const MagicPage* HexBook::find_spell(
         {
             if ( p->any )
             {
-                if ( const MagicPage* q = find_spell(s, n, p->next[c], i+1) )
+                if ( const MagicPage* q = find_spell(s, n, p->next[c], i+1, bookmark) )
                     return q;
             }
             else
@@ -155,10 +164,12 @@ const MagicPage* HexBook::find_spell(
         }
         if ( p->any )
         {
-            if ( const MagicPage* q = find_spell(s, n, p->any, i+1) )
+            if ( const MagicPage* q = find_spell(s, n, p->any, i+1, bookmark) )
                 return q;
         }
-        return p->value.empty() ? nullptr : p;
+
+        return p->value ? p : nullptr;
     }
+
     return p;
 }

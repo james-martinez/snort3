@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,40 +29,25 @@
 
 using namespace snort;
 
-static const char* s_buffer = nullptr;
-
-void IpsOption::set_buffer(const char* s)
-{ s_buffer = s; }
-
 //-------------------------------------------------------------------------
 
 IpsOption::IpsOption(const char* s, option_type_t t)
 {
     name = s;
     type = t;
-
-    switch ( t )
-    {
-    case RULE_OPTION_TYPE_BUFFER_SET: buffer = s_buffer = s; break;
-    case RULE_OPTION_TYPE_CONTENT:
-    case RULE_OPTION_TYPE_BUFFER_USE: buffer = s_buffer; break;
-    default: buffer = "n/a";
-    }
 }
 
 uint32_t IpsOption::hash() const
 {
     uint32_t a = 0, b = 0, c = 0;
     mix_str(a, b, c, get_name());
-    mix_str(a, b, c, get_buffer());
     finalize(a, b, c);
     return c;
 }
 
 bool IpsOption::operator==(const IpsOption& ips) const
 {
-    return !strcmp(get_name(), ips.get_name()) and
-        !strcmp(get_buffer(), ips.get_buffer());
+    return !strcmp(get_name(), ips.get_name());
 }
 
 //-------------------------------------------------------------------------
@@ -84,10 +69,16 @@ TEST_CASE("IpsOption test", "[ips_option]")
     StubIpsOption main_ips("ips_test",
         option_type_t::RULE_OPTION_TYPE_OTHER);
 
+    SECTION("buffer test")
+    {
+        REQUIRE(main_ips.get_buffer());  // only until api is updated
+    }
+
     SECTION("IpsOperator == test")
     {
         StubIpsOption case_diff_name("not_hello_world",
-            option_type_t::RULE_OPTION_TYPE_BUFFER_USE);
+            option_type_t::RULE_OPTION_TYPE_LEAF_NODE);
+
         REQUIRE((main_ips == case_diff_name) == false);
 
         StubIpsOption case_diff_option("hello_world",

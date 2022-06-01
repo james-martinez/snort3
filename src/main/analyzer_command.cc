@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -35,11 +35,40 @@
 
 #include "analyzer.h"
 #include "reload_tracker.h"
+#include "reload_tuner.h"
 #include "snort.h"
 #include "snort_config.h"
 #include "swapper.h"
 
 using namespace snort;
+
+void AnalyzerCommand::log_message(ControlConn* ctrlcon, const char* format, va_list& ap)
+{
+    if (ctrlcon && !ctrlcon->is_local())
+    {
+        va_list rap;
+        va_copy(rap, ap);
+        ctrlcon->respond(format, rap);
+        va_end(rap);
+    }
+    LogMessage(format, ap);
+}
+
+void AnalyzerCommand::log_message(ControlConn* ctrlcon, const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    log_message(ctrlcon, format, args);
+    va_end(args);
+}
+
+void AnalyzerCommand::log_message(const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    log_message(ctrlcon, format, args);
+    va_end(args);
+}
 
 bool ACStart::execute(Analyzer& analyzer, void**)
 {
@@ -107,9 +136,6 @@ bool ACResetStats::execute(Analyzer&, void**)
 
 ACResetStats::ACResetStats(clear_counter_type_t requested_type_l) : requested_type(
         requested_type_l) { }
-
-ACSwap::ACSwap(Swapper* ps, ControlConn *ctrlcon) : ps(ps), ctrlcon(ctrlcon)
-{ }
 
 bool ACSwap::execute(Analyzer& analyzer, void** ac_state)
 {
@@ -180,14 +206,8 @@ ACSwap::~ACSwap()
     HostAttributesManager::swap_cleanup();
 
     ReloadTracker::end(ctrlcon);
-    LogMessage("== reload complete\n");
-    if (ctrlcon && !ctrlcon->is_local())
-        ctrlcon->respond("== reload complete\n");
+    log_message("== reload complete\n");
 }
-
-ACHostAttributesSwap::ACHostAttributesSwap(ControlConn *ctrlcon)
-    : ctrlcon(ctrlcon)
-{ }
 
 bool ACHostAttributesSwap::execute(Analyzer&, void**)
 {
@@ -199,9 +219,7 @@ ACHostAttributesSwap::~ACHostAttributesSwap()
 {
     HostAttributesManager::swap_cleanup();
     ReloadTracker::end(ctrlcon);
-    LogMessage("== reload host attributes complete\n");
-    if (ctrlcon && !ctrlcon->is_local())
-        ctrlcon->respond("== reload host attributes complete\n");
+    log_message("== reload host attributes complete\n");
 }
 
 bool ACDAQSwap::execute(Analyzer& analyzer, void**)

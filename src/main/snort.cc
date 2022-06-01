@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,6 +32,7 @@
 #include "connectors/connectors.h"
 #include "detection/fp_config.h"
 #include "file_api/file_service.h"
+#include "filters/detection_filter.h"
 #include "filters/rate_filter.h"
 #include "filters/sfrf.h"
 #include "filters/sfthreshold.h"
@@ -74,12 +75,6 @@
 #include "trace/trace_logger.h"
 #include "utils/util.h"
 
-#ifdef PIGLET
-#include "piglet/piglet.h"
-#include "piglet/piglet_manager.h"
-#include "piglet_plugins/piglet_plugins.h"
-#endif
-
 #ifdef SHELL
 #include "control/control_mgmt.h"
 #include "ac_shell_cmd.h"
@@ -116,9 +111,6 @@ void Snort::init(int argc, char** argv)
     load_connectors();
     load_ips_options();
     load_loggers();
-#ifdef PIGLET
-    load_piglets();
-#endif
     load_search_engines();
     load_policy_selectors();
     load_stream_inspectors();
@@ -135,10 +127,6 @@ void Snort::init(int argc, char** argv)
     LogMessage("%s  Snort++ %s\n", get_prompt(), VERSION);
 #endif
     LogMessage("--------------------------------------------------\n");
-
-#ifdef PIGLET
-    Piglet::Manager::init();
-#endif
 
     SideChannelManager::pre_config_init();
 
@@ -158,6 +146,9 @@ void Snort::init(int argc, char** argv)
     /* Set the global snort_conf that will be used during run time */
     SnortConfig::set_conf(sc);
 
+    if (!sc->policy_map->setup_network_policies())
+        ParseError("Network policy user ids must be unique\n");
+
     // This call must be immediately after "SnortConfig::set_conf(sc)"
     // since the first trace call may happen somewhere after this point
     TraceApi::thread_init(sc->trace_config);
@@ -169,14 +160,8 @@ void Snort::init(int argc, char** argv)
         ModuleManager::dump_modules();
         PluginManager::dump_plugins();
     }
-#ifdef PIGLET
-    if ( !Piglet::piglet_mode() )
-#endif
     CodecManager::instantiate();
 
-#ifdef PIGLET
-    if ( !Piglet::piglet_mode() )
-#endif
     if ( !sc->output.empty() )
         EventManager::instantiate(sc->output.c_str(), sc);
 
@@ -205,10 +190,12 @@ void Snort::init(int argc, char** argv)
     else if ( SnortConfig::log_verbose() )
         InspectorManager::print_config(sc);
 
+    InspectorManager::global_init();
+    InspectorManager::prepare_inspectors(sc);
     InspectorManager::prepare_controls(sc);
 
     // Must be after InspectorManager::configure()
-    FileService::post_init(sc);
+    FileService::post_init();
 
     if (sc->file_mask != 0)
         umask(sc->file_mask);
@@ -221,6 +208,8 @@ void Snort::init(int argc, char** argv)
     sc->post_setup();
     sc->update_reload_id();
 
+    detection_filter_init(sc->detection_filter_config);
+
     const MpseApi* search_api = sc->fast_pattern_config->get_search_api();
     const MpseApi* offload_search_api = sc->fast_pattern_config->get_offload_search_api();
 
@@ -229,9 +218,6 @@ void Snort::init(int argc, char** argv)
     if ((offload_search_api != nullptr) and (offload_search_api != search_api))
         MpseManager::activate_search_engine(offload_search_api, sc);
 
-#ifdef PIGLET
-    if ( !Piglet::piglet_mode() )
-#endif
     /* Finish up the pcap list and put in the queues */
     Trough::setup();
 
@@ -325,11 +311,7 @@ void Snort::term()
     IpsManager::global_term(sc);
     HostAttributesManager::term();
 
-#ifdef PIGLET
-    if ( !Piglet::piglet_mode() )
-#endif
     Trough::cleanup();
-
     ClosePidFile();
 
     /* remove pid file */
@@ -369,6 +351,7 @@ void Snort::term()
     PluginManager::release_plugins();
     ScriptManager::release_scripts();
     memory::MemoryCap::cleanup();
+    detection_filter_term();
 
     term_signals();
 }
@@ -477,7 +460,8 @@ SnortConfig* Snort::get_reload_config(const char* fname, const char* plugin_path
         return nullptr;
     }
 
-    InspectorManager::tear_down_removed_inspectors(old, sc);
+    InspectorManager::reconcile_inspectors(old, sc);
+    InspectorManager::prepare_inspectors(sc);
     InspectorManager::prepare_controls(sc);
 
     FileService::verify_reload(sc);
@@ -547,6 +531,7 @@ SnortConfig* Snort::get_updated_policy(
     reset_parse_errors();
 
     SnortConfig* sc = new SnortConfig(other_conf, iname);
+    sc->global_dbus->clone(*other_conf->global_dbus, iname);
 
     if ( fname )
     {
@@ -597,6 +582,8 @@ SnortConfig* Snort::get_updated_policy(
         return nullptr;
     }
 
+    InspectorManager::reconcile_inspectors(other_conf, sc, true);
+    InspectorManager::prepare_inspectors(sc);
     InspectorManager::prepare_controls(sc);
 
     other_conf->cloned = true;
@@ -610,6 +597,7 @@ SnortConfig* Snort::get_updated_module(SnortConfig* other_conf, const char* name
     reloading = true;
 
     SnortConfig* sc = new SnortConfig(other_conf, name);
+    sc->global_dbus->clone(*other_conf->global_dbus, name);
 
     if ( name )
     {
@@ -637,6 +625,8 @@ SnortConfig* Snort::get_updated_module(SnortConfig* other_conf, const char* name
         return nullptr;
     }
 
+    InspectorManager::reconcile_inspectors(other_conf, sc, true);
+    InspectorManager::prepare_inspectors(sc);
     InspectorManager::prepare_controls(sc);
 
     other_conf->cloned = true;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2009-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -133,12 +133,12 @@ int RateFilter_Test(const OptTreeNode* otn, Packet* p)
         // events and these require: src -> client, dst -> server.
         if ( p->is_from_server() )
         {
-            return SFRF_TestThreshold(rfc, gid, sid, get_network_policy()->policy_id,
+            return SFRF_TestThreshold(rfc, gid, sid, get_inspection_policy()->policy_id,
                 dip, sip, p->pkth->ts.tv_sec, SFRF_COUNT_INCREMENT);
         }
     }
 
-    return SFRF_TestThreshold(rfc, gid, sid, get_network_policy()->policy_id,
+    return SFRF_TestThreshold(rfc, gid, sid, get_inspection_policy()->policy_id,
         sip, dip, p->pkth->ts.tv_sec, SFRF_COUNT_INCREMENT);
 }
 

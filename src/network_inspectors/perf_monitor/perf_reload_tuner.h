@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,7 +21,7 @@
 #ifndef PERF_RELOAD_TUNER_H
 #define PERF_RELOAD_TUNER_H
 
-#include "main/snort_config.h"
+#include "main/reload_tuner.h"
 
 class PerfMonReloadTuner : public snort::ReloadResourceTuner
 {

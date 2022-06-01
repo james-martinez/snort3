@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,10 +32,6 @@
 #include "log/messages.h"
 #include "lua/lua.h"
 #include "lua/lua_script.h"
-
-#ifdef PIGLET
-#include "piglet/piglet_manager.h"
-#endif
 
 using namespace snort;
 using namespace std;
@@ -224,11 +220,6 @@ static void load_script(const char* f)
 
     else if ( type == LogLuaApi::type )
         lua_api.emplace_back(new LogLuaApi(name, chunk, ver));
-
-#ifdef PIGLET
-    else if ( type == "piglet" )
-        Piglet::Manager::add_chunk(f, name, chunk);
-#endif
 
     else
     {

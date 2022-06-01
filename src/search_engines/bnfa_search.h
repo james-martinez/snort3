@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -160,7 +160,6 @@ void bnfa_init_xlatcase();
 
 bnfa_struct_t* bnfaNew(const MpseAgent*);
 
-void bnfaSetOpt(bnfa_struct_t* p, int flag);
 void bnfaSetCase(bnfa_struct_t* p, int flag);
 void bnfaFree(bnfa_struct_t* pstruct);
 

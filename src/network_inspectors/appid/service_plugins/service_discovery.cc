@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -97,7 +97,6 @@ void ServiceDiscovery::initialize(AppIdInspector& inspector)
     new LprServiceDetector(this);
     new MdnsServiceDetector(this);
     new MySqlServiceDetector(this);
-    new NbssServiceDetector(this);
     new NbnsServiceDetector(this);
     new NbdgmServiceDetector(this);
     new NntpServiceDetector(this);

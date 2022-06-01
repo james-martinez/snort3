@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -67,11 +67,13 @@ public:
         bool no_case;
         bool negated;
         bool literal;
+        bool multi_match;
+
         unsigned flags;
 
         PatternDescriptor(
-            bool noc = false, bool neg = false, bool lit = false, unsigned f = 0)
-        { no_case = noc; negated = neg; literal = lit; flags = f; }
+            bool noc = false, bool neg = false, bool lit = false, bool multi = false, unsigned f = 0)
+        { no_case = noc; negated = neg; literal = lit; multi_match = multi; flags = f; }
     };
 
     virtual int add_pattern(

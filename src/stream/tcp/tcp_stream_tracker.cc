@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -71,7 +71,7 @@ TcpStreamTracker::TcpStreamTracker(bool client) :
 { }
 
 TcpStreamTracker::~TcpStreamTracker()
-{ delete splitter; }
+{ if (splitter != nullptr) splitter->go_away(); }
 
 TcpStreamTracker::TcpEvent TcpStreamTracker::set_tcp_event(const TcpSegmentDescriptor& tsd)
 {
@@ -201,6 +201,18 @@ void TcpStreamTracker::cache_mac_address(const TcpSegmentDescriptor& tsd, uint8_
     }
 }
 
+
+void TcpStreamTracker::set_fin_seq_status_seen(const TcpSegmentDescriptor& tsd)
+{
+    if ( !fin_seq_set and SEQ_GEQ(tsd.get_end_seq(), r_win_base) )
+    {
+        fin_i_seq = tsd.get_seq();
+        fin_final_seq = tsd.get_end_seq();
+        fin_seq_set = true;
+        fin_seq_status = TcpStreamTracker::FIN_WITH_SEQ_SEEN;
+    }
+}
+
 void TcpStreamTracker::init_tcp_state()
 {
     tcp_state = ( client_tracker ) ?
@@ -214,6 +226,7 @@ void TcpStreamTracker::init_tcp_state()
     mss = 0;
     tf_flags = 0;
     mac_addr_valid = false;
+    fin_i_seq = 0;
     fin_final_seq = 0;
     fin_seq_status = TcpStreamTracker::FIN_NOT_SEEN;
     fin_seq_set = false;
@@ -222,6 +235,7 @@ void TcpStreamTracker::init_tcp_state()
     held_packet = null_iterator;
     flush_policy = STREAM_FLPOLICY_IGNORE;
     reassembler.reset();
+    splitter_finish_flag = false;
 }
 
 //-------------------------------------------------------------------------
@@ -241,7 +255,7 @@ void TcpStreamTracker::init_flush_policy()
 void TcpStreamTracker::set_splitter(StreamSplitter* ss)
 {
     if ( splitter )
-        delete splitter;
+        splitter->go_away();
 
     splitter = ss;
 
@@ -262,6 +276,21 @@ void TcpStreamTracker::set_splitter(const Flow* flow)
         set_splitter(ins->get_splitter(!client_tracker) );
     else
         set_splitter(new AtomSplitter(!client_tracker) );
+}
+
+bool TcpStreamTracker::splitter_finish(snort::Flow* flow)
+{
+    if (!splitter)
+        return true;
+
+    if (!splitter_finish_flag)
+    {
+        splitter_finish_flag = true;
+        return splitter->finish(flow);
+    }
+    // there shouldn't be any un-flushed data beyond this point,
+    // returning false here, discards it
+    return false;
 }
 
 void TcpStreamTracker::init_on_syn_sent(TcpSegmentDescriptor& tsd)
@@ -509,7 +538,7 @@ void TcpStreamTracker::update_tracker_ack_sent(TcpSegmentDescriptor& tsd)
     }
 
     if ( ( fin_seq_status == TcpStreamTracker::FIN_WITH_SEQ_SEEN )
-        && SEQ_EQ(r_win_base, fin_final_seq) )
+        && SEQ_GEQ(tsd.get_ack(), fin_final_seq + 1) )
     {
         fin_seq_status = TcpStreamTracker::FIN_WITH_SEQ_ACKED;
     }
@@ -578,15 +607,6 @@ bool TcpStreamTracker::update_on_fin_recv(TcpSegmentDescriptor& tsd)
     else
         fin_seq_adjust = 1;
 
-    // set final seq # any packet rx'ed with seq > is bad
-    if ( !fin_seq_set )
-    {
-        fin_final_seq = tsd.get_end_seq();
-        fin_seq_set = true;
-        if( tsd.get_len() == 0 )
-            fin_seq_status = TcpStreamTracker::FIN_WITH_SEQ_SEEN;
-    }
-
     return true;
 }
 
@@ -648,15 +668,32 @@ void TcpStreamTracker::perform_fin_recv_flush(TcpSegmentDescriptor& tsd)
 {
     if ( tsd.is_data_segment() )
         session->handle_data_segment(tsd);
-    else if ( flush_policy == STREAM_FLPOLICY_ON_DATA and SEQ_EQ(tsd.get_seq(), rcv_nxt) )
-        reassembler.flush_queued_segments(tsd.get_flow(), true, tsd.get_pkt());
+
+    if ( flush_policy == STREAM_FLPOLICY_ON_DATA and SEQ_EQ(tsd.get_end_seq(), rcv_nxt)
+         and !tsd.get_flow()->searching_for_service() )
+        reassembler.finish_and_final_flush(tsd.get_flow(), true, tsd.get_pkt());
 }
 
 uint32_t TcpStreamTracker::perform_partial_flush()
 {
     uint32_t flushed = 0;
     if ( held_packet != null_iterator )
-        flushed = reassembler.perform_partial_flush(session->flow);
+    {
+        Packet* p;
+        flushed = reassembler.perform_partial_flush(session->flow, p);
+
+        // If the held_packet hasn't been released by perform_partial_flush(),
+        // call finalize directly.
+        if ( is_holding_packet() )
+        {
+            finalize_held_packet(p);
+            tcpStats.held_packet_purges++;
+        }
+
+        // call this here explicitly, because we've avoided it in reassembler
+        // and we need to set flow state to BLOCK, if need be
+        Stream::check_flow_closed(p);
+    }
     return flushed;
 }
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -46,6 +46,7 @@ static const PegInfo bind_pegs[] =
 {
     { CountType::SUM, "raw_packets", "raw packets evaluated" },
     { CountType::SUM, "new_flows", "new flows evaluated" },
+    { CountType::SUM, "rebinds", "flows rebound" },
     { CountType::SUM, "service_changes", "flow service changes evaluated" },
     { CountType::SUM, "assistant_inspectors", "flow assistant inspector requests handled" },
     { CountType::SUM, "new_standby_flows", "new HA flows evaluated" },
@@ -347,7 +348,7 @@ bool BinderModule::set(const char* fqn, Value& v, SnortConfig*)
     }
     else if ( v.is("addr_spaces") )
     {
-        if (!parse_int_set<uint16_t>(v, binding.when.addr_spaces))
+        if (!parse_int_set<uint32_t>(v, binding.when.addr_spaces))
             return false;
         binding.when.add_criteria(BindWhen::Criteria::BWC_ADDR_SPACES);
     }
@@ -431,7 +432,7 @@ bool BinderModule::end(const char* fqn, int idx, SnortConfig* sc)
             if ( policy_type == FILE_KEY )
             {
                 Shell* sh = new Shell(policy_filename.c_str());
-                auto policies = sc->policy_map->add_shell(sh, false);
+                auto policies = sc->policy_map->add_shell(sh, get_network_parse_policy());
                 binding.use.inspection_index = policies->inspection->policy_id;
                 binding.use.ips_index = policies->ips->policy_id;
             }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,7 @@
 
 #include "cursor.h"
 
+#include "detection/detection_engine.h"
 #include "detection/detection_util.h"
 #include "protocols/packet.h"
 
@@ -94,17 +95,17 @@ void Cursor::set_data(CursorData* cd)
 
 void Cursor::reset(Packet* p)
 {
-    InspectionBuffer buf;
+    if ( p->flow and p->flow->gadget )
+    {
+        const DataBuffer& buf = DetectionEngine::get_alt_buffer(p);
 
-    // FIXIT-M should this be converted to get_fp_buf()?
-    if ( p->flow and p->flow->gadget and
-        p->flow->gadget->get_buf(buf.IBT_ALT, p, buf) )
-    {
-        set("alt_data", buf.data, buf.len);
+        if ( buf.len )
+        {
+            set("alt_data", buf.data, buf.len);
+            return;
+        }
     }
-    else
-    {
-        set("pkt_data", p->data, p->get_detect_limit());
-    }
+
+    set("pkt_data", p->data, p->get_detect_limit());
 }
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -41,6 +41,8 @@ class AppInfoTableEntry;
 
 #define DETECTOR "Detector"
 #define DETECTORFLOW "DetectorFlow"
+
+#define LUA_STATE_GLOBAL_SC_ID  "snort_config"
 
 struct DetectorPackageInfo
 {

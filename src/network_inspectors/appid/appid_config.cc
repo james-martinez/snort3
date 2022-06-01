@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -115,7 +115,7 @@ bool AppIdContext::init_appid(SnortConfig* sc, AppIdInspector& inspector)
     {
         odp_ctxt->get_client_disco_mgr().initialize(inspector);
         odp_ctxt->get_service_disco_mgr().initialize(inspector);
-        odp_thread_local_ctxt->initialize(*this, true);
+        odp_thread_local_ctxt->initialize(sc, *this, true);
         odp_ctxt->initialize(inspector);
 
         // do not reload third party on reload_config()
@@ -139,7 +139,6 @@ bool AppIdContext::init_appid(SnortConfig* sc, AppIdInspector& inspector)
 void AppIdContext::create_odp_ctxt()
 {
     SnortConfig* sc = SnortConfig::get_main_conf();
-    SearchTool::set_conf(sc);
     odp_ctxt = new OdpContext(config, sc);
 }
 
@@ -168,7 +167,8 @@ void OdpContext::initialize(AppIdInspector& inspector)
     service_disco_mgr.finalize_service_patterns();
     client_disco_mgr.finalize_client_patterns();
     http_matchers.finalize_patterns();
-    efp_ca_matchers.finalize_patterns();
+    eve_ca_matchers.finalize_patterns();
+    alpn_matchers.finalize_patterns();
     // sip patterns need to be finalized after http patterns because they
     // are dependent on http patterns
     sip_matchers.finalize_patterns(*this);
@@ -184,11 +184,12 @@ void OdpContext::reload()
     client_pattern_detector->reload_client_port_patterns();
     service_disco_mgr.reload_service_patterns();
     client_disco_mgr.reload_client_patterns();
-    efp_ca_matchers.reload_patterns();
+    eve_ca_matchers.reload_patterns();
     http_matchers.reload_patterns();
     sip_matchers.reload_patterns();
     ssl_matchers.reload_patterns();
     dns_matchers.reload_patterns();
+    alpn_matchers.reload_patterns();
 }
 
 void OdpContext::add_port_service_id(IpProtocol proto, uint16_t port, AppId appid)
@@ -224,12 +225,13 @@ AppId OdpContext::get_protocol_service_id(IpProtocol proto)
     return ip_protocol[(uint16_t)proto];
 }
 
-void OdpThreadContext::initialize(AppIdContext& ctxt, bool is_control, bool reload_odp)
+void OdpThreadContext::initialize(const SnortConfig* sc, AppIdContext& ctxt, bool is_control,
+    bool reload_odp)
 {
     if (!is_control and reload_odp)
-        LuaDetectorManager::init_thread_manager(ctxt);
+        LuaDetectorManager::init_thread_manager(sc, ctxt);
     else
-        LuaDetectorManager::initialize(ctxt, is_control, reload_odp);
+        LuaDetectorManager::initialize(sc, ctxt, is_control, reload_odp);
 }
 
 OdpThreadContext::~OdpThreadContext()

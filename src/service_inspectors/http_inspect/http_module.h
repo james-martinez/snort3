@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,7 @@
 
 #include "framework/module.h"
 #include "helpers/literal_search.h"
+#include "mime/file_mime_config.h"
 #include "profiler/profiler.h"
 
 #include "http_enum.h"
@@ -57,6 +58,7 @@ public:
     bool decompress_swf = false;
     bool decompress_zip = false;
     bool decompress_vba = false;
+    snort::DecodeConfig* mime_decode_conf;
     bool script_detection = false;
     snort::LiteralSearch::Handle* script_detection_handle = nullptr;
     bool publish_request_body = true;
@@ -72,6 +74,7 @@ public:
         uint32_t max_bracket_depth = 256;
         uint32_t max_scope_depth = 256;
         std::unordered_set<std::string> ignored_ids;
+        std::unordered_set<std::string> ignored_props;
         int max_javascript_whitespaces = 200;
         class HttpJsNorm* js_norm = nullptr;
     };

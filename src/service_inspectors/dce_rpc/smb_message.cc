@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -1725,6 +1725,7 @@ void DCE2_Smb1Process(DCE2_SmbSsnData* ssd)
 
             if (!DCE2_BufferIsEmpty(*seg_buf))
             {
+                set_file_data(nullptr, 0);
                 DCE2_BufferDestroy(*seg_buf);
                 *seg_buf = nullptr;
             }

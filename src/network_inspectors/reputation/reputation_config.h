@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -80,20 +80,13 @@ typedef std::vector<ListFile*> ListFiles;
 struct ReputationConfig
 {
     uint32_t memcap = 500;
-    int num_entries = 0;
     bool scanlocal = false;
     IPdecision priority = TRUSTED;
     NestedIP nested_ip = INNER;
     AllowAction allow_action = DO_NOT_BLOCK;
     std::string blocklist_path;
     std::string allowlist_path;
-    bool memcap_reached = false;
-    uint8_t* reputation_segment = nullptr;
-    table_flat_t* ip_list = nullptr;
-    ListFiles list_files;
     std::string list_dir;
-
-    ~ReputationConfig();
 };
 
 struct IPrepInfo

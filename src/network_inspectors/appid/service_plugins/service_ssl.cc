@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -576,8 +576,8 @@ int SslServiceDetector::validate(AppIdDiscoveryArgs& args)
                 }
 
                 rec = (const ServiceSSLV3Record*)data;
-                if (size < offsetof(ServiceSSLV3Record, version) ||
-                    rec->length_msb)
+                if (rec->type != SSL_SERVER_HELLO_DONE &&
+                    (size < offsetof(ServiceSSLV3Record, version) or rec->length_msb))
                 {
                     goto fail;
                 }
@@ -630,6 +630,8 @@ int SslServiceDetector::validate(AppIdDiscoveryArgs& args)
                     }
                     break;
                 case SSL_SERVER_HELLO_DONE:
+                    if (size < offsetof(ServiceSSLV3Record, version))
+                        goto success;
                     if (rec->length)
                         goto fail;
                     if (ss->tot_length != offsetof(ServiceSSLV3Record, version))

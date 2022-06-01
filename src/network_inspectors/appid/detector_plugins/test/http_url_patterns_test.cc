@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -60,7 +60,7 @@ namespace snort
 {
 AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&) :
     StashGenericObject(STASH_GENERIC_OBJECT_APPID) {}
-SearchTool::SearchTool(const char*, bool) { }
+SearchTool::SearchTool(bool) { }
 void SearchTool::reload() { }
 static bool test_find_all_done = false;
 static bool test_find_all_enabled = false;
@@ -84,9 +84,10 @@ void AppIdDiscovery::register_tcp_pattern(AppIdDetector*, unsigned char const*, 
 void AppIdDiscovery::register_udp_pattern(AppIdDetector*, unsigned char const*, unsigned int, int, unsigned int) { }
 int AppIdDiscovery::add_service_port(AppIdDetector*, ServiceDetectorPort const&) { return 0; }
 DnsPatternMatchers::~DnsPatternMatchers() = default;
-EfpCaPatternMatchers::~EfpCaPatternMatchers() = default;
+EveCaPatternMatchers::~EveCaPatternMatchers() = default;
 SipPatternMatchers::~SipPatternMatchers() = default;
 SslPatternMatchers::~SslPatternMatchers() = default;
+AlpnPatternMatchers::~AlpnPatternMatchers() = default;
 void AppIdModule::reset_stats() {}
 bool AppIdInspector::configure(snort::SnortConfig*) { return true; }
 

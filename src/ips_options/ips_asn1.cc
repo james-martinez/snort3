@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -86,7 +86,7 @@ static THREAD_LOCAL ProfileStats asn1PerfStats;
 class Asn1Option : public IpsOption
 {
 public:
-    Asn1Option(const ASN1_CTXT& c) : IpsOption(s_name, RULE_OPTION_TYPE_BUFFER_USE)
+    Asn1Option(const ASN1_CTXT& c) : IpsOption(s_name)
     { config = c; }
 
     uint32_t hash() const override;

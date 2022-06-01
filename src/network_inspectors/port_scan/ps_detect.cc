@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -54,9 +54,10 @@ struct PS_HASH_KEY
 {
     int protocol;
     SfIp scanner;
-    SfIp scanned;
     int16_t group;
-    uint16_t asid;
+    SfIp scanned;
+    uint16_t pad;
+    uint32_t asid;
 };
 PADDING_GUARD_END
 
@@ -326,6 +327,7 @@ bool PortScan::ps_tracker_lookup(
 
     ps_pkt->proto = key.protocol;
     key.asid = p->pkth->address_space_id;
+    key.pad = 0;
 
     /*
     **  Let's lookup the host that is being scanned, taking into account

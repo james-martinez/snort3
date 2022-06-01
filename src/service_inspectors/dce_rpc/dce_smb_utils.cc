@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -951,7 +951,8 @@ DCE2_Ret DCE2_SmbProcessRequestData(DCE2_SmbSsnData* ssd,
         if (data_len > UINT16_MAX)
             data_len = UINT16_MAX;
 
-        DCE2_CoProcess(&ssd->sd, ftracker->fp_co_tracker, data_ptr, (uint16_t)data_len);
+        if (ftracker->fp_co_tracker)
+            DCE2_CoProcess(&ssd->sd, ftracker->fp_co_tracker, data_ptr, (uint16_t)data_len);
 
         if (!ftracker->fp_used)
             ftracker->fp_used = true;
@@ -978,8 +979,8 @@ DCE2_Ret DCE2_SmbProcessResponseData(DCE2_SmbSsnData* ssd,
         // Maximum possible fragment length is 16 bit
         if (data_len > UINT16_MAX)
             data_len = UINT16_MAX;
-
-        DCE2_CoProcess(&ssd->sd, ftracker->fp_co_tracker, data_ptr, (uint16_t)data_len);
+        if (ftracker->fp_co_tracker)
+            DCE2_CoProcess(&ssd->sd, ftracker->fp_co_tracker, data_ptr, (uint16_t)data_len);
     }
     else
     {
@@ -1350,7 +1351,7 @@ static void DCE2_SmbInjectDeletePdu(DCE2_SmbFileTracker* ftracker)
     Packet* inject_pkt = DetectionEngine::get_current_wire_packet();
     Packet* p = DetectionEngine::get_current_packet();
 
-    if ( inject_pkt->flow != p->flow )
+    if ( !inject_pkt || inject_pkt->flow != p->flow )
         return;
 
     NbssHdr* nb_hdr = (NbssHdr*)dce2_smb_delete_pdu;
@@ -1721,6 +1722,7 @@ void DCE2_SmbProcessFileData(DCE2_SmbSsnData* ssd,
     {
         set_file_data(data_ptr, (data_len > UINT16_MAX) ? UINT16_MAX : (uint16_t)data_len);
         DCE2_FileDetect();
+        set_file_data(nullptr, 0);
     }
 
     if (ftracker == ssd->fapi_ftracker)

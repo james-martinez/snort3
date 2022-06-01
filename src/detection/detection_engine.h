@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -56,7 +56,7 @@ public:
 
     static Packet* get_current_packet();
     static Packet* get_current_wire_packet();
-    static Packet* set_next_packet(Packet* parent = nullptr, Flow* flow = nullptr);
+    static Packet* set_next_packet(const Packet* parent = nullptr, Flow* flow = nullptr);
     static uint8_t* get_next_buffer(unsigned& max);
 
     static bool offload(Packet*);

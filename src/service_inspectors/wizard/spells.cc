@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,13 +23,15 @@
 
 #include <cassert>
 
+#include "main/snort_config.h"
+
 #include "magic.h"
 
 using namespace std;
 
 #define WILD 0x100
 
-SpellBook::SpellBook() : glob(nullptr)
+SpellBook::SpellBook()
 {
     // allows skipping leading whitespace only
     root->next[(int)' '] = root;
@@ -65,6 +67,7 @@ bool SpellBook::translate(const char* in, HexVector& out)
         }
         ++i;
     }
+
     return true;
 }
 
@@ -83,8 +86,9 @@ void SpellBook::add_spell(
         p = t;
         ++i;
     }
+
     p->key = key;
-    p->value = val;
+    p->value = snort::SnortConfig::get_static_name(val);
 }
 
 bool SpellBook::add_spell(const char* key, const char*& val)
@@ -94,6 +98,7 @@ bool SpellBook::add_spell(const char* key, const char*& val)
     if ( !translate(key, hv) )
     {
         val = nullptr;
+
         return false;
     }
 
@@ -105,10 +110,10 @@ bool SpellBook::add_spell(const char* key, const char*& val)
     {
         int c = toupper(hv[i]);
 
-        if ( c == WILD && p->any )
+        if ( c == WILD and p->any )
             p = p->any;
 
-        else if ( c != WILD && p->next[c] )
+        else if ( c != WILD and p->next[c] )
             p = p->next[c];
 
         else
@@ -118,16 +123,18 @@ bool SpellBook::add_spell(const char* key, const char*& val)
     }
     if ( p->key == key )
     {
-        val = p->value.c_str();
+        val = p->value;
+
         return false;
     }
 
     add_spell(key, val, hv, i, p);
+
     return true;
 }
 
 const MagicPage* SpellBook::find_spell(
-    const uint8_t* s, unsigned n, const MagicPage* p, unsigned i) const
+    const uint8_t* s, unsigned n, const MagicPage* p, unsigned i, const MagicPage*& bookmark) const
 {
     while ( i < n )
     {
@@ -137,7 +144,7 @@ const MagicPage* SpellBook::find_spell(
         {
             if ( p->any )
             {
-                if ( const MagicPage* q = find_spell(s, n, p->next[c], i+1) )
+                if ( const MagicPage* q = find_spell(s, n, p->next[c], i+1, bookmark) )
                     return q;
             }
             else
@@ -151,26 +158,30 @@ const MagicPage* SpellBook::find_spell(
         {
             while ( i < n )
             {
-                if ( const MagicPage* q = find_spell(s, n, p->any, i) )
+                if ( const MagicPage* q = find_spell(s, n, p->any, i, bookmark) )
                 {
-                    glob = q->any ? q : p;
+                    bookmark = q->any ? q : p;
+
                     return q;
                 }
+
                 ++i;
             }
+
             return p;
         }
 
-        // If no match but has glob, continue lookup from glob
-        if ( p->value.empty() && glob )
-        {   
-            p = glob;
-            glob = nullptr;
-            
-            return find_spell(s, n, p, i);
+        // If no match but has bookmark, continue lookup from bookmark
+        if ( !p->value and bookmark )
+        {
+            p = bookmark;
+            bookmark = nullptr;
+
+            return find_spell(s, n, p, i, bookmark);
         }
 
-        return p->value.empty() ? nullptr : p;
+        return p->value ? p : nullptr;
     }
+
     return p;
 }

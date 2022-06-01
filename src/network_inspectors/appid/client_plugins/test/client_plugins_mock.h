@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,9 +23,10 @@ namespace snort
 {
 // Stubs for  messages
 void LogMessage(const char*,...) { }
+void WarningMessage(const char*,...) { }
 
 // Stubs for search_tool.cc
-SearchTool::SearchTool(char const*, bool) { }
+SearchTool::SearchTool(bool) { }
 SearchTool::~SearchTool() = default;
 void SearchTool::add(const char*, unsigned, int, bool) { }
 void SearchTool::add(const char*, unsigned, void*, bool) { }

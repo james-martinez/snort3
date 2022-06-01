@@ -4,19 +4,19 @@ A tagged packet was logged.
 
 105:1
 
-Back orifice traffic detected, unknown direction
+Back Orifice traffic detected, unknown direction
 
 105:2
 
-Back orifice client traffic detected
+Back Orifice client traffic detected
 
 105:3
 
-Back orifice server traffic detected
+Back Orifice server traffic detected
 
 105:4
 
-Back orifice length field >= 1024 bytes
+Back Orifice length field >= 1024 bytes
 
 106:1
 
@@ -732,7 +732,7 @@ specific unreserved characters that are exempted from triggering this alert.
 
 119:2
 
-URI is percent encoded and the result is percent encoded again. This alert can only be generated if
+URI contains double-encoded hexadecimal characters. This alert can only be generated if
 the iis_double_decode option is configured.
 
 119:3
@@ -765,7 +765,7 @@ generated if the simplify_path option is configured.
 119:9
 
 The backslash character appears in the path portion of a URI. This alert can only be generated if
-the backslash_to_slash option is configured.
+the backslash_to_slash option is configured
 
 119:10
 
@@ -867,7 +867,7 @@ HTTP response has Content-Type charset=utf-7.
 119:109
 
 More than one level of JavaScript obfuscation. This alert can only be generated when
-normalize_javascript  configuration option is true.
+normalize_javascript configuration option is true or enhanced JavaScript normalizer is enabled.
 
 119:110
 
@@ -877,7 +877,7 @@ This alert can only be generated when normalize_javascript  configuration option
 119:111
 
 More than one encoding within JavaScript obfuscated data. This alert can only be generated when
-normalize_javascript  configuration option is true.
+normalize_javascript configuration option is true or enhanced JavaScript normalizer is enabled.
 
 119:112
 
@@ -1295,6 +1295,10 @@ The HTTP version in the start line has a valid format but the version is 0.
 The HTTP version in the start line has a valid format but the version is higher than 1. This alert
 does not apply to HTTP/2 or HTTP/3 traffic.
 
+119:278
+
+The HTTP message body is gzip encoded and the FEXTRA flag is set in the gzip header.
+
 121:1
 
 Invalid flag set on HTTP/2 frame header
@@ -1360,7 +1364,7 @@ HTTP/2 dynamic table has more than 512 entries
 
 121:15
 
-HTTP/2 push promise frame with promised stream ID already in use.
+HTTP/2 push promise frame with promised stream ID already in use
 
 121:16
 
@@ -1824,8 +1828,7 @@ Received TCP data with no TCP flags set.
 
 129:12
 
-Consecutive TCP small segments exceed the configured threshold. The size required to be a small segment can
-be configured via stream_tcp.small_segments.maximum_size, and the maximum number of these small segments can be configured
+Consecutive (in the order of received packets, not the order of sequence numbers) TCP small segments exceed the configured threshold. The size required to be a small segment can be configured via stream_tcp.small_segments.maximum_size, and the maximum number of these small segments can be configured
 with int stream_tcp.small_segments.count.
 
 129:13

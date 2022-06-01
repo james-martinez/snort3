@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -48,10 +48,6 @@ public:
 
     ~Dce2Smb2RequestTracker()
     {
-        if (smb_module_is_up and (snort::is_packet_thread()))
-        {
-	        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, "request tracker terminating\n");
-        }
         if (fname)
             snort_free(fname);
     }

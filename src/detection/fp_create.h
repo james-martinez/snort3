@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -55,9 +55,7 @@ struct NCListNode
 */
 int fpCreateFastPacketDetection(snort::SnortConfig*);
 void fpDeleteFastPacketDetection(snort::SnortConfig*);
-void get_pattern_info(const PatternMatchData* pmd,
-    const char* pattern, int pattern_length, std::string& hex, std::string& txt,
-    std::string& opts);
+void get_pattern_info(const PatternMatchData* pmd, std::string& hex, std::string& txt, std::string& opts);
 
 #endif
 

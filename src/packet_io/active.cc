@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -61,6 +61,7 @@ const char* Active::act_str[Active::ACT_MAX][Active::AST_MAX] =
     { "allow", "error", "error", "error" },
     { "hold", "error", "error", "error" },
     { "retry", "error", "error", "error" },
+    { "rewrite", "cant_rewrite", "would_rewrite", "force_rewrite" },
     { "drop", "cant_drop", "would_drop", "force_drop" },
     { "block", "cant_block", "would_block", "force_block" },
     { "reset", "cant_reset", "would_reset", "force_reset" },
@@ -527,6 +528,11 @@ void Active::update_status_actionable(const Packet* p)
             active_status = AST_WOULD;
             active_would_reason = WHD_INTERFACE_IDS;
         }
+        else if ( active_action == ACT_REWRITE and !SFDAQ::can_replace() )
+        {
+            active_status = AST_WOULD;
+            active_would_reason = WHD_INTERFACE_IDS;
+        }
     }
     else if ( p->context->conf->inline_test_mode() )
     {
@@ -552,9 +558,7 @@ void Active::update_status(const Packet* p, bool force)
     else if ( force )
         active_status = AST_FORCE;
     else if ( active_status != AST_FORCE )
-    {
         update_status_actionable(p);
-    }
 }
 
 void Active::daq_update_status(const Packet* p)
@@ -586,6 +590,14 @@ void Active::daq_drop_packet(const Packet* p)
         active_action = ACT_DROP;
 
     daq_update_status(p);
+}
+
+void Active::rewrite_packet(const Packet* p, bool force)
+{
+    if ( active_action < ACT_REWRITE )
+        active_action = ACT_REWRITE;
+
+    update_status(p, force);
 }
 
 bool Active::retry_packet(const Packet* p)
@@ -679,16 +691,10 @@ void Active::reset_session(Packet* p, bool force)
     reset_session(p, &default_reset, force);
 }
 
-void Active::update_reset_status(Packet* p, bool force)
+void Active::reset_session(Packet* p, ActiveAction* reject, bool force)
 {
     active_action = ACT_RESET;
     update_status(p, force);
-}
-
-void Active::reset_session(Packet* p, ActiveAction* reject, bool force, bool skip_update_status)
-{
-    if ( !skip_update_status )
-        update_reset_status(p, force);
 
     if ( force or (p->context->conf->inline_mode() and SFDAQ::forwarding_packet(p->pkth)) )
         Stream::drop_flow(p);
@@ -719,8 +725,9 @@ void Active::set_delayed_action(ActiveActionType action, bool force)
 void Active::set_delayed_action(ActiveActionType action, ActiveAction* act, bool force)
 {
     delayed_active_action = action;
-    assert(delayed_reject == nullptr);
-    delayed_reject = act;
+
+    if (delayed_reject == nullptr)
+        delayed_reject = act;
 
     if ( force )
         active_status = AST_FORCE;
@@ -859,4 +866,3 @@ void Active::send_reason_to_daq(Packet& p)
     if ( reason != -1 )
         p.daq_instance->set_packet_verdict_reason(p.daq_msg, reason);
 }
-

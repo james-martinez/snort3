@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,7 @@
 #include "ps_module.h"
 #include "log/messages.h"
 #include "main/snort.h"
+#include "main/snort_config.h"
 
 #include <cassert>
 
@@ -326,7 +327,7 @@ bool PortScanModule::set(const char* fqn, Value& v, SnortConfig*)
 bool PortScanModule::end(const char* fqn, int, SnortConfig* sc)
 {
     if ( Snort::is_reloading() && strcmp(fqn, "port_scan") == 0 )
-        sc->register_reload_resource_tuner(new PortScanReloadTuner(config->memcap));
+        sc->register_reload_handler(new PortScanReloadTuner(config->memcap));
     return true;
 }
 

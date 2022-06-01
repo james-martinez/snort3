@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -170,11 +170,13 @@ RejectAction::RejectAction(uint32_t f) : IpsAction(s_name, &rej_act_action) , re
 
 void RejectAction::exec(Packet* p, const OptTreeNode* otn)
 {
-    p->active->update_reset_status(p, false);
+    p->active->set_delayed_action(Active::ACT_RESET, get_active_action());
+    p->active->set_drop_reason("ips");
+    p->active->reset_again();
+    p->active->update_status(p);
+
     if ( otn )
         Actions::alert(p, otn);
-
-    p->active->reset_session(p, get_active_action(), false, true);
 }
 
 //-------------------------------------------------------------------------

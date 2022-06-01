@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -99,6 +99,10 @@ public:
 
     static bool is_pruning_in_progress()
     { return pruning_in_progress; }
+
+    size_t uni_flows_size() const;
+    size_t uni_ip_flows_size() const;
+    size_t flows_size() const;
 
 private:
     void delete_uni();

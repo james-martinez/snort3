@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -68,7 +68,7 @@ class HashOption : public IpsOption
 {
 public:
     HashOption(const char* s, HashPsIdx hpi, HashMatchData* c, HashFunc f, unsigned n) :
-        IpsOption(s, RULE_OPTION_TYPE_BUFFER_USE)
+        IpsOption(s)
     { config = c; hashf = f; size = n; idx = hpi; assert(n <= MAX_HASH_SIZE); }
 
     ~HashOption() override { delete config; }

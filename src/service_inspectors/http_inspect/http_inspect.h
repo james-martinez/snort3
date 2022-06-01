@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,24 +32,32 @@
 #include "http_common.h"
 #include "http_enum.h"
 #include "http_field.h"
+#include "http_inspect_base.h"
 #include "http_module.h"
-#include "http_msg_section.h"
 #include "http_stream_splitter.h"
 
 class HttpApi;
+class HttpParam;
 
-class HttpInspect : public snort::Inspector
+class HttpInspect : public HttpInspectBase
 {
 public:
     HttpInspect(const HttpParaList* params_);
-    ~HttpInspect() override { delete params; delete script_finder; }
+    ~HttpInspect() override;
 
     bool get_buf(snort::InspectionBuffer::Type ibt, snort::Packet* p,
         snort::InspectionBuffer& b) override;
     bool get_buf(unsigned id, snort::Packet* p, snort::InspectionBuffer& b) override;
-    const Field& http_get_buf(Cursor& c, snort::Packet* p,
-        const HttpBufferInfo& buffer_info) const;
+    const Field& http_get_buf(snort::Packet* p, const HttpBufferInfo& buffer_info) const;
+    const Field& http_get_param_buf(Cursor& c, snort::Packet* p,
+        const HttpParam& param) const;
     int32_t http_get_num_headers(snort::Packet* p, const HttpBufferInfo& buffer_info) const;
+    HttpEnums::VersionId http_get_version_id(snort::Packet* p,
+        const HttpBufferInfo& buffer_info) const;
+    HttpCommon::SectionType get_type_expected(snort::Flow* flow, HttpCommon::SourceId source_id) const override;
+    void finish_h2_body(snort::Flow* flow, HttpCommon::SourceId source_id, HttpCommon::H2BodyState state,
+        bool clear_partial_buffer) const override;
+    void set_h2_body_state(snort::Flow* flow, HttpCommon::SourceId source_id, HttpCommon::H2BodyState state) const override;
     bool get_fp_buf(snort::InspectionBuffer::Type ibt, snort::Packet* p,
         snort::InspectionBuffer& b) override;
     bool configure(snort::SnortConfig*) override;
@@ -58,7 +66,7 @@ public:
     void clear(snort::Packet* p) override;
 
     HttpStreamSplitter* get_splitter(bool is_client_to_server) override
-    { return new HttpStreamSplitter(is_client_to_server, this); }
+    { return &splitter[is_client_to_server ? HttpCommon::SRC_CLIENT : HttpCommon::SRC_SERVER]; }
 
     bool can_carve_files() const override
     { return true; }
@@ -79,6 +87,8 @@ public:
 private:
     friend HttpApi;
     friend HttpStreamSplitter;
+
+    HttpStreamSplitter splitter[2] = { { true, this }, { false, this } };
 
     bool process(const uint8_t* data, const uint16_t dsize, snort::Flow* const flow,
         HttpCommon::SourceId source_id_, bool buf_owner) const;

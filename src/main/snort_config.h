@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,6 +26,7 @@
 #include <sys/types.h>
 
 #include <list>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -61,24 +62,17 @@ enum RunFlag
     RUN_FLAG__PAUSE               = 0x00004000,
     RUN_FLAG__NO_PCRE             = 0x00008000,
 
-    /* If stream is configured, the STATEFUL flag is set.  This is
-     * somewhat misnamed and is used to assure a session is established */
-    RUN_FLAG__ASSURE_EST          = 0x00010000,
+    RUN_FLAG__DUMP_RULE_STATE     = 0x00010000,
     RUN_FLAG__DUMP_RULE_DEPS      = 0x00020000,
     RUN_FLAG__TEST                = 0x00040000,
     RUN_FLAG__MEM_CHECK           = 0x00080000,
 
     RUN_FLAG__TRACK_ON_SYN        = 0x00100000,
     RUN_FLAG__IP_FRAGS_ONLY       = 0x00200000,
-    RUN_FLAG__DUMP_RULE_STATE     = 0x00400000,
-
-    RUN_FLAG__TEST_FEATURES       = 0x00800000,
+    RUN_FLAG__TEST_FEATURES       = 0x00400000,
 
 #ifdef SHELL
     RUN_FLAG__SHELL               = 0x01000000,
-#endif
-#ifdef PIGLET
-    RUN_FLAG__PIGLET              = 0x02000000,
 #endif
 };
 
@@ -149,7 +143,6 @@ struct IpsActionsConfig;
 struct LatencyConfig;
 struct MemoryConfig;
 struct PayloadInjectorConfig;
-struct PHInstance;
 struct Plugins;
 struct PORT_RULE_MAP;
 struct RateFilterConfig;
@@ -163,34 +156,11 @@ struct ThresholdConfig;
 namespace snort
 {
 class GHash;
-class PolicySelector;
 class ProtocolReference;
+class ReloadResourceTuner;
 class ThreadConfig;
 class XHash;
 struct ProfilerConfig;
-
-class ReloadResourceTuner
-{
-public:
-    static const unsigned RELOAD_MAX_WORK_PER_PACKET = 3;
-    // be aggressive when idle as analyzer gets chance once in every second only due to daq timeout
-    static const unsigned RELOAD_MAX_WORK_WHEN_IDLE = 32767;
-
-    virtual ~ReloadResourceTuner() = default;
-
-    // returns true if resource tuning required, false otherwise
-    virtual bool tinit() = 0;
-
-    // each of these returns true if resource tuning is complete, false otherwise
-    virtual bool tune_packet_context() = 0;
-    virtual bool tune_idle_context() = 0;
-
-protected:
-    ReloadResourceTuner() = default;
-
-    unsigned max_work = RELOAD_MAX_WORK_PER_PACKET;
-    unsigned max_work_idle = RELOAD_MAX_WORK_WHEN_IDLE;
-};
 
 struct SnortConfig
 {
@@ -270,7 +240,7 @@ public:
     // chown() use this later, -1 means no change to user_id/group_id
     int user_id = -1;
     int group_id = -1;
-
+    uint16_t watchdog_timer = 0;
     bool dirty_pig = false;
 
     std::string chroot_dir;        /* -t or config chroot */
@@ -394,9 +364,7 @@ public:
     PolicyMap* policy_map = nullptr;
     std::string tweaks;
 
-    PolicySelector* global_selector = nullptr;
-    PHInstance* flow_tracking = nullptr;
-    PHInstance* removed_flow_tracking = nullptr;
+    DataBus* global_dbus = nullptr;
 
     uint16_t tunnel_mask = 0;
 
@@ -434,11 +402,13 @@ public:
     bool cloned = false;
     Plugins* plugins = nullptr;
     SoRules* so_rules = nullptr;
-    unsigned reload_id = 0;
 
     DumpConfigType dump_config_type = DUMP_CONFIG_NONE;
 private:
     std::list<ReloadResourceTuner*> reload_tuners;
+    unsigned reload_id = 0;
+    static std::mutex static_names_mutex;
+    static std::unordered_map<std::string, std::string> static_names;
 
 public:
     //------------------------------------------------------
@@ -477,6 +447,7 @@ public:
     void set_no_logging_timestamps(bool);
     void set_obfuscate(bool);
     void set_obfuscation_mask(const char*);
+    void set_overlay_trace_config(TraceConfig*);
     void set_include_path(const char*);
     void set_process_all_events(bool);
     void set_rule_db_dir(const char*);
@@ -486,7 +457,7 @@ public:
     void set_uid(const char*);
     void set_umask(uint32_t);
     void set_utc(bool);
-    void set_overlay_trace_config(TraceConfig*);
+    void set_watchdog(uint16_t);
     SO_PUBLIC bool set_latency_enable();
 
     //------------------------------------------------------
@@ -616,9 +587,6 @@ public:
     bool conf_error_out() const
     { return run_flags & RUN_FLAG__CONF_ERROR_OUT; }
 
-    bool assure_established() const
-    { return run_flags & RUN_FLAG__ASSURE_EST; }
-
     bool test_features() const
     { return run_flags & RUN_FLAG__TEST_FEATURES; }
 
@@ -702,13 +670,16 @@ public:
     // runtime access to const config - especially for packet threads
     // prefer access via packet->context->conf
     SO_PUBLIC static const SnortConfig* get_conf();
+    // Thread local copy of the reload_id needed for commands that cause reevaluation
+    SO_PUBLIC static unsigned get_thread_reload_id();
+    SO_PUBLIC static void update_thread_reload_id();
 
     // runtime access to mutable config - main thread only, and only special cases
     SO_PUBLIC static SnortConfig* get_main_conf();
 
     static void set_conf(const SnortConfig*);
 
-    SO_PUBLIC void register_reload_resource_tuner(ReloadResourceTuner*);
+    SO_PUBLIC void register_reload_handler(ReloadResourceTuner*);
 
     static void cleanup_fatal_error();
 
@@ -741,6 +712,8 @@ public:
 
     static bool log_show_plugins()
     { return logging_flags & LOGGING_FLAG__SHOW_PLUGINS; }
+
+    SO_PUBLIC static const char* get_static_name(const char* name);
 };
 }
 

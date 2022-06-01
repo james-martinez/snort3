@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -69,22 +69,6 @@ void otn_trigger_actions(const OptTreeNode* otn, Packet* p)
 //-------------------------------------------------------------------------
 // rule FOO
 //-------------------------------------------------------------------------
-
-void* get_rule_type_data(OptTreeNode* otn, const char* name)
-{
-    OptFpList* fpl = otn->opt_func;
-
-    while ( fpl )
-    {
-        if ( fpl->ips_opt )
-        {
-            if ( !strcmp(fpl->ips_opt->get_name(), name) )
-                return fpl->ips_opt;
-        }
-        fpl = fpl->next;
-    }
-    return nullptr;
-}
 
 namespace snort
 {

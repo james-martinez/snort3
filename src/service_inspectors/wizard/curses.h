@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,6 +23,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+
+#include "mms_curse.h"
 
 enum DCE_State
 {
@@ -65,6 +67,12 @@ public:
         uint32_t helper;
     } dce;
 
+    struct MMS
+    {
+        MMS_State state;
+        MMS_State last_state;
+    } mms;
+
     struct SSL
     {
         SSL_State state;
@@ -77,6 +85,8 @@ public:
     CurseTracker()
     {
         dce.state = DCE_State::STATE_0;
+        mms.state = MMS_State::MMS_STATE__TPKT_VER;
+        mms.last_state = mms.state;
         ssl.state = SSL_State::BYTE_0_LEN_MSB;
     }
 };
@@ -86,7 +96,7 @@ typedef bool (* curse_alg)(const uint8_t* data, unsigned len, CurseTracker*);
 struct CurseDetails
 {
     std::string name;
-    std::string service;
+    const char* service;
     curse_alg alg;
     bool is_tcp;
 };

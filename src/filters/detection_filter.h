@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -29,8 +29,13 @@
 // and thereby controls event generation.  event_filter is evaluated after
 // the event is queued, and thereby controls which events get logged.
 
+#include "profiler/profiler.h"
+
 namespace snort
 {
+
+extern THREAD_LOCAL snort::ProfileStats detectionFilterPerfStats;
+
 struct SfIp;
 }
 

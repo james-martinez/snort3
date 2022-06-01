@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -173,7 +173,8 @@ static int service_init(lua_State* L)
     auto& ud = *UserData<LuaServiceObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     // auto pServiceName = luaL_checkstring(L, 2);
     auto pValidator = luaL_checkstring(L, 3);
@@ -986,6 +987,40 @@ static int client_add_payload(lua_State* L)
     return 1;
 }
 
+/** Add a alpn to service app mapping.
+ *  @param Lua_State* - Lua state variable.
+ *  @param appid/stack - the AppId to map the data to.
+ *  @param alpn  - application protocol negotiations string.
+ */
+static int add_alpn_to_service_mapping(lua_State* L)
+{
+    auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
+    // Verify detector user data and that we are NOT in packet context
+    ud->validate_lua_state(false);
+    if (!init(L))
+        return 0;
+    int index = 1;
+
+    uint32_t appid = lua_tointeger(L, ++index);
+
+    // Verify that alpn is a valid string
+    const char* tmp_string = lua_tostring(L, ++index);
+    if (!tmp_string)
+    {
+        ErrorMessage("appid: Invalid alpn service string: appid %u.\n", appid);
+        return 0;
+    }
+    const std::string service_name(tmp_string);
+    const std::string detector_name = ud->get_detector()->get_name();
+
+    ud->get_odp_ctxt().get_alpn_matchers().add_alpn_pattern(appid, service_name, detector_name);
+
+    ud->get_odp_ctxt().get_app_info_mgr().set_app_info_active(appid);
+
+    return 0;
+}
+
+
 /** Add a fp process to client app mapping.
  *  @param Lua_State* - Lua state variable.
  *  @param appid/stack - the AppId to map the fp data to
@@ -997,7 +1032,8 @@ static int add_process_to_client_mapping(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
     int index = 1;
 
     uint32_t appid = lua_tointeger(L, ++index);
@@ -1006,14 +1042,15 @@ static int add_process_to_client_mapping(lua_State* L)
     const char* tmp_string = lua_tostring(L, ++index);
     if (!tmp_string)
     {
-        ErrorMessage("appid: Invalid efp process_name string: appid %u.\n", appid);
+        ErrorMessage("appid: Invalid eve process_name string: appid %u.\n", appid);
         return 0;
     }
     const std::string process_name(tmp_string);
     uint8_t process_score = lua_tointeger(L, ++index);
+    const std::string detector_name = ud->get_detector()->get_name();
 
-    ud->get_odp_ctxt().get_efp_ca_matchers().add_efp_ca_pattern(appid, process_name,
-        process_score);
+    ud->get_odp_ctxt().get_eve_ca_matchers().add_eve_ca_pattern(appid, process_name,
+        process_score, detector_name);
 
     ud->get_odp_ctxt().get_app_info_mgr().set_app_info_active(appid);
 
@@ -1053,7 +1090,8 @@ static int detector_add_http_pattern(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -1095,7 +1133,8 @@ static int detector_add_ssl_cert_pattern(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -1122,7 +1161,8 @@ static int detector_add_dns_host_pattern(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -1148,7 +1188,8 @@ static int detector_add_ssl_cname_pattern(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -1175,7 +1216,8 @@ static int detector_add_host_port_application(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     SfIp ip_address;
     int index = 1;
@@ -1195,7 +1237,11 @@ static int detector_add_host_port_application(lua_State* L)
     if (toipprotocol(L, ++index, proto))
         return 0;
 
-    if (!ud->get_odp_ctxt().host_port_cache_add(&ip_address, (uint16_t)port, proto, type, app_id))
+    lua_getglobal(L, LUA_STATE_GLOBAL_SC_ID);
+    const SnortConfig* sc = *static_cast<const SnortConfig**>(lua_touserdata(L, -1));
+    lua_pop(L, 1);
+    if (!ud->get_odp_ctxt().host_port_cache_add(
+        sc, &ip_address, (uint16_t)port, proto, type, app_id))
         ErrorMessage("%s:Failed to backend call\n",__func__);
 
     return 0;
@@ -1250,7 +1296,8 @@ static int detector_add_content_type_pattern(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     size_t stringSize = 0;
     int index = 1;
@@ -1279,7 +1326,8 @@ static int detector_add_ssh_client_pattern(lua_State* L)
 {
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     size_t string_size = 0;
     int index = 1;
@@ -1471,7 +1519,8 @@ static int detector_chp_create_application(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -1623,7 +1672,8 @@ static int detector_add_chp_action(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     HttpFieldIds ptype;
     size_t psize;
@@ -1714,7 +1764,8 @@ static int detector_add_chp_multi_action(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     HttpFieldIds ptype;
     size_t psize;
@@ -1760,7 +1811,8 @@ static int detector_port_only_service(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -1906,7 +1958,8 @@ static int detector_add_url_application(lua_State* L)
     // Verify detector user data and that we are NOT in packet context
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -1999,7 +2052,8 @@ static int detector_add_rtmp_url(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -2092,7 +2146,8 @@ static int detector_add_sip_user_agent(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -2211,7 +2266,8 @@ static int add_http_pattern(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -2250,7 +2306,8 @@ static int add_url_pattern(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -2343,7 +2400,8 @@ static int add_port_pattern_client(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     size_t patternSize = 0;
     int index = 1;
@@ -2397,7 +2455,8 @@ static int add_port_pattern_service(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     size_t patternSize = 0;
     int index = 1;
@@ -2432,7 +2491,8 @@ static int detector_add_sip_server(lua_State* L)
     auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are NOT in packet context
     ud->validate_lua_state(false);
-    if (!init(L)) return 0;
+    if (!init(L))
+        return 0;
 
     int index = 1;
 
@@ -2720,6 +2780,7 @@ static const luaL_Reg detector_methods[] =
 
     /* add client mapping for process name derived by fingerprinting */
     { "addProcessToClientMapping", add_process_to_client_mapping },
+    { "addAlpnToServiceMapping",  add_alpn_to_service_mapping },
 
     //HTTP Multi Pattern engine
     { "CHPCreateApp",             detector_chp_create_application },

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -60,7 +60,7 @@ public:
     // apply_delayed_action, in a big switch(action). Do away with these and
     // use the actual (Base)Action objects.
     enum ActiveActionType : uint8_t
-    { ACT_TRUST, ACT_ALLOW, ACT_HOLD, ACT_RETRY, ACT_DROP, ACT_BLOCK, ACT_RESET, ACT_MAX };
+    { ACT_TRUST, ACT_ALLOW, ACT_HOLD, ACT_RETRY, ACT_REWRITE, ACT_DROP, ACT_BLOCK, ACT_RESET, ACT_MAX };
 
 public:
 
@@ -111,14 +111,17 @@ public:
 
     void kill_session(Packet*, EncodeFlags = ENC_FLAG_FWD);
 
-    bool can_block() const
+    bool can_act() const
     { return active_status == AST_ALLOW or active_status == AST_FORCE; }
 
     const char* get_action_string() const
     { return act_str[active_action][active_status]; }
 
+    void update_status(const Packet*, bool force = false);
+
     void drop_packet(const Packet*, bool force = false);
     void daq_drop_packet(const Packet*);
+    void rewrite_packet(const Packet*, bool force = false);
     bool retry_packet(const Packet*);
     bool hold_packet(const Packet*);
     void cancel_packet_hold();
@@ -126,9 +129,7 @@ public:
     void trust_session(Packet*, bool force = false);
     void block_session(Packet*, bool force = false);
     void reset_session(Packet*, bool force = false);
-    void reset_session(Packet*, snort::ActiveAction* r, bool force = false,
-        bool skip_update_status = false);
-    void update_reset_status(Packet*, bool force);
+    void reset_session(Packet*, snort::ActiveAction* r, bool force = false);
 
     static void queue(snort::ActiveAction* a, snort::Packet* p);
     static void clear_queue(snort::Packet*);
@@ -212,7 +213,6 @@ private:
     static int send_ip(DAQ_Msg_h, int, const uint8_t* buf, uint32_t len);
 
     void update_status_actionable(const Packet*);
-    void update_status(const Packet*, bool force = false);
     void daq_update_status(const Packet*);
 
     void block_session(const Packet*, ActiveActionType, bool force = false);

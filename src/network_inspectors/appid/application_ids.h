@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -1015,6 +1015,8 @@ enum ApplicationIds : AppId
     APP_ID_SMB_VERSION_1                  = 4645,
     APP_ID_SMB_VERSION_2                  = 4646,
     APP_ID_SMB_VERSION_3                  = 4647,
+    APP_ID_HTTP3                          = 4667,
+    APP_ID_SMB_OVER_QUIC                  = 4668,
 #ifdef REG_TEST
     APP_ID_DNS_OVER_TLS                   = 4615,
     APP_ID_REGTEST                        = 10000,

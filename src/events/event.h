@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -39,6 +39,7 @@ struct Event
     SigInfo* sig_info = nullptr;
     struct sf_timeval32 ref_time = { 0, 0 };   /* reference time for the event reference */
     const char* alt_msg = nullptr;
+    std::string action_string;
 
     Event() = default;
     Event(SigInfo& si)
@@ -52,10 +53,11 @@ struct Event
 
     void update_event_id(uint16_t log_id);
     void update_event_id_and_ref(uint16_t log_id);
+    SO_PUBLIC static uint32_t update_and_get_event_id();
 
     void set_event(uint32_t gid, uint32_t sid, uint32_t rev,
         uint32_t classification, uint32_t priority, uint16_t event_ref,
-        uint16_t log_id, const struct timeval& tv);
+        uint16_t log_id, const struct timeval& tv, const std::string& act = "");
 
 
 private:

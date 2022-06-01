@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -59,9 +59,6 @@ public:
     static const char* get_type_name(PlugType);
 
     static const snort::BaseApi* get_api(PlugType, const char* name);
-#ifdef PIGLET
-    static PlugType get_type_from_name(const std::string&);
-#endif
     static const char* get_current_plugin();
 
     static void instantiate(const snort::BaseApi*, snort::Module*, snort::SnortConfig*);

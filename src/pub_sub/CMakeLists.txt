@@ -1,16 +1,18 @@
 set (PUB_SUB_INCLUDES
     appid_debug_log_event.h
     appid_events.h
+    assistant_gadget_event.h
     cip_events.h
     data_decrypt_event.h
     daq_message_event.h
     dcerpc_events.h
     dhcp_events.h
-    efp_process_event.h
+    eve_process_event.h
     expect_events.h
     finalize_packet_event.h
     http_events.h
     http_request_body_event.h
+    netflow_event.h
     opportunistic_tls_event.h
     sip_events.h
     smb_events.h

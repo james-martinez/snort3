@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,6 +29,7 @@ MagicPage::MagicPage(const MagicBook& b) : book(b)
 {
     for ( int i = 0; i < 256; ++i )
         next[i] = nullptr;
+
     any = nullptr;
 }
 
@@ -36,22 +37,20 @@ MagicPage::~MagicPage()
 {
     for ( int i = 0; i < 256; ++i )
     {
-        if ( next[i] && next[i] != this )
+        if ( next[i] and next[i] != this )
             delete next[i];
     }
+
     delete any;
 }
 
-const char* MagicBook::find_spell(const uint8_t* data, unsigned len, const MagicPage*& p) const
+const char* MagicBook::find_spell(const uint8_t* data, unsigned len,
+    const MagicPage*& p, const MagicPage*& bookmark) const
 {
     assert(p);
+    p = find_spell(data, len, p, 0, bookmark);
 
-    p = find_spell(data, len, p, 0);
-
-    if ( p && !p->value.empty() )
-        return p->value.c_str();
-
-    return nullptr;
+    return p ? p->value : nullptr;
 }
 
 MagicBook::MagicBook()

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,7 @@
 #include <cerrno>
 
 #include "detection/pattern_match_data.h"
+#include "framework/cursor.h"
 #include "framework/module.h"
 #include "framework/ips_option.h"
 #include "framework/range.h"
@@ -219,6 +220,9 @@ public:
     PatternMatchData* get_alternate_pattern() override;
     ~Dce2IfaceOption() override;
 
+    CursorActionType get_cursor_type() const override
+    { return CAT_SET_FAST_PATTERN; }
+
 private:
     const RangeCheck version;
     const bool any_frag;
@@ -363,7 +367,7 @@ bool Dce2IfaceOption::operator==(const IpsOption& ips) const
     return this == &ips;
 }
 
-IpsOption::EvalStatus Dce2IfaceOption::eval(Cursor&, Packet* p)
+IpsOption::EvalStatus Dce2IfaceOption::eval(Cursor& c, Packet* p)
 {
     RuleProfile profile(dce2_iface_perf_stats);
 
@@ -390,6 +394,12 @@ IpsOption::EvalStatus Dce2IfaceOption::eval(Cursor&, Packet* p)
     if (!any_frag && !ropts->first_frag)
     {
         return NO_MATCH;
+    }
+
+    if (p->packet_flags & PKT_FAST_PAT_EVAL)
+    {
+        c.set("pkt_data", p->data, p->dsize);
+        return MATCH;
     }
 
     if (DCE2_UuidCompare((void*)&ropts->iface, &uuid) != 0)

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,6 +21,8 @@
 #include "config.h"
 #endif
 
+#include "http_stream_splitter.h"
+
 #include "packet_io/active.h"
 
 #include "http_common.h"
@@ -28,7 +30,7 @@
 #include "http_enum.h"
 #include "http_inspect.h"
 #include "http_module.h"
-#include "http_stream_splitter.h"
+#include "http_msg_section.h"
 #include "http_test_input.h"
 
 using namespace snort;
@@ -219,19 +221,6 @@ StreamSplitter::Status HttpStreamSplitter::scan(Packet* pkt, const uint8_t* data
     }
 
     HttpModule::increment_peg_counts(PEG_SCAN);
-
-    if (session_data->detection_status[source_id] == DET_REACTIVATING)
-    {
-        if (source_id == SRC_CLIENT)
-        {
-            flow->set_to_server_detection(true);
-        }
-        else
-        {
-            flow->set_to_client_detection(true);
-        }
-        session_data->detection_status[source_id] = DET_ON;
-    }
 
     // Check for 0.9 response message
     if ((type == SEC_STATUS) &&

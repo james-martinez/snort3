@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,6 +24,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 enum JSProgramScopeType : unsigned int
 {
@@ -38,7 +39,7 @@ class JSIdentifierCtxBase
 public:
     virtual ~JSIdentifierCtxBase() = default;
 
-    virtual const char* substitute(const char* identifier) = 0;
+    virtual const char* substitute(const char* identifier, bool is_property) = 0;
     virtual void add_alias(const char* alias, const std::string&& value) = 0;
     virtual const char* alias_lookup(const char* alias) const = 0;
     virtual bool is_ignored(const char* identifier) const = 0;
@@ -55,9 +56,10 @@ class JSIdentifierCtx : public JSIdentifierCtxBase
 {
 public:
     JSIdentifierCtx(int32_t depth, uint32_t max_scope_depth,
-        const std::unordered_set<std::string>& ignored_ids);
+        const std::unordered_set<std::string>& ignored_ids_list,
+        const std::unordered_set<std::string>& ignored_props_list);
 
-    virtual const char* substitute(const char* identifier) override;
+    virtual const char* substitute(const char* identifier, bool is_property) override;
     virtual void add_alias(const char* alias, const std::string&& value) override;
     virtual const char* alias_lookup(const char* alias) const override;
     virtual bool is_ignored(const char* identifier) const override;
@@ -72,39 +74,66 @@ public:
     virtual size_t size() const override
     { return (sizeof(JSIdentifierCtx) + (sizeof(std::string) * 2 * 500) +
         (sizeof(ProgramScope) * 3)); }
+
 private:
+
+    struct NormId
+    {
+        const char* id_name = nullptr;
+        const char* prop_name = nullptr;
+        uint8_t type = 0;
+    };
+    
+    using Alias = std::vector<std::string>;
+    using AliasRef = std::list<Alias*>;
+    using AliasMap = std::unordered_map<std::string, Alias>;
+    using NameMap = std::unordered_map<std::string, NormId>;
+
     class ProgramScope
     {
     public:
-        ProgramScope(JSProgramScopeType t) : t(t) {}
+        ProgramScope(JSProgramScopeType t) : t(t)
+        {}
 
-        void add_alias(const char* alias, const std::string&& value);
-        const char* get_alias_value(const char* alias) const;
+        ~ProgramScope()
+        { for (auto a : to_remove) a->pop_back(); }
+
+        void reference(Alias& a)
+        { to_remove.push_back(&a); }
 
         JSProgramScopeType type() const
         { return t; }
+
     private:
-        std::unordered_map<std::string, std::string> aliases;
         JSProgramScopeType t;
+        AliasRef to_remove{};
     };
 
-    std::list<ProgramScope> scopes;
-    std::unordered_map<std::string, std::string> ident_names;
-    const std::unordered_set<std::string>& ignored_ids;
+    inline const char* substitute(unsigned char c, bool is_property);
+    inline bool is_substituted(const NormId& id, bool is_property);
+    inline const char* acquire_norm_name(NormId& id);
+    inline void init_ignored_names();
 
-    int32_t ident_last_name = 0;
-    int32_t depth;
+    // do not swap next two lines, the destructor frees them in the reverse order
+    AliasMap aliases;
+    std::list<ProgramScope> scopes;
+
+    NormId id_fast[256];
+    NameMap id_names;
+    const std::unordered_set<std::string>& ignored_ids_list;
+    const std::unordered_set<std::string>& ignored_props_list;
+
+    const char* norm_name;
+    const char* norm_name_end;
     uint32_t max_scope_depth;
 
 // advanced program scope access for testing
-#ifdef CATCH_TEST_BUILD
+#if defined(CATCH_TEST_BUILD) || defined(BENCHMARK_TEST)
 public:
     // compare scope list with the passed pattern
     bool scope_check(const std::list<JSProgramScopeType>& compare) const;
     const std::list<JSProgramScopeType> get_types() const;
-    bool scope_contains(size_t pos, const char* alias) const;
 #endif // CATCH_TEST_BUILD
 };
 
 #endif // JS_IDENTIFIER_CTX
-

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -73,6 +73,25 @@
 #else
 #  define PADDING_GUARD_BEGIN
 #  define PADDING_GUARD_END
+#endif
+
+// Pair of macros to temporarily disable and then enable warnings for code
+// that is accessing members of packed types with pointers
+#if defined(__clang__) && __clang_major__ >= 4 && !defined(__ICC)
+#  define PACKED_MEMBER_ADDR_BEGIN \
+    _Pragma(STRINGIFY( clang diagnostic push )) \
+    _Pragma(STRINGIFY( clang diagnostic ignored "-Waddress-of-packed-member" ))
+#  define PACKED_MEMBER_ADDR_END \
+    _Pragma(STRINGIFY( clang diagnostic pop ))
+#elif defined(__GNUC__) && __GNUC__ >= 9 && !defined(__ICC)
+#  define PACKED_MEMBER_ADDR_BEGIN \
+    _Pragma(STRINGIFY( GCC diagnostic push )) \
+    _Pragma(STRINGIFY( GCC diagnostic ignored "-Waddress-of-packed-member" ))
+#  define PACKED_MEMBER_ADDR_END \
+    _Pragma(STRINGIFY( GCC diagnostic pop ))
+#else
+#  define PACKED_MEMBER_ADDR_BEGIN
+#  define PACKED_MEMBER_ADDR_END
 #endif
 
 #endif

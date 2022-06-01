@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -125,7 +125,7 @@ bool AddressSpaceSelectorModule::end(const char* fqn, int idx, SnortConfig* sc)
         }
 
         Shell* sh = new Shell(policy_filename.c_str());
-        auto policies = sc->policy_map->add_shell(sh, true);
+        auto policies = sc->policy_map->add_shell(sh, nullptr);
         selection.use.network_index = policies->network->policy_id;
         selection.use.inspection_index = policies->inspection->policy_id;
         selection.use.ips_index = policies->ips->policy_id;

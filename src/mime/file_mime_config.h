@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,7 +26,7 @@
 
 /*These are temporary values*/
 #define DEFAULT_MIME_MEMCAP           838860
-#define DEFAULT_DEPTH                 1464
+#define DEFAULT_DEPTH                 0
 #define DEFAULT_DECOMP                100000
 #define MAX_LOG_MEMCAP                104857600
 #define MIN_LOG_MEMCAP                3276

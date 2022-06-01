@@ -29,8 +29,8 @@ if ( ENABLE_STATIC_DAQ )
     LIST(APPEND EXTERNAL_LIBRARIES ${DAQ_STATIC_MODULE_LIBS})
 endif ()
 
-if ( HAVE_FLATBUFFERS )
-    LIST(APPEND EXTERNAL_LIBRARIES ${FLATBUFFERS_LIBRARIES})
+if ( HAVE_ATOMIC )
+    LIST(APPEND EXTERNAL_LIBRARIES ${ATOMIC_LIBRARIES})
 endif()
 
 if ( HAVE_HYPERSCAN )
@@ -82,12 +82,6 @@ if ( ENABLE_UNIT_TESTS OR ENABLE_BENCHMARK_TESTS )
     set( UNIT_TESTS_LIBRARIES $<TARGET_OBJECTS:catch_tests>)
     add_subdirectory(catch)
 endif ( ENABLE_UNIT_TESTS OR ENABLE_BENCHMARK_TESTS )
-
-if ( ENABLE_PIGLET )
-    set ( PIGLET_LIBRARIES $<TARGET_OBJECTS:piglet> $<TARGET_OBJECTS:piglet_plugins> )
-    add_subdirectory ( piglet )
-    add_subdirectory ( piglet_plugins )
-endif ( ENABLE_PIGLET )
 
 add_subdirectory(actions)
 add_subdirectory(codecs)
@@ -193,7 +187,6 @@ add_executable( snort
     $<TARGET_OBJECTS:time>
     $<TARGET_OBJECTS:trace>
     $<TARGET_OBJECTS:utils>
-    ${PIGLET_LIBRARIES}
     ${STATIC_CODEC_PLUGINS}
     ${STATIC_NETWORK_INSPECTOR_PLUGINS}
     ${STATIC_SERVICE_INSPECTOR_PLUGINS}

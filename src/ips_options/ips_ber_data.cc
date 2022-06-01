@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -47,6 +47,9 @@ public:
     { return true; }
 
     EvalStatus eval(Cursor&, Packet*) override;
+
+    CursorActionType get_cursor_type() const override
+    { return CAT_ADJUST; }
 
 private:
     uint32_t type;

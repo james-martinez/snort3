@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -170,6 +170,8 @@ static const RuleMap smtp_rules[] =
     { SMTP_AUTH_ABORT_AUTH, "Cyrus SASL authentication attack" },
     { SMTP_AUTH_COMMAND_OVERFLOW, "attempted authentication command buffer overflow" },
     { SMTP_FILE_DECOMP_FAILED, "file decompression failed" },
+    { SMTP_STARTTLS_INJECTION_ATTEMPT, "STARTTLS command injection attempt"},
+    
 
     { 0, nullptr }
 };

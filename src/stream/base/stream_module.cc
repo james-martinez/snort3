@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -221,11 +221,11 @@ bool StreamModule::end(const char* fqn, int, SnortConfig* sc)
     {
         StreamReloadResourceManager* reload_resource_manager = new StreamReloadResourceManager;
         if (reload_resource_manager->initialize(config))
-            sc->register_reload_resource_tuner(reload_resource_manager);
+            sc->register_reload_handler(reload_resource_manager);
         else
             delete reload_resource_manager;
 
-        sc->register_reload_resource_tuner(new HPQReloadTuner(config.held_packet_timeout));
+        sc->register_reload_handler(new HPQReloadTuner(config.held_packet_timeout));
     }
 
     return true;

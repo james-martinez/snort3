@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,7 +29,7 @@
 
 // this is the current version of the base api
 // must be prefixed to subtype version
-#define BASE_API_VERSION 11
+#define BASE_API_VERSION 13
 
 // set options to API_OPTIONS to ensure compatibility
 #ifndef API_OPTIONS
@@ -50,9 +50,6 @@ enum PlugType
     PT_LOGGER,
     PT_CONNECTOR,
     PT_POLICY_SELECTOR,
-#ifdef PIGLET
-    PT_PIGLET,
-#endif
     PT_MAX
 };
 

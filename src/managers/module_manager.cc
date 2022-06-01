@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -725,7 +725,8 @@ SO_PUBLIC bool open_table(const char* s, int idx)
 
     // FIXIT-M only basic modules, inspectors and ips actions can be reloaded at present
     if ( ( Snort::is_reloading() ) and h->api
-            and h->api->type != PT_INSPECTOR and h->api->type != PT_IPS_ACTION )
+            and h->api->type != PT_INSPECTOR and h->api->type != PT_IPS_ACTION
+            and h->api->type != PT_POLICY_SELECTOR )
     {
         return false;
     }
@@ -1393,13 +1394,13 @@ void ModuleManager::dump_stats(const char* skip, bool dynamic)
     }
 }
 
-void ModuleManager::accumulate()
+void ModuleManager::accumulate(const char* except)
 {
     auto mod_hooks = get_all_modhooks();
 
     for ( auto* mh : mod_hooks )
     {
-        if ( !strcmp(mh->mod->name, "memory") )
+        if ( except and !strcmp(mh->mod->name, except) )
             continue;
 
         lock_guard<mutex> lock(stats_mutex);

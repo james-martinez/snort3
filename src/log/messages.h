@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -23,6 +23,7 @@
 
 #include <arpa/inet.h>
 #include <cstdio>
+#include <cstdarg>
 #include <string>
 #include <ctime>
 
@@ -41,9 +42,6 @@ enum WarningGroup
     WARN_DAQ, WARN_CONF, WARN_CONF_STRICT, WARN_VARS,
     WARN_SYMBOLS, WARN_SCRIPTS, WARN_HOSTS, WARN_RULES,
     WARN_FLOWBITS, WARN_PLUGINS,
-#ifdef PIGLET
-    WARN_PIGLET,
-#endif
     WARN_MAX
 };
 
@@ -61,6 +59,7 @@ SO_PUBLIC void ParseError(const char*, ...) __attribute__((format (printf, 1, 2)
 SO_PUBLIC void ReloadError(const char*, ...) __attribute__((format (printf, 1, 2)));
 [[noreturn]] SO_PUBLIC void ParseAbort(const char*, ...) __attribute__((format (printf, 1, 2)));
 
+SO_PUBLIC void LogMessage(const char*, va_list& ap);
 SO_PUBLIC void LogMessage(const char*, ...) __attribute__((format (printf, 1, 2)));
 SO_PUBLIC void LogMessage(FILE*, const char*, ...) __attribute__((format (printf, 2, 3)));
 SO_PUBLIC void WarningMessage(const char*, ...) __attribute__((format (printf, 1, 2)));

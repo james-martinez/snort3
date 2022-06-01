@@ -5,9 +5,6 @@
 
 arp_spoof = nil
 
--- bug: false will limit http file_data
-file_id.enable_signature = true
-
 ftp_server.check_encrypted = true
 
 detection =
@@ -35,12 +32,6 @@ smtp.decompress_swf = true
 smtp.decompress_zip = true
 
 stream_ip.min_frag_length = 100
-
-stream_tcp.small_segments =
-{
-    count = 3,
-    maximum_size = 150,
-}
 
 telnet.check_encrypted = true
 telnet.normalize = true

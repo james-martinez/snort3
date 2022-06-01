@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -132,4 +132,11 @@ void RnaCPEOSInfoEventHandler::handle(DataEvent& event, Flow*)
     Profile profile(rna_perf_stats);
     ++rna_stats.cpe_os;
     pnd.analyze_cpe_os_info(event);
+}
+
+void RnaNetflowEventHandler::handle(DataEvent& event, Flow*)
+{
+    Profile profile(rna_perf_stats);
+    ++rna_stats.netflow_record;
+    pnd.analyze_netflow(event);
 }

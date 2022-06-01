@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -146,10 +146,6 @@ static const char* to_string(const PerfFormat& pf)
         return "csv";
     case PerfFormat::JSON:
         return "json";
-#ifdef HAVE_FLATBUFFERS
-    case PerfFormat::FBS:
-        return "flatbuffers";
-#endif
     case PerfFormat::MOCK:
         return "mock";
     }

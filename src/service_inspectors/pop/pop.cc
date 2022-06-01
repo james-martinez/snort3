@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -100,9 +100,6 @@ const PegInfo pop_peg_names[] =
     { CountType::END, nullptr, nullptr }
 };
 
-
-static void snort_pop(POP_PROTO_CONF* GlobalConf, Packet* p);
-static void POP_ResetState(Flow*);
 
 PopFlowData::PopFlowData() : FlowData(inspector_id)
 {
@@ -725,7 +722,7 @@ bool Pop::get_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b)
                 return false;
 
             const BufferData& vba_buf = pop_ssn->mime_ssn->get_vba_inspect_buf();
-            
+
             if (vba_buf.data_ptr() && vba_buf.length())
             {
                 b.data = vba_buf.data_ptr();
@@ -778,6 +775,13 @@ static void pop_dtor(Inspector* p)
     delete p;
 }
 
+static const char* pop_bufs[] =
+{
+    "file_data",
+    "vba_data",
+    nullptr
+};
+
 const InspectApi pop_api =
 {
     {
@@ -794,7 +798,7 @@ const InspectApi pop_api =
     },
     IT_SERVICE,
     PROTO_BIT__PDU,
-    nullptr, // buffers
+    pop_bufs,
     "pop3",
     pop_init,
     pop_term, // pterm

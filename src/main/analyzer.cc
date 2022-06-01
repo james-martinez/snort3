@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -169,6 +169,7 @@ static void process_daq_sof_eof_msg(DAQ_Msg_h msg, DAQ_Verdict& verdict)
     const DAQ_FlowStats_t *stats = (const DAQ_FlowStats_t*) daq_msg_get_hdr(msg);
     const char* key;
 
+    select_default_policy(*stats, SnortConfig::get_conf());
     if (daq_msg_get_type(msg) == DAQ_MSG_TYPE_EOF)
     {
         packet_time_update(&stats->eof_timestamp);
@@ -209,9 +210,18 @@ static bool process_packet(Packet* p)
     return true;
 }
 
+static inline bool is_sticky_verdict(const DAQ_Verdict verdict)
+{
+    return verdict == DAQ_VERDICT_WHITELIST or verdict == DAQ_VERDICT_BLACKLIST
+        or verdict == DAQ_VERDICT_IGNORE;
+}
+
 // Finalize DAQ message verdict
 static DAQ_Verdict distill_verdict(Packet* p)
 {
+    if ( p->flow and is_sticky_verdict(p->flow->last_verdict) )
+        return p->flow->last_verdict;
+
     DAQ_Verdict verdict = DAQ_VERDICT_PASS;
     Active* act = p->active;
 
@@ -219,7 +229,7 @@ static DAQ_Verdict distill_verdict(Packet* p)
     if ( act->session_was_blocked() ||
             (p->flow && (p->flow->flow_state == Flow::FlowState::BLOCK)) )
     {
-        if ( !act->can_block() )
+        if ( !act->can_act() )
             verdict = DAQ_VERDICT_PASS;
         else if ( act->get_tunnel_bypass() )
         {
@@ -233,7 +243,7 @@ static DAQ_Verdict distill_verdict(Packet* p)
     }
 
     // Second Pass, now with more side effects
-    if ( act->packet_was_dropped() && act->can_block() )
+    if ( act->packet_was_dropped() && act->can_act() )
     {
         if ( verdict == DAQ_VERDICT_PASS )
             verdict = DAQ_VERDICT_BLOCK;
@@ -281,6 +291,10 @@ static DAQ_Verdict distill_verdict(Packet* p)
             daq_stats.internal_whitelist++;
         }
     }
+
+    if ( p->flow )
+        p->flow->last_verdict = verdict;
+
     return verdict;
 }
 
@@ -377,7 +391,7 @@ void Analyzer::process_daq_pkt_msg(DAQ_Msg_h msg, bool retry)
     Packet* p = switcher->get_context()->packet;
     p->context->wire_packet = p;
     p->context->packet_number = get_packet_number();
-    select_default_policy(pkthdr, p->context->conf);
+    select_default_policy(*pkthdr, p->context->conf);
 
     DetectionEngine::reset();
     sfthreshold_reset();
@@ -394,6 +408,9 @@ void Analyzer::process_daq_pkt_msg(DAQ_Msg_h msg, bool retry)
         switcher->stop();
     }
 
+    // Beyond this point, we don't have an active context, but e.g. calls to
+    // get_current_packet() or get_current_wire_packet() require a context.
+    // We must ensure that a context is available when one is needed.
     Stream::handle_timeouts(false);
     HighAvailabilityManager::process_receive();
 }
@@ -588,7 +605,6 @@ void Analyzer::init_unprivileged()
 
     InitTag();
     EventTrace_Init();
-    detection_filter_init(sc->detection_filter_config);
 
     EventManager::open_outputs();
     IpsManager::setup_options(sc);
@@ -640,8 +656,8 @@ void Analyzer::term()
 
     DetectionEngine::idle();
     InspectorManager::thread_stop(sc);
-    ModuleManager::accumulate();
     InspectorManager::thread_term();
+    ModuleManager::accumulate("memory");
     ActionManager::thread_term();
 
     IpsManager::clear_options(sc);
@@ -661,7 +677,6 @@ void Analyzer::term()
     Profiler::consolidate_stats();
 
     DetectionEngine::thread_term();
-    detection_filter_term();
     EventTrace_Term();
     CleanupTag();
     FileService::thread_term();
@@ -765,6 +780,9 @@ bool Analyzer::handle_command()
         return false;
 
     void* ac_state = nullptr;
+    if ( ac->need_update_reload_id() )
+        SnortConfig::update_thread_reload_id();
+
     if ( ac->execute(*this, &ac_state) )
         add_command_to_completed_queue(ac);
     else

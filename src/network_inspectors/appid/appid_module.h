@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,13 +28,14 @@
 #include "framework/module.h"
 #include "main/analyzer.h"
 #include "main/analyzer_command.h"
-#include "main/snort_config.h"
+#include "main/reload_tuner.h"
 
 #include "appid_config.h"
 #include "appid_peg_counts.h"
 
 namespace snort
 {
+struct SnortConfig;
 class Trace;
 }
 
@@ -43,6 +44,7 @@ extern THREAD_LOCAL const snort::Trace* appid_trace;
 
 #define MOD_NAME "appid"
 #define MOD_HELP "application and service identification"
+#define MOD_USAGE snort::Module::GLOBAL
 
 
 class AppIdReloadTuner : public snort::ReloadResourceTuner
@@ -91,7 +93,7 @@ public:
     void reset_stats() override;
 
     Usage get_usage() const override
-    { return CONTEXT; }
+    { return MOD_USAGE; }
     void sum_stats(bool) override;
     void show_dynamic_stats() override;
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,10 +27,9 @@
 using namespace snort;
 
 extern const BaseApi* se_ac_bnfa[];
+extern const BaseApi* se_ac_full[];
 
 #ifdef STATIC_SEARCH_ENGINES
-extern const BaseApi* se_ac_std[];
-extern const BaseApi* se_acsmx2[];
 #ifdef HAVE_HYPERSCAN
 extern const BaseApi* se_hyperscan[];
 #endif
@@ -39,10 +38,9 @@ extern const BaseApi* se_hyperscan[];
 void load_search_engines()
 {
     PluginManager::load_plugins(se_ac_bnfa);
+    PluginManager::load_plugins(se_ac_full);
 
 #ifdef STATIC_SEARCH_ENGINES
-    PluginManager::load_plugins(se_ac_std);
-    PluginManager::load_plugins(se_acsmx2);
 #ifdef HAVE_HYPERSCAN
     PluginManager::load_plugins(se_hyperscan);
 #endif

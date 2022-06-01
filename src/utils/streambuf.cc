@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -367,6 +367,26 @@ streamsize ostreambuf_infl::xsputn(const char* s, streamsize n)
     pbump(n);
 
     return n;
+}
+
+// cppcheck-suppress unusedFunction
+streamsize ostreambuf_infl::xsgetn(char* s, streamsize n)
+{
+    assert(n >= 0);
+
+    if (pptr() != epptr())
+    {
+        n = max(0, n);
+        auto c_avail = epptr() - pptr();
+        n = min(c_avail, n);
+
+        memcpy(s, pptr(), n);
+        pbump(n);
+
+        return n;
+    }
+
+    return 0;
 }
 
 // cppcheck-suppress unusedFunction

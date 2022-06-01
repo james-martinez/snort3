@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -86,7 +86,7 @@ RnaInspector::~RnaInspector()
     }
 }
 
-bool RnaInspector::configure(SnortConfig* sc)
+bool RnaInspector::configure(SnortConfig*)
 {
     DataBus::subscribe_network( APPID_EVENT_ANY_CHANGE, new RnaAppidEventHandler(*pnd) );
     DataBus::subscribe_network( DHCP_INFO_EVENT, new RnaDHCPInfoEventHandler(*pnd) );
@@ -105,17 +105,21 @@ bool RnaInspector::configure(SnortConfig* sc)
     DataBus::subscribe_network( STREAM_TCP_SYN_EVENT, new RnaTcpSynEventHandler(*pnd) );
     DataBus::subscribe_network( STREAM_TCP_SYN_ACK_EVENT, new RnaTcpSynAckEventHandler(*pnd) );
     DataBus::subscribe_network( STREAM_TCP_MIDSTREAM_EVENT, new RnaTcpMidstreamEventHandler(*pnd) );
+
     DataBus::subscribe_network( CPE_OS_INFO_EVENT, new RnaCPEOSInfoEventHandler(*pnd) );
+    DataBus::subscribe_network( NETFLOW_EVENT, new RnaNetflowEventHandler(*pnd) );
 
     if (rna_conf && rna_conf->log_when_idle)
         DataBus::subscribe_network( THREAD_IDLE_EVENT, new RnaIdleEventHandler(*pnd) );
 
-    // tinit is not called during reload, so pass processor pointers to threads via reload tuner
-    if ( Snort::is_reloading() && InspectorManager::get_inspector(RNA_NAME, true) )
-        sc->register_reload_resource_tuner(new FpProcReloadTuner(*mod_conf));
+    if ( mod_conf->ua_processor )
+        mod_conf->ua_processor->make_mpse();
 
     return true;
 }
+
+void RnaInspector::install_reload_handler(SnortConfig* sc)
+{ sc->register_reload_handler(new FpProcReloadTuner(*mod_conf)); }
 
 void RnaInspector::eval(Packet* p)
 {

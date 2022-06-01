@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -91,7 +91,7 @@ Http2FlowData::~Http2FlowData()
     {
         delete infractions[k];
         delete events[k];
-        delete hi_ss[k];
+        hi_ss[k]->go_away();
         delete[] frame_data[k];
     }
 

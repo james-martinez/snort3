@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 // Copyright (C) 2000,2001 Andrew R. Baker <andrewb@uab.edu>
@@ -33,6 +33,7 @@
 #include <fstream>
 #include <stack>
 
+#include "detection/fp_utils.h"
 #include "log/messages.h"
 #include "main/snort_config.h"
 #include "managers/module_manager.h"
@@ -160,6 +161,8 @@ static bool relative_to_include_dir(const char* file, std::string& path)
 
 const char* get_config_file(const char* arg, std::string& file)
 {
+    assert(arg);
+
     bool absolute = (arg[0] == '/');
 
     if ( absolute )
@@ -242,12 +245,8 @@ void add_service_to_otn(SnortConfig* sc, OptTreeNode* otn, const char* svc_name)
     {
         // well-known services supporting file_data
         // applies to both alert file and service:file rules
-        add_service_to_otn(sc, otn, "ftp-data");
-        add_service_to_otn(sc, otn, "netbios-ssn");
-        add_service_to_otn(sc, otn, "http");
-        add_service_to_otn(sc, otn, "pop3");
-        add_service_to_otn(sc, otn, "imap");
-        add_service_to_otn(sc, otn, "smtp");
+        std::string buf = "file_data";
+        add_default_services(sc, buf, otn);
         add_service_to_otn(sc, otn, "file");
         return;
     }

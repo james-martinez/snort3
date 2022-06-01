@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -49,6 +49,9 @@ static std::vector<void *> s_state;
 static ScratchAllocator* scratcher = nullptr;
 
 static unsigned s_parse_errors = 0;
+
+DataBus::DataBus() = default;
+DataBus::~DataBus() = default;
 
 SnortConfig::SnortConfig(const SnortConfig* const, const char*)
 {

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -125,7 +125,7 @@ AppIdSession* AppIdSession::allocate_session(const Packet* p, IpProtocol proto,
 }
 
 AppIdSession::AppIdSession(IpProtocol proto, const SfIp* ip, uint16_t port,
-    AppIdInspector& inspector, OdpContext& odp_ctxt, uint16_t asid)
+    AppIdInspector& inspector, OdpContext& odp_ctxt, uint32_t asid)
     : FlowData(inspector_id, &inspector), config(inspector.get_ctxt().config),
         initiator_port(port), asid(asid), protocol(proto),
         api(*(new AppIdSessionApi(this, *ip))), odp_ctxt(odp_ctxt),
@@ -493,6 +493,9 @@ void AppIdSession::update_encrypted_app_id(AppId service_id)
     case APP_ID_POP3:
         misc_app_id = APP_ID_POP3S;
         break;
+    case APP_ID_HTTP3:
+    case APP_ID_SMB_OVER_QUIC:
+        misc_app_id = APP_ID_QUIC;
     default:
         break;
     }
@@ -768,6 +771,9 @@ AppId AppIdSession::pick_service_app_id() const
 {
     AppId rval = APP_ID_NONE;
 
+    if (api.service.get_alpn_service_app_id() > APP_ID_NONE)
+        return api.service.get_alpn_service_app_id();
+
     if (!tp_appid_ctxt)
     {
         if (is_service_detected())
@@ -842,25 +848,23 @@ AppId AppIdSession::pick_ss_client_app_id() const
         tmp_id = api.hsessions[0]->client.get_id();
     if (tmp_id > APP_ID_NONE)
     {
-        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_APPID);
+        api.client.set_eve_client_app_detect_type(CLIENT_APP_DETECT_APPID);
         return tmp_id;
     }
 
-    if (api.client.get_efp_client_app_id() > APP_ID_NONE and
-        (api.client.get_id() == APP_ID_SSL_CLIENT or
-            api.client.get_id() <= APP_ID_NONE))
+    if (use_eve_client_app_id())
     {
-        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_TLS_FP);
-        return api.client.get_efp_client_app_id();
+        api.client.set_eve_client_app_detect_type(CLIENT_APP_DETECT_TLS_FP);
+        return api.client.get_eve_client_app_id();
     }
 
     if (api.client.get_id() > APP_ID_NONE)
     {
-        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_APPID);
+        api.client.set_eve_client_app_detect_type(CLIENT_APP_DETECT_APPID);
         return api.client.get_id();
     }
 
-    api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_APPID);
+    api.client.set_eve_client_app_detect_type(CLIENT_APP_DETECT_APPID);
     return encrypted.client_id;
 }
 

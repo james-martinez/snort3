@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,7 +21,6 @@
 #ifndef RNA_FINGERPRINT_UA_H
 #define RNA_FINGERPRINT_UA_H
 
-#include "main/snort_config.h"
 #include "main/snort_types.h"
 #include "search_engines/search_tool.h"
 
@@ -52,7 +51,7 @@ public:
     bool has_pattern()
     { return os_mpse != nullptr; }
 
-    void make_mpse(SnortConfig* sc = nullptr);
+    void make_mpse(bool priority = false);
 
     void match_mpse(const char*, const char*, const UaFingerprint*&, const char*&, bool&);
 

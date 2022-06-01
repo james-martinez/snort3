@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -85,7 +85,7 @@ public:
 
     static void dump_stats(const char* skip = nullptr, bool dynamic = false);
 
-    static void accumulate();
+    static void accumulate(const char* except = nullptr);
     static void accumulate_module(const char* name);
     static void reset_stats(SnortConfig*);
     static void reset_stats(clear_counter_type_t);

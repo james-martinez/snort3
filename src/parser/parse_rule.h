@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -34,7 +34,7 @@ struct RuleTreeNode;
 
 void parse_rule_init();
 void parse_rule_term();
-void parse_rule_print();
+void parse_rule_print(unsigned fb_total, unsigned fb_unchk, unsigned fb_unset);
 int get_policy_loaded_rule_count();
 int get_policy_shared_rule_count();
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -157,7 +157,7 @@ AppIdConfig stub_config;
 AppIdContext stub_ctxt(stub_config);
 OdpContext stub_odp_ctxt(stub_config, nullptr);
 AppIdSession::AppIdSession(IpProtocol, const SfIp* ip, uint16_t, AppIdInspector& inspector,
-    OdpContext& odpctxt, uint16_t) : snort::FlowData(inspector_id, (snort::Inspector*)&inspector),
+    OdpContext& odpctxt, uint32_t) : snort::FlowData(inspector_id, (snort::Inspector*)&inspector),
         config(stub_config), api(*(new AppIdSessionApi(this, *ip))), odp_ctxt(odpctxt)
 {
     this->set_session_flags(APPID_SESSION_DISCOVER_APP);

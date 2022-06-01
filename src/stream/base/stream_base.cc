@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -60,7 +60,6 @@ const PegInfo base_pegs[] =
     { CountType::SUM, "idle_prunes", " sessions pruned due to timeout" },
     { CountType::SUM, "excess_prunes", "sessions pruned due to excess" },
     { CountType::SUM, "uni_prunes", "uni sessions pruned" },
-    { CountType::SUM, "preemptive_prunes", "sessions pruned during preemptive pruning (deprecated)" },
     { CountType::SUM, "memcap_prunes", "sessions pruned due to memcap" },
     { CountType::SUM, "ha_prunes", "sessions pruned by high availability sync" },
     { CountType::SUM, "stale_prunes", "sessions pruned due to stale connection" },
@@ -76,6 +75,9 @@ const PegInfo base_pegs[] =
     { CountType::SUM, "reload_allowed_deletes", "number of allowed flows deleted by config reloads" },
     { CountType::SUM, "reload_blocked_deletes", "number of blocked flows deleted by config reloads" },
     { CountType::SUM, "reload_offloaded_deletes", "number of offloaded flows deleted by config reloads" },
+    { CountType::NOW, "current_flows", "current number of flows in cache" },
+    { CountType::NOW, "uni_flows", "number of uni flows in cache" },
+    { CountType::NOW, "uni_ip_flows", "number of uni ip flows in cache" },
     { CountType::END, nullptr, nullptr }
 };
 
@@ -90,7 +92,6 @@ void base_prep()
     stream_base_stats.timeout_prunes = flow_con->get_prunes(PruneReason::IDLE);
     stream_base_stats.excess_prunes = flow_con->get_prunes(PruneReason::EXCESS);
     stream_base_stats.uni_prunes = flow_con->get_prunes(PruneReason::UNI);
-    stream_base_stats.preemptive_prunes = flow_con->get_prunes(PruneReason::MEMCAP);
     stream_base_stats.memcap_prunes = flow_con->get_prunes(PruneReason::MEMCAP);
     stream_base_stats.ha_prunes = flow_con->get_prunes(PruneReason::HA);
     stream_base_stats.stale_prunes = flow_con->get_prunes(PruneReason::STALE);
@@ -98,6 +99,9 @@ void base_prep()
     stream_base_stats.reload_allowed_flow_deletes = flow_con->get_deletes(FlowDeleteState::ALLOWED);
     stream_base_stats.reload_offloaded_flow_deletes= flow_con->get_deletes(FlowDeleteState::OFFLOADED);
     stream_base_stats.reload_blocked_flow_deletes= flow_con->get_deletes(FlowDeleteState::BLOCKED);
+    stream_base_stats.current_flows = flow_con->get_num_flows();
+    stream_base_stats.uni_flows = flow_con->get_uni_flows();
+    stream_base_stats.uni_ip_flows = flow_con->get_uni_ip_flows();
     ExpectCache* exp_cache = flow_con->get_exp_cache();
 
     if ( exp_cache )
@@ -182,7 +186,7 @@ StreamBase::StreamBase(const StreamModuleConfig* c)
 { config = *c; }
 
 void StreamBase::tear_down(SnortConfig* sc)
-{ sc->register_reload_resource_tuner(new StreamUnloadReloadResourceManager); }
+{ sc->register_reload_handler(new StreamUnloadReloadResourceManager); }
 
 void StreamBase::tinit()
 {

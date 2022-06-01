@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -50,8 +50,6 @@ FlowControl::FlowControl(const FlowCacheConfig& fc)
 
 FlowControl::~FlowControl()
 {
-    DetectionEngine de;
-
     delete cache;
     snort_free(mem);
     delete exp_cache;
@@ -78,6 +76,16 @@ void FlowControl::clear_counts()
     cache->reset_stats();
     num_flows = 0;
 }
+
+PegCount FlowControl::get_uni_flows() const
+{ return cache->uni_flows_size(); }
+
+PegCount FlowControl::get_uni_ip_flows() const
+{ return cache->uni_ip_flows_size(); }
+
+PegCount FlowControl::get_num_flows() const
+{ return cache->flows_size(); }
+
 
 //-------------------------------------------------------------------------
 // cache foo
@@ -117,9 +125,9 @@ unsigned FlowControl::delete_flows(unsigned num_to_delete)
 bool FlowControl::prune_one(PruneReason reason, bool do_cleanup)
 { return cache->prune_one(reason, do_cleanup); }
 
-void FlowControl::timeout_flows(time_t cur_time)
+void FlowControl::timeout_flows(unsigned max, time_t cur_time)
 {
-    cache->timeout(1, cur_time);
+    cache->timeout(max, cur_time);
 }
 
 Flow* FlowControl::stale_flow_cleanup(FlowCache* cache, Flow* flow, Packet* p)
@@ -312,7 +320,7 @@ static void init_roles(Packet* p, Flow* flow)
         flow->server_group = p->pkth->egress_group;
     }
 
-    flow->tenant = p->get_flow_geneve_vni();
+    flow->tenant = p->pkth->tenant_id;
 
     flow->flags.app_direction_swapped = false;
     if ( flow->ssn_state.direction == FROM_CLIENT )
@@ -435,14 +443,20 @@ unsigned FlowControl::process(Flow* flow, Packet* p)
 
     if ( flow->flow_state != Flow::FlowState::SETUP )
     {
-        const SnortConfig* sc = SnortConfig::get_conf();
-        set_inspection_policy(sc, flow->inspection_policy_id);
-        set_ips_policy(sc, flow->ips_policy_id);
+        unsigned reload_id = SnortConfig::get_thread_reload_id();
+        if (flow->reload_id != reload_id)
+            flow->network_policy_id = get_network_policy()->policy_id;
+        else
+        {
+            set_inspection_policy(flow->inspection_policy_id);
+            set_ips_policy(p->context->conf, flow->ips_policy_id);
+        }
         p->filtering_state = flow->filtering_state;
     }
 
     else
     {
+        flow->network_policy_id = get_network_policy()->policy_id;
         if (PacketTracer::is_active())
             PacketTracer::log("Session: new snort session\n");
 

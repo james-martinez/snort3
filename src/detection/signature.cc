@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -204,23 +204,6 @@ OptTreeNode* OtnLookup(GHash* otn_map, uint32_t gid, uint32_t sid)
     key.sid = sid;
 
     OptTreeNode* otn = (OptTreeNode*)otn_map->find(&key);
-
-    return otn;
-}
-
-OptTreeNode* GetOTN(uint32_t gid, uint32_t sid)
-{
-    OptTreeNode* otn = OtnLookup(SnortConfig::get_conf()->otn_map, gid, sid);
-
-    if ( !otn )
-        return nullptr;
-
-    if ( !getRtnFromOtn(otn) )
-    {
-        // If not configured to autogenerate and there isn't an RTN, meaning
-        // this rule isn't in the current policy, return nullptr.
-        return nullptr;
-    }
 
     return otn;
 }
@@ -480,8 +463,8 @@ void dump_rule_state(const SnortConfig* sc)
             std::string action = Actions::get_string(rtn->action);
             json.put("action", action.c_str());
 
-            const char* s = rtn->enabled() ? "enabled" : "disabled";
-            json.put("state", s);
+            const char* s = rtn->enabled() ? "yes" : "no";
+            json.put("enable", s);
 
             json.close();
         }

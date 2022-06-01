@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -173,24 +173,5 @@ void MpseManager::print_qinfo()
     sfksearch_print_qinfo();
     acsmx2_print_qinfo();
 }
-#endif
-
-#ifdef PIGLET
-
-MpseWrapper* MpseManager::instantiate(const char* name, Module* m, SnortConfig* sc)
-{
-    auto api = ::get_api(name);
-
-    if ( !api || !api->ctor )
-        return nullptr;
-
-    auto p = api->ctor(sc, m, nullptr);
-
-    if ( !p )
-        return nullptr;
-
-    return new MpseWrapper(api, p);
-}
-
 #endif
 

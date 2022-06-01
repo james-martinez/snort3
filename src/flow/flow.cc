@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -23,12 +23,14 @@
 
 #include "flow.h"
 
+#include "detection/context_switcher.h"
 #include "detection/detection_engine.h"
+#include "flow/flow_key.h"
 #include "flow/ha.h"
 #include "flow/session.h"
 #include "framework/data_bus.h"
 #include "helpers/bitop.h"
-#include "ips_options/ips_flowbits.h"
+#include "main/analyzer.h"
 #include "memory/memory_cap.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
@@ -118,6 +120,8 @@ void Flow::term()
         delete stash;
         stash = nullptr;
     }
+
+    service = nullptr;
 }
 
 inline void Flow::clean()
@@ -146,16 +150,18 @@ void Flow::flush(bool do_cleanup)
     {
         DetectionEngine::onload(this);
 
-        if ( do_cleanup )
+        if ( !do_cleanup )
+            session->clear();
+
+        else if ( Analyzer::get_switcher()->get_context() )
+            session->flush();
+
+        else
         {
             DetectionEngine::set_next_packet();
             DetectionEngine de;
-
             session->flush();
-            de.get_context()->clear_callbacks();
         }
-        else
-            session->clear();
     }
 
     if ( was_blocked() )
@@ -168,17 +174,18 @@ void Flow::reset(bool do_cleanup)
     {
         DetectionEngine::onload(this);
 
-        if ( do_cleanup )
+        if ( !do_cleanup )
+            session->clear();
+
+        else if ( Analyzer::get_switcher()->get_context() )
+            session->cleanup();
+
+        else
         {
             DetectionEngine::set_next_packet();
             DetectionEngine de;
-
             session->cleanup();
-
-            de.get_context()->clear_callbacks();
         }
-        else
-            session->clear();
     }
 
     free_flow_data();
@@ -326,11 +333,45 @@ void Flow::free_flow_data(uint32_t proto)
 
 void Flow::free_flow_data()
 {
+    const SnortConfig* sc = SnortConfig::get_conf();
+    PolicySelector* ps = sc->policy_map->get_policy_selector();
+    NetworkPolicy* np = nullptr;
+    InspectionPolicy* ip = nullptr;
+    IpsPolicy* ipsp = nullptr;
+    if (ps)
+    {
+        np = get_network_policy();
+        ip = get_inspection_policy();
+        ipsp = get_ips_policy();
+
+        unsigned t_reload_id = SnortConfig::get_thread_reload_id();
+        if (reload_id == t_reload_id)
+        {
+            ::set_network_policy(network_policy_id);
+            ::set_inspection_policy(inspection_policy_id);
+            ::set_ips_policy(sc, ips_policy_id);
+        }
+        else
+        {
+            _daq_pkt_hdr pkthdr = {};
+            pkthdr.address_space_id = key->addressSpaceId;
+            pkthdr.tenant_id = tenant;
+            select_default_policy(pkthdr, sc);
+        }
+    }
+
     while (flow_data)
     {
         FlowData* tmp = flow_data;
         flow_data = flow_data->next;
         delete tmp;
+    }
+
+    if (ps)
+    {
+        set_network_policy(np);
+        set_inspection_policy(ip);
+        set_ips_policy(ipsp);
     }
 }
 

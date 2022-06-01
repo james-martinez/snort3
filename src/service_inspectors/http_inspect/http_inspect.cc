@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -48,6 +48,7 @@
 #include "http_msg_request.h"
 #include "http_msg_status.h"
 #include "http_msg_trailer.h"
+#include "http_param.h"
 #include "http_test_manager.h"
 
 using namespace snort;
@@ -131,9 +132,17 @@ HttpInspect::HttpInspect(const HttpParaList* params_) :
     }
 }
 
+HttpInspect::~HttpInspect()
+{
+    delete params->mime_decode_conf;
+    delete params;
+    delete script_finder;
+}
+
 bool HttpInspect::configure(SnortConfig* )
 {
     params->js_norm_param.js_norm->configure();
+    params->mime_decode_conf->sync_all_depths();
 
     return true;
 }
@@ -149,6 +158,10 @@ void HttpInspect::show(const SnortConfig*) const
     std::string js_norm_ident_ignore;
     for (auto s : params->js_norm_param.ignored_ids)
         js_norm_ident_ignore += s + " ";
+
+    std::string js_norm_prop_ignore;
+    for (auto s : params->js_norm_param.ignored_props)
+        js_norm_prop_ignore += s + " ";
 
     ConfigLogger::log_limit("request_depth", params->request_depth, -1LL);
     ConfigLogger::log_limit("response_depth", params->response_depth, -1LL);
@@ -169,6 +182,8 @@ void HttpInspect::show(const SnortConfig*) const
     ConfigLogger::log_value("js_norm_max_scope_depth", params->js_norm_param.max_scope_depth);
     if (!js_norm_ident_ignore.empty())
         ConfigLogger::log_list("js_norm_ident_ignore", js_norm_ident_ignore.c_str());
+    if (!js_norm_prop_ignore.empty())
+        ConfigLogger::log_list("js_norm_prop_ignore", js_norm_prop_ignore.c_str());
     ConfigLogger::log_value("bad_characters", bad_chars.c_str());
     ConfigLogger::log_value("ignore_unreserved", unreserved_chars.c_str());
     ConfigLogger::log_flag("percent_u", params->uri_param.percent_u);
@@ -261,10 +276,9 @@ bool HttpInspect::get_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffe
 
 bool HttpInspect::get_buf(unsigned id, Packet* p, InspectionBuffer& b)
 {
-    Cursor c;
     HttpBufferInfo buffer_info(id);
 
-    const Field& http_buffer = http_get_buf(c, p, buffer_info);
+    const Field& http_buffer = http_get_buf(p, buffer_info);
 
     if (http_buffer.length() <= 0)
         return false;
@@ -274,15 +288,25 @@ bool HttpInspect::get_buf(unsigned id, Packet* p, InspectionBuffer& b)
     return true;
 }
 
-const Field& HttpInspect::http_get_buf(Cursor& c, Packet* p,
-    const HttpBufferInfo& buffer_info) const
+const Field& HttpInspect::http_get_buf(Packet* p, const HttpBufferInfo& buffer_info) const
 {
     HttpMsgSection* const current_section = HttpContextData::get_snapshot(p);
 
     if (current_section == nullptr)
         return Field::FIELD_NULL;
 
-    return current_section->get_classic_buffer(c, buffer_info);
+    return current_section->get_classic_buffer(buffer_info);
+}
+
+const Field& HttpInspect::http_get_param_buf(Cursor& c, Packet* p,
+    const HttpParam& param) const
+{
+    HttpMsgSection* const current_section = HttpContextData::get_snapshot(p);
+
+    if (current_section == nullptr)
+        return Field::FIELD_NULL;
+
+    return current_section->get_param_buffer(c, param);
 }
 
 int32_t HttpInspect::http_get_num_headers(Packet* p,
@@ -294,6 +318,36 @@ int32_t HttpInspect::http_get_num_headers(Packet* p,
         return STAT_NOT_COMPUTE;
 
     return current_section->get_num_headers(buffer_info);
+}
+
+VersionId HttpInspect::http_get_version_id(Packet* p,
+    const HttpBufferInfo& buffer_info) const
+{
+    const HttpMsgSection* const current_section = HttpContextData::get_snapshot(p);
+
+    if (current_section == nullptr)
+        return VERS__NOT_PRESENT;
+
+    return current_section->get_version_id(buffer_info);
+}
+
+HttpCommon::SectionType HttpInspect::get_type_expected(snort::Flow* flow, HttpCommon::SourceId source_id) const
+{
+    HttpFlowData* session_data = http_get_flow_data(flow);
+    return session_data->get_type_expected(source_id);
+}
+
+void HttpInspect::finish_h2_body(snort::Flow* flow, HttpCommon::SourceId source_id, HttpCommon::H2BodyState state,
+    bool clear_partial_buffer) const
+{
+    HttpFlowData* session_data = http_get_flow_data(flow);
+    session_data->finish_h2_body(source_id, state, clear_partial_buffer);
+}
+
+void HttpInspect::set_h2_body_state(snort::Flow* flow, HttpCommon::SourceId source_id, HttpCommon::H2BodyState state) const
+{
+    HttpFlowData* session_data = http_get_flow_data(flow);
+    session_data->set_h2_body_state(source_id, state);
 }
 
 bool HttpInspect::get_fp_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b)
@@ -660,23 +714,6 @@ void HttpInspect::clear(Packet* p)
 
     current_section->clear();
     HttpTransaction* current_transaction = current_section->get_transaction();
-
-    const SourceId source_id = current_section->get_source_id();
-
-    // FIXIT-M This check may not apply to the transaction attached to the packet
-    // in case of offload.
-    if (session_data->detection_status[source_id] == DET_DEACTIVATING)
-    {
-        if (source_id == SRC_CLIENT)
-        {
-            p->flow->set_to_server_detection(false);
-        }
-        else
-        {
-            p->flow->set_to_client_detection(false);
-        }
-        session_data->detection_status[source_id] = DET_OFF;
-    }
 
     current_transaction->garbage_collect();
     session_data->garbage_collect();

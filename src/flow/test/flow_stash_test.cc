@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -111,7 +111,7 @@ void DataBus::_subscribe(const char* key, DataHandler* h)
 
 void DataBus::_unsubscribe(const char*, DataHandler*) {}
 
-void DataBus::_publish(const char* key, DataEvent& e, Flow* f)
+void DataBus::_publish(const char* key, DataEvent& e, Flow* f) const
 {
     auto v = map.find(key);
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -684,6 +684,7 @@ static void init_daq_pkthdr(
     pkth->egress_group = phdr->egress_group;
     pkth->flags = phdr->flags;
     pkth->address_space_id = phdr->address_space_id;
+    pkth->tenant_id = phdr->tenant_id;
     pkth->opaque = opaque;
 }
 

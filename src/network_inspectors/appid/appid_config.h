@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,7 +30,7 @@
 
 #include "app_info_table.h"
 #include "client_plugins/client_discovery.h"
-#include "client_plugins/efp_ca_patterns.h"
+#include "client_plugins/eve_ca_patterns.h"
 #include "detector_plugins/dns_patterns.h"
 #include "detector_plugins/http_url_patterns.h"
 #include "detector_plugins/sip_patterns.h"
@@ -39,6 +39,7 @@
 #include "length_app_cache.h"
 #include "lua_detector_flow_api.h"
 #include "lua_detector_module.h"
+#include "service_plugins/alpn_patterns.h"
 #include "service_plugins/service_discovery.h"
 #include "detector_plugins/ssh_patterns.h"
 #include "tp_appid_module_api.h"
@@ -153,10 +154,10 @@ public:
         return host_port_cache.find(ip, port, proto, *this);
     }
 
-    bool host_port_cache_add(const snort::SfIp* ip, uint16_t port, IpProtocol proto, unsigned type,
-        AppId appid)
+    bool host_port_cache_add(const snort::SnortConfig* sc, const snort::SfIp* ip, uint16_t port,
+        IpProtocol proto, unsigned type, AppId appid)
     {
-        return host_port_cache.add(ip, port, proto, type, appid);
+        return host_port_cache.add(sc, ip, port, proto, type, appid);
     }
 
     AppId length_cache_find(const LengthKey& key)
@@ -179,9 +180,9 @@ public:
         return http_matchers;
     }
 
-    EfpCaPatternMatchers& get_efp_ca_matchers()
+    EveCaPatternMatchers& get_eve_ca_matchers()
     {
-        return efp_ca_matchers;
+        return eve_ca_matchers;
     }
 
     SipPatternMatchers& get_sip_matchers()
@@ -209,6 +210,11 @@ public:
         return *service_pattern_detector;
     }
 
+    AlpnPatternMatchers& get_alpn_matchers()
+    {
+        return alpn_matchers;
+    }
+
     void add_port_service_id(IpProtocol, uint16_t, AppId);
     void add_protocol_service_id(IpProtocol, AppId);
     AppId get_port_service_id(IpProtocol, uint16_t);
@@ -221,13 +227,14 @@ private:
     LengthCache length_cache;
     DnsPatternMatchers dns_matchers;
     HttpPatternMatchers http_matchers;
-    EfpCaPatternMatchers efp_ca_matchers;
+    EveCaPatternMatchers eve_ca_matchers;
     ServiceDiscovery service_disco_mgr;
     SipPatternMatchers sip_matchers;
     SslPatternMatchers ssl_matchers;
     SshPatternMatchers ssh_matchers;
     PatternClientDetector* client_pattern_detector;
     PatternServiceDetector* service_pattern_detector;
+    AlpnPatternMatchers alpn_matchers;
 
     std::array<AppId, APP_ID_PORT_ARRAY_SIZE> tcp_port_only = {}; // port-only TCP services
     std::array<AppId, APP_ID_PORT_ARRAY_SIZE> udp_port_only = {}; // port-only UDP services
@@ -241,7 +248,8 @@ class OdpThreadContext
 {
 public:
     ~OdpThreadContext();
-    void initialize(AppIdContext& ctxt, bool is_control=false, bool reload_odp=false);
+    void initialize(const snort::SnortConfig*, AppIdContext& ctxt, bool is_control=false,
+        bool reload_odp=false);
 
     void set_lua_detector_mgr(LuaDetectorManager& mgr)
     {

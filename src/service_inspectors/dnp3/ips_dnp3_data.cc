@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -47,12 +47,15 @@ static THREAD_LOCAL ProfileStats dnp3_data_perf_stats;
 class Dnp3DataOption : public IpsOption
 {
 public:
-    Dnp3DataOption() : IpsOption(s_name, RULE_OPTION_TYPE_BUFFER_SET) { }
+    Dnp3DataOption() : IpsOption(s_name) { }
 
     uint32_t hash() const override;
     bool operator==(const IpsOption&) const override;
 
     EvalStatus eval(Cursor&, Packet*) override;
+
+    CursorActionType get_cursor_type() const override
+    { return CAT_SET_FAST_PATTERN; }
 };
 
 uint32_t Dnp3DataOption::hash() const

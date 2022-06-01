@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -226,7 +226,7 @@ class AppIdSession : public snort::FlowData
 {
 public:
     AppIdSession(IpProtocol, const snort::SfIp*, uint16_t port, AppIdInspector&,
-        OdpContext&, uint16_t asid = 0);
+        OdpContext&, uint32_t asid = 0);
     ~AppIdSession() override;
 
     static AppIdSession* allocate_session(const snort::Packet*, IpProtocol,
@@ -241,7 +241,7 @@ public:
     std::unordered_map<unsigned, AppIdFlowData*> flow_data;
     uint64_t flags = 0;
     uint16_t initiator_port = 0;
-    uint16_t asid = 0;
+    uint32_t asid = 0;
 
     uint16_t session_packet_count = 0;
     uint16_t init_pkts_without_reply = 0;
@@ -510,14 +510,30 @@ public:
         api.client.update_user(id, username, change_bits);
     }
 
-    void set_efp_client_app_id(AppId id)
+    void set_eve_client_app_id(AppId id)
     {
-        api.client.set_efp_client_app_id(id);
+        api.client.set_eve_client_app_id(id);
     }
 
-    AppId get_efp_client_app_id() const
+    AppId get_eve_client_app_id() const
     {
-        return api.client.get_efp_client_app_id();
+        return api.client.get_eve_client_app_id();
+    }
+
+    bool use_eve_client_app_id() const
+    {
+        return (api.client.get_eve_client_app_id() > APP_ID_NONE and
+            (api.client.get_id() == APP_ID_SSL_CLIENT or api.client.get_id() <= APP_ID_NONE));
+    }
+
+    void set_alpn_service_app_id(AppId id)
+    {
+        api.service.set_alpn_service_app_id(id);
+    }
+
+    AppId get_alpn_service_app_id() const
+    {
+        return api.service.get_alpn_service_app_id();
     }
 
     AppId get_payload_id() const

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -157,6 +157,22 @@ public:
     std::string get_as_string() const;
     Parameter::Type get_param_type() const;
     std::string get_origin_string() const;
+
+    std::string get_unquoted_string() const
+    {
+        if ( str.length() < 2 )
+            return str;
+
+        std::string tmp = str;
+
+        if ( tmp.front() == '"' and tmp.back() == '"' )
+        {
+            tmp.erase(0, 1);
+            tmp.erase(tmp.size() - 1, 1);
+        }
+
+        return tmp;
+    }
 
     bool strtol(long&) const;
     bool strtol(long&, const std::string&) const;

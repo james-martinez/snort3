@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,6 +24,8 @@
 #include "appid_peg_counts.h"
 #include "utils/stats.h"
 
+#define APPID_UT_ID 1492
+
 namespace snort
 {
 // Stubs for messages
@@ -44,7 +46,7 @@ bool Inspector::get_buf(const char*, Packet*, InspectionBuffer&) { return true; 
 class StreamSplitter* Inspector::get_splitter(bool) { return nullptr; }
 
 // Stubs for search_tool.cc
-SearchTool::SearchTool(const char*, bool) { }
+SearchTool::SearchTool(bool) { }
 SearchTool::~SearchTool() = default;
 
 // Stubs for util.cc
@@ -80,7 +82,8 @@ AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&) :
     StashGenericObject(STASH_GENERIC_OBJECT_APPID) {}
 }
 
-EfpCaPatternMatchers::~EfpCaPatternMatchers() { }
+AlpnPatternMatchers::~AlpnPatternMatchers() {}
+EveCaPatternMatchers::~EveCaPatternMatchers() { }
 SslPatternMatchers::~SslPatternMatchers() { }
 SipPatternMatchers::~SipPatternMatchers() { }
 HttpPatternMatchers::~HttpPatternMatchers() { }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -33,7 +33,7 @@ LiteralSearch::Handle* search_handle = nullptr;
 const LiteralSearch* searcher = nullptr;
 
 CursorActionType VbaDataOption::get_cursor_type() const
-{ return CAT_SET_VBA; }
+{ return CAT_SET_FAST_PATTERN; }
 
 IpsOption::EvalStatus VbaDataOption::eval(Cursor& c, Packet* p)
 {

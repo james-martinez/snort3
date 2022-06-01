@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -52,6 +52,7 @@ public:
         const char*, bool, AppId& service_id, AppId& client_id, AppId& payload_id);
     const AppIdSessionApi* get_appid_session_api(const Flow& flow) const;
     bool is_inspection_needed(const Inspector& g) const;
+    const char* get_appid_detector_directory() const;
 
     bool is_service_http_type(AppId service_id) const
     {
@@ -70,6 +71,7 @@ public:
             case APP_ID_SSHELL:
             case APP_ID_SSL:
             case APP_ID_QUIC:
+            case APP_ID_HTTP3:
                 return true;
         }
 

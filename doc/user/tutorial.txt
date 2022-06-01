@@ -44,9 +44,6 @@ Optional:
 * dblatex from http://dblatex.sourceforge.net to build the pdf manual (in
   addition to asciidoc)
 
-* flatbuffers from https://google.github.io/flatbuffers/ for enabling the
-  flatbuffers serialization format
-
 * hyperscan >= 4.4.0 from https://github.com/01org/hyperscan to build new
   the regex and sd_pattern rule options and hyperscan search engine.
   Hyperscan is large so it recommended to follow their instructions for
@@ -187,6 +184,10 @@ General Use
   It is also preferred to configure a non-debug build with optimizations enabled.
 
 Lua Configuration
+
+* Some parameters could be configured via a command line option or snort module.
+  In this case a command line option has the highest precedence, in turn,
+  snort module configuration has precedence over other modules.
 
 * Configure the wizard and default bindings will be created based on configured
   inspectors.  No need to explicitly bind ports in this case.
@@ -331,6 +332,7 @@ The following parameters can't be changed during reload, and require a restart:
 * process.set_uid
 * snort.--bpf
 * snort.-l
+* trace.output
 
 In addition, the following scenarios require a restart:
 

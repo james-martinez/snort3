@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -207,8 +207,19 @@ public:
         return service_group;
     }
 
+    void set_alpn_service_app_id(AppId id)
+    {
+        alpn_service_app_id = id;
+    }
+
+    AppId get_alpn_service_app_id() const
+    {
+        return alpn_service_app_id;
+    }
+
 private:
     AppId port_service_id = APP_ID_NONE;
+    AppId alpn_service_app_id = APP_ID_NONE;
     bool deferred = false;
     using ApplicationDescriptor::set_id;
     std::string my_vendor;
@@ -243,17 +254,17 @@ public:
         return my_username.empty() ? nullptr : my_username.c_str();
     }
 
-    void set_efp_client_app_id(AppId id)
+    void set_eve_client_app_id(AppId id)
     {
-        efp_client_app_id = id;
+        eve_client_app_id = id;
     }
 
-    AppId get_efp_client_app_id() const
+    AppId get_eve_client_app_id() const
     {
-        return efp_client_app_id;
+        return eve_client_app_id;
     }
 
-    void set_efp_client_app_detect_type(ClientAppDetectType client_app_detect_type)
+    void set_eve_client_app_detect_type(ClientAppDetectType client_app_detect_type)
     {
         my_client_detect_type = client_app_detect_type;
     }
@@ -266,7 +277,7 @@ public:
 private:
     std::string my_username;
     AppId my_user_id = APP_ID_NONE;
-    AppId efp_client_app_id = APP_ID_NONE;
+    AppId eve_client_app_id = APP_ID_NONE;
     ClientAppDetectType my_client_detect_type = CLIENT_APP_DETECT_APPID;
 };
 

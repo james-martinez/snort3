@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -51,14 +51,15 @@ HostPortVal* HostPortCache::find(const SfIp* ip, uint16_t port, IpProtocol proto
         return nullptr;
 }
 
-bool HostPortCache::add(const SfIp* ip, uint16_t port, IpProtocol proto, unsigned type, AppId
-    appId)
+bool HostPortCache::add(const SnortConfig* sc, const SfIp* ip, uint16_t port, IpProtocol proto,
+    unsigned type, AppId appId)
 {
     HostPortKey hk;
     HostPortVal hv;
 
     hk.ip = *ip;
-    AppIdInspector* inspector = (AppIdInspector*) InspectorManager::get_inspector(MOD_NAME);
+    AppIdInspector* inspector =
+        (AppIdInspector*)InspectorManager::get_inspector(MOD_NAME, false, sc);
     assert(inspector);
     const AppIdContext& ctxt = inspector->get_ctxt();
     hk.port = (ctxt.get_odp_ctxt().allow_port_wildcard_host_cache)? 0 : port;

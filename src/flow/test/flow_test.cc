@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,12 +23,15 @@
 #include "config.h"
 #endif
 
+#include "detection/context_switcher.h"
 #include "detection/detection_engine.h"
 #include "flow/flow.h"
 #include "flow/flow_stash.h"
 #include "flow/ha.h"
 #include "framework/inspector.h"
 #include "framework/data_bus.h"
+#include "main/analyzer.h"
+#include "main/policy.h"
 #include "main/snort_config.h"
 #include "protocols/ip.h"
 #include "protocols/layer.h"
@@ -58,8 +61,25 @@ void FlowStash::reset() {}
 
 void DetectionEngine::onload(Flow*) {}
 
-Packet* DetectionEngine::set_next_packet(Packet*, Flow*) { return nullptr; }
+void set_network_policy(unsigned) { }
+void set_inspection_policy(unsigned) { }
+void set_ips_policy(const snort::SnortConfig*, unsigned) { }
+void select_default_policy(const _daq_pkt_hdr&, const SnortConfig*) { }
+namespace snort
+{
+NetworkPolicy* get_network_policy() { return nullptr; }
+InspectionPolicy* get_inspection_policy() { return nullptr; }
+IpsPolicy* get_ips_policy() { return nullptr; }
+void set_network_policy(NetworkPolicy*) { }
+void set_inspection_policy(InspectionPolicy*) { }
+void set_ips_policy(IpsPolicy*) { }
+unsigned SnortConfig::get_thread_reload_id() { return 0; }
+}
 
+Packet* DetectionEngine::set_next_packet(const Packet*, Flow*) { return nullptr; }
+
+ContextSwitcher* Analyzer::get_switcher() { return nullptr; }
+snort::IpsContext* ContextSwitcher::get_context() const { return nullptr; }
 IpsContext* DetectionEngine::get_context() { return nullptr; }
 
 DetectionEngine::DetectionEngine() = default;

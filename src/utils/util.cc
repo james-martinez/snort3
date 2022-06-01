@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -36,10 +36,6 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <zlib.h>
-
-#ifdef HAVE_FLATBUFFERS
-#include <flatbuffers/flatbuffers.h>
-#endif
 
 #ifdef HAVE_HYPERSCAN
 #include <hs_compile.h>
@@ -106,7 +102,7 @@ int DisplayBanner()
 #endif
     LogMessage("   ''''    By Martin Roesch & The Snort Team\n");
     LogMessage("           http://snort.org/contact#team\n");
-    LogMessage("           Copyright (C) 2014-2021 Cisco and/or its affiliates."
+    LogMessage("           Copyright (C) 2014-2022 Cisco and/or its affiliates."
                            " All rights reserved.\n");
     LogMessage("           Copyright (C) 1998-2013 Sourcefire, Inc., et al.\n");
     LogMessage("           Using DAQ version %s\n", daq_version_string());
@@ -115,9 +111,6 @@ int DisplayBanner()
     LogMessage("           Using %s\n", pcap_lib_version());
     LogMessage("           Using PCRE version %s\n", pcre_version());
     LogMessage("           Using ZLIB version %s\n", zlib_version);
-#ifdef HAVE_FLATBUFFERS
-    LogMessage("           Using %s\n", flatbuffers::flatbuffer_version_string);
-#endif
 #ifdef HAVE_HYPERSCAN
     LogMessage("           Using Hyperscan version %s\n", hs_version());
 #endif
@@ -207,7 +200,11 @@ void CreatePidFile(pid_t pid)
     }
     else
     {
-        fclose(pid_lockfile);
+        if (pid_lockfile)
+        {
+            fclose(pid_lockfile);
+            pid_lockfile = nullptr;
+        }
         const char* error = get_error(errno);
         ErrorMessage("Failed to create pid file %s, Error: %s\n",
             sc->pid_filename.c_str(), error);
@@ -528,6 +525,25 @@ char* snort_strdup(const char* str)
     char* p = (char*)snort_alloc(n);
     memcpy(p, str, n);
     return p;
+}
+
+const uint8_t* snort_memrchr(const uint8_t* buf, char c, size_t len)
+{
+#ifdef HAVE_MEMRCHR
+    return (const uint8_t*)memrchr(buf, c, len);
+#else
+    size_t n = len;
+    const uint8_t* tmp = buf;
+    const uint8_t* ptr = nullptr;
+
+    while ( n > 0 && (tmp = (const uint8_t*)memchr(tmp, c, n)) )
+    {
+        ptr = tmp++;
+        n = len - (tmp - buf);
+    }
+
+    return ptr;
+#endif
 }
 
 void ts_print(const struct timeval* tvp, char* timebuf, bool yyyymmdd)

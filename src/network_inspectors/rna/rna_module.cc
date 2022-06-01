@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -387,6 +387,7 @@ static const PegInfo rna_pegs[] =
     { CountType::SUM, "dhcp_data", "count of DHCP data events received" },
     { CountType::SUM, "dhcp_info", "count of new DHCP lease events received" },
     { CountType::SUM, "smb", "count of new SMB events received" },
+    { CountType::SUM, "netflow_record", "count of netflow record events received" },
     { CountType::END, nullptr, nullptr},
 };
 
@@ -533,10 +534,6 @@ bool RnaModule::end(const char* fqn, int index, SnortConfig* sc)
             mod_conf->tcp_processor->make_tcp_fp_tables(TcpFpProcessor::TCP_FP_MODE::SERVER);
             mod_conf->tcp_processor->make_tcp_fp_tables(TcpFpProcessor::TCP_FP_MODE::CLIENT);
         }
-
-        if ( mod_conf->ua_processor )
-            mod_conf->ua_processor->make_mpse(sc);
-
     }
 
     if ( index > 0 and mod_conf->tcp_processor and !strcmp(fqn, "rna.tcp_fingerprints") )

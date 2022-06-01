@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -41,6 +41,14 @@ using namespace snort;
     JSIdentifierCtxStub ident_ctx;                                 \
     JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
     auto ret = norm.normalize(src, sizeof(src));                   \
+    const char* ptr = norm.get_src_next();                         \
+    int act_len = norm.script_size();                              \
+    const char* dst = norm.take_script();
+
+#define NORMALIZE_EXT(src)                                         \
+    JSIdentifierCtxStub ident_ctx;                                 \
+    JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
+    auto ret = norm.normalize(src, sizeof(src), true);             \
     const char* ptr = norm.get_src_next();                         \
     int act_len = norm.script_size();                              \
     const char* dst = norm.take_script();
@@ -106,7 +114,7 @@ using namespace snort;
     {                                                               \
         char dst1[sizeof(exp1)];                                    \
                                                                     \
-        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids); \
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids, s_ignored_props); \
         JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
@@ -120,7 +128,7 @@ using namespace snort;
         char dst1[sizeof(exp1)];                                    \
         char dst2[sizeof(exp2)];                                    \
                                                                     \
-        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids); \
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids, s_ignored_props); \
         JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
@@ -355,7 +363,7 @@ using namespace snort;
 
 #define NORM_COMBINED_S_2(src1, src2, exp)                              \
     {                                                                   \
-        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids); \
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids, s_ignored_props); \
         JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                         \
         auto ret = norm.normalize(src1, sizeof(src1) - 1);              \
@@ -399,7 +407,7 @@ static const char clamav_buf2[] =
     "function () { var tst=\"a\"+'bc'+     'd'; }";
 
 static const char clamav_expected2[] =
-    "function(){var tst=\"a\"+'bc'+'d';}";
+    "function(){var tst=\"abcd';}";
 
 static const char clamav_buf3[] =
     "dF('bmfsu%2639%2638x11u%2638%263%3A%264C1');";
@@ -479,7 +487,7 @@ static const char clamav_buf12[] =
     "var x='test\\u0000test';";
 
 static const char clamav_expected12[] =
-    "var x='test\\u0000test';";
+    "var x='test\u0000test';";
 
 static const char clamav_buf13[] =
     "var x\\s12345";
@@ -491,7 +499,7 @@ static const char clamav_buf14[] =
     "document.write(unescape('test%20test";
 
 static const char clamav_expected14[] =
-    "document.write(unescape('test%20test";
+    "document.write('test test";
 
 TEST_CASE("clamav tests", "[JSNormalizer]")
 {
@@ -641,6 +649,42 @@ static const char all_patterns_buf6[] =
 static const char all_patterns_expected6[] =
     "tag ` template\n   ${a+b}   template`";
 
+static const char all_patterns_buf7[] =
+    "/Day:   \\d{2}\\/Month:   \\d{2}\\/Year:   \\d{4}/;"
+    "/<\\d{3}>\\//g";
+
+static const char all_patterns_expected7[] =
+    "/Day:   \\d{2}\\/Month:   \\d{2}\\/Year:   \\d{4}/;"
+    "/<\\d{3}>\\//g";
+
+static const char all_patterns_buf8[] =
+    "a = \"   \\\"   \\\\\\\"   \\\\\";"
+    "b = `   \\`   \\\\\\`   \\\\`;"
+    "c = '   \\'   \\\\\\'   \\\\';"
+    "d = /   \\/   \\\\\\/   \\\\/;"
+    "a + b;";
+
+static const char all_patterns_expected8[] =
+    "a=\"   \\\"   \\\\\\\"   \\\\\";"
+    "b=`   \\`   \\\\\\`   \\\\`;"
+    "c='   \\'   \\\\\\'   \\\\';"
+    "d=/   \\/   \\\\\\/   \\\\/;"
+    "a+b;";
+
+static const char all_patterns_buf9[] =
+    "var r = /^(?:(?:https?|mailto|ftp):|[^:/?#]*(?:[/?#]|$))/i;"
+    "new Lb(function(a){return /^[^:]*([/?#]|$)/.test(a)});"
+    "pa=/^((https:)?\\/\\/[0-9a-z.:[\\]-]+\\/|\\/[^/\\\\]|"
+    "[^:/\\\\%]+\\/|[^:/\\\\%]*[?#]|about:blank#)/i;"
+    "/[/ a  b   c / 1]/ a  b   c / 1;";
+
+static const char all_patterns_expected9[] =
+    "var r=/^(?:(?:https?|mailto|ftp):|[^:/?#]*(?:[/?#]|$))/i;"
+    "new Lb(function(a){return /^[^:]*([/?#]|$)/.test(a)});"
+    "pa=/^((https:)?\\/\\/[0-9a-z.:[\\]-]+\\/|\\/[^/\\\\]"
+    "|[^:/\\\\%]+\\/|[^:/\\\\%]*[?#]|about:blank#)/i;"
+    "/[/ a  b   c / 1]/ a b c/1;";
+
 TEST_CASE("all patterns", "[JSNormalizer]")
 {
     SECTION("whitespaces and special characters")
@@ -731,6 +775,21 @@ TEST_CASE("all patterns", "[JSNormalizer]")
         NORMALIZE(all_patterns_buf6);
         VALIDATE(all_patterns_buf6, all_patterns_expected6);
     }
+    SECTION("regex literal with slashes")
+    {
+        NORMALIZE(all_patterns_buf7);
+        VALIDATE(all_patterns_buf7, all_patterns_expected7);
+    }
+    SECTION("multiple escaped slashes")
+    {
+        NORMALIZE(all_patterns_buf8);
+        VALIDATE(all_patterns_buf8, all_patterns_expected8);
+    }
+    SECTION("slashes and braces")
+    {
+        NORMALIZE(all_patterns_buf9);
+        VALIDATE(all_patterns_buf9, all_patterns_expected9);
+    }
 }
 
 // Test vectors for different syntax cases
@@ -751,7 +810,7 @@ static const char syntax_cases_buf0[] =
     "var esc = 'I don\\'t \\n know';\n";
 
 static const char syntax_cases_expected0[] =
-    "var a;var b=\"init this    stuff\";var c=\"Hi\"+\" \"+\"Joe\";"
+    "var a;var b=\"init this    stuff\";var c=\"Hi Joe\";"
     "var d=1+2+\"3\";var e=[2,3,5,8];var f=false;var g=/( i'm   a  .* regex )/;"
     "var h=function(){};const PI=3.14;var a=1,b=2,c=a+b;let z='zzz zz';var g=null;"
     "var name={first:\"Jane\",last:\"Doe\"};var esc='I don\\'t \\n know';";
@@ -1050,6 +1109,22 @@ static const char syntax_cases_buf23[] =
 static const char syntax_cases_expected23[] =
     "`${`${`${`${`";
 
+static const char syntax_cases_buf24[] =
+    "var a=/{{{{/}}}}/;"
+    "var b=/{{{{{/}}}}}/;";
+
+static const char syntax_cases_expected24[] =
+    "var a=/{{{{/}}}}/;"
+    "var b=/{{{{";
+
+static const char syntax_cases_buf25[] =
+    "return /regex0/.foo + /regex1/.bar ;"
+    "return /regex2/.baz * /regex3/.qux ;";
+
+static const char syntax_cases_expected25[] =
+    "return /regex0/.var_0000+/regex1/.var_0001;"
+    "return /regex2/.var_0002*/regex3/.var_0003;";
+
 TEST_CASE("syntax cases", "[JSNormalizer]")
 {
     SECTION("variables")
@@ -1132,6 +1207,10 @@ TEST_CASE("syntax cases", "[JSNormalizer]")
         NORMALIZE(syntax_cases_buf22);
         VALIDATE(syntax_cases_buf22, syntax_cases_expected22);
     }
+    SECTION("regex after operator")
+    {
+        NORMALIZE_S(syntax_cases_buf25, syntax_cases_expected25);
+    }
 }
 
 TEST_CASE("bad tokens", "[JSNormalizer]")
@@ -1173,13 +1252,19 @@ TEST_CASE("bad tokens", "[JSNormalizer]")
     }
 }
 
-TEST_CASE("template literal overflow", "[JSNormalizer]")
+TEST_CASE("braces overflow", "[JSNormalizer]")
 {
     SECTION("exceeding template literal limit")
     {
         NORMALIZE(syntax_cases_buf23);
         VALIDATE_FAIL(syntax_cases_buf23, syntax_cases_expected23,
             JSTokenizer::TEMPLATE_NESTING_OVERFLOW, 15);
+    }
+    SECTION("exceeding regex literal limit")
+    {
+        NORMALIZE(syntax_cases_buf24);
+        VALIDATE_FAIL(syntax_cases_buf24, syntax_cases_expected24,
+            JSTokenizer::TEMPLATE_NESTING_OVERFLOW, 30);
     }
 }
 
@@ -1574,12 +1659,18 @@ static const char unexpected_tag_buf0[] =
 static const char unexpected_tag_expected0[] =
     "var a=1;";
 
+static const char unexpected_tag_expected0_ext[] =
+    "var a=1;";
+
 static const char unexpected_tag_buf1[] =
     "var a = 1;\n"
     "<script type=application/javascript>\n"
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected1[] =
+    "var a=1;";
+
+static const char unexpected_tag_expected1_ext[] =
     "var a=1;";
 
 static const char unexpected_tag_buf2[] =
@@ -1590,6 +1681,9 @@ static const char unexpected_tag_buf2[] =
 static const char unexpected_tag_expected2[] =
     "var a=1;var str='";
 
+static const char unexpected_tag_expected2_ext[] =
+    "var a=1;var str='<script> something';var b=2;";
+
 static const char unexpected_tag_buf3[] =
     "var a = 1;\n"
     "var str = 'something <script> something';\n"
@@ -1597,6 +1691,9 @@ static const char unexpected_tag_buf3[] =
 
 static const char unexpected_tag_expected3[] =
     "var a=1;var str='something ";
+
+static const char unexpected_tag_expected3_ext[] =
+    "var a=1;var str='something <script> something';var b=2;";
 
 static const char unexpected_tag_buf4[] =
     "var a = 1;\n"
@@ -1606,6 +1703,9 @@ static const char unexpected_tag_buf4[] =
 static const char unexpected_tag_expected4[] =
     "var a=1;var str='something ";
 
+static const char unexpected_tag_expected4_ext[] =
+    "var a=1;var str='something <script>';var b=2;";
+
 static const char unexpected_tag_buf5[] =
     "var a = 1;\n"
     "var str = '</script> something';\n"
@@ -1613,6 +1713,9 @@ static const char unexpected_tag_buf5[] =
 
 static const char unexpected_tag_expected5[] =
     "var a=1;var str='";
+
+static const char unexpected_tag_expected5_ext[] =
+    "var a=1;var str='</script> something';var b=2;";
 
 static const char unexpected_tag_buf6[] =
     "var a = 1;\n"
@@ -1622,6 +1725,9 @@ static const char unexpected_tag_buf6[] =
 static const char unexpected_tag_expected6[] =
     "var a=1;var str='something ";
 
+static const char unexpected_tag_expected6_ext[] =
+    "var a=1;var str='something </script> something';var b=2;";
+
 static const char unexpected_tag_buf7[] =
     "var a = 1;\n"
     "var str = 'something </script>';\n"
@@ -1630,13 +1736,19 @@ static const char unexpected_tag_buf7[] =
 static const char unexpected_tag_expected7[] =
     "var a=1;var str='something ";
 
+static const char unexpected_tag_expected7_ext[] =
+    "var a=1;var str='something </script>';var b=2;";
+
 static const char unexpected_tag_buf8[] =
     "var a = 1;\n"
-    "var str = 'something \\<script\\> something';\n"
+    "var str = 'something \\<script> something';\n"
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected8[] =
     "var a=1;var str='something \\";
+
+static const char unexpected_tag_expected8_ext[] =
+    "var a=1;var str='something \\<script> something';var b=2;";
 
 static const char unexpected_tag_buf9[] =
     "var a = 1;\n"
@@ -1644,6 +1756,9 @@ static const char unexpected_tag_buf9[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected9[] =
+    "var a=1;var str='something \\<\\/script\\> something';var b=2;";
+
+static const char unexpected_tag_expected9_ext[] =
     "var a=1;var str='something \\<\\/script\\> something';var b=2;";
 
 static const char unexpected_tag_buf10[] =
@@ -1654,6 +1769,9 @@ static const char unexpected_tag_buf10[] =
 static const char unexpected_tag_expected10[] =
     "var a=1;";
 
+static const char unexpected_tag_expected10_ext[] =
+    "var a=1;var b=2;";
+
 static const char unexpected_tag_buf11[] =
     "var a = 1;\n"
     "//something <script> something\n"
@@ -1661,6 +1779,9 @@ static const char unexpected_tag_buf11[] =
 
 static const char unexpected_tag_expected11[] =
     "var a=1;";
+
+static const char unexpected_tag_expected11_ext[] =
+    "var a=1;var b=2;";
 
 static const char unexpected_tag_buf12[] =
     "var a = 1;\n"
@@ -1670,6 +1791,9 @@ static const char unexpected_tag_buf12[] =
 static const char unexpected_tag_expected12[] =
     "var a=1;";
 
+static const char unexpected_tag_expected12_ext[] =
+    "var a=1;var b=2;";
+
 static const char unexpected_tag_buf13[] =
     "var a = 1;\n"
     "/*<script> something*/\n"
@@ -1677,6 +1801,9 @@ static const char unexpected_tag_buf13[] =
 
 static const char unexpected_tag_expected13[] =
     "var a=1;";
+
+static const char unexpected_tag_expected13_ext[] =
+    "var a=1;var b=2;";
 
 static const char unexpected_tag_buf14[] =
     "var a = 1;\n"
@@ -1686,6 +1813,9 @@ static const char unexpected_tag_buf14[] =
 static const char unexpected_tag_expected14[] =
     "var a=1;";
 
+static const char unexpected_tag_expected14_ext[] =
+    "var a=1;var b=2;";
+
 static const char unexpected_tag_buf15[] =
     "var a = 1;\n"
     "/*something <script>*/\n"
@@ -1693,6 +1823,9 @@ static const char unexpected_tag_buf15[] =
 
 static const char unexpected_tag_expected15[] =
     "var a=1;";
+
+static const char unexpected_tag_expected15_ext[] =
+    "var a=1;var b=2;";
 
 static const char unexpected_tag_buf16[] =
     "var a = 1;\n"
@@ -1702,6 +1835,9 @@ static const char unexpected_tag_buf16[] =
 static const char unexpected_tag_expected16[] =
     "var a=1;";
 
+static const char unexpected_tag_expected16_ext[] =
+    "var a=1;var b=2;";
+
 static const char unexpected_tag_buf17[] =
     "var a = 1;\n"
     "<!--something </script> something//-->\n"
@@ -1709,6 +1845,9 @@ static const char unexpected_tag_buf17[] =
 
 static const char unexpected_tag_expected17[] =
     "var a=1;";
+
+static const char unexpected_tag_expected17_ext[] =
+    "var a=1;var b=2;";
 
 static const char unexpected_tag_buf18[] =
     "var a = 1;\n"
@@ -1718,6 +1857,9 @@ static const char unexpected_tag_buf18[] =
 static const char unexpected_tag_expected18[] =
     "var a=1;";
 
+static const char unexpected_tag_expected18_ext[] =
+    "var a=1;var b=2;";
+
 static const char unexpected_tag_buf19[] =
     "var a = 1;\n"
     "/*</script>\n"
@@ -1726,6 +1868,9 @@ static const char unexpected_tag_buf19[] =
 
 static const char unexpected_tag_expected19[] =
     "var a=1;";
+
+static const char unexpected_tag_expected19_ext[] =
+    "var a=1;var b=2;";
 
 static const char unexpected_tag_buf20[] =
     "var a = 1;\n"
@@ -1737,6 +1882,9 @@ static const char unexpected_tag_buf20[] =
 static const char unexpected_tag_expected20[] =
     "var a=1;";
 
+static const char unexpected_tag_expected20_ext[] =
+    "var a=1;var b=2;";
+
 static const char unexpected_tag_buf21[] =
     "var a = 1;\n"
     "/*something\n"
@@ -1746,12 +1894,18 @@ static const char unexpected_tag_buf21[] =
 static const char unexpected_tag_expected21[] =
     "var a=1;";
 
+static const char unexpected_tag_expected21_ext[] =
+    "var a=1;var b=2;";
+
 static const char unexpected_tag_buf22[] =
     "var a = 1;\n"
     "var str = 'script somescript /script something';\n"
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected22[] =
+    "var a=1;var str='script somescript /script something';var b=2;";
+
+static const char unexpected_tag_expected22_ext[] =
     "var a=1;var str='script somescript /script something';var b=2;";
 
 static const char unexpected_tag_buf23[] =
@@ -1762,6 +1916,9 @@ static const char unexpected_tag_buf23[] =
 static const char unexpected_tag_expected23[] =
     "var a=1;var str='script somescript /script something ";
 
+static const char unexpected_tag_expected23_ext[] =
+    "var a=1;var str='script somescript /script something <script>';var b=2;";
+
 static const char unexpected_tag_buf24[] =
     "var a = 1;\n"
     "var str = 'something <sCrIpT>';\n"
@@ -1770,32 +1927,35 @@ static const char unexpected_tag_buf24[] =
 static const char unexpected_tag_expected24[] =
     "var a=1;var str='something ";
 
+static const char unexpected_tag_expected24_ext[] =
+    "var a=1;var str='something <sCrIpT>';var b=2;";
+
 TEST_CASE("nested script tags", "[JSNormalizer]")
 {
     SECTION("explicit open tag - simple")
     {
         NORMALIZE(unexpected_tag_buf0);
-        VALIDATE_FAIL(unexpected_tag_buf0, unexpected_tag_expected0, JSTokenizer::OPENING_TAG, 18);
+        VALIDATE_FAIL(unexpected_tag_buf0, unexpected_tag_expected0, JSTokenizer::OPENING_TAG, 19);
     }
     SECTION("explicit open tag - complex")
     {
         NORMALIZE(unexpected_tag_buf1);
-        VALIDATE_FAIL(unexpected_tag_buf1, unexpected_tag_expected1, JSTokenizer::OPENING_TAG, 18);
+        VALIDATE_FAIL(unexpected_tag_buf1, unexpected_tag_expected1, JSTokenizer::OPENING_TAG, 19);
     }
     SECTION("open tag within literal - start")
     {
         NORMALIZE(unexpected_tag_buf2);
-        VALIDATE_FAIL(unexpected_tag_buf2, unexpected_tag_expected2, JSTokenizer::OPENING_TAG, 29);
+        VALIDATE_FAIL(unexpected_tag_buf2, unexpected_tag_expected2, JSTokenizer::OPENING_TAG, 30);
     }
     SECTION("open tag within literal - mid")
     {
         NORMALIZE(unexpected_tag_buf3);
-        VALIDATE_FAIL(unexpected_tag_buf3, unexpected_tag_expected3, JSTokenizer::OPENING_TAG, 39);
+        VALIDATE_FAIL(unexpected_tag_buf3, unexpected_tag_expected3, JSTokenizer::OPENING_TAG, 40);
     }
     SECTION("open tag within literal - end")
     {
         NORMALIZE(unexpected_tag_buf4);
-        VALIDATE_FAIL(unexpected_tag_buf4, unexpected_tag_expected4, JSTokenizer::OPENING_TAG, 39);
+        VALIDATE_FAIL(unexpected_tag_buf4, unexpected_tag_expected4, JSTokenizer::OPENING_TAG, 40);
     }
     SECTION("close tag within literal - start")
     {
@@ -1815,7 +1975,7 @@ TEST_CASE("nested script tags", "[JSNormalizer]")
     SECTION("open tag within literal - escaped")
     {
         NORMALIZE(unexpected_tag_buf8);
-        VALIDATE_FAIL(unexpected_tag_buf8, unexpected_tag_expected8, JSTokenizer::OPENING_TAG, 40);
+        VALIDATE_FAIL(unexpected_tag_buf8, unexpected_tag_expected8, JSTokenizer::OPENING_TAG, 41);
     }
     SECTION("close tag within literal - escaped")
     {
@@ -1890,12 +2050,217 @@ TEST_CASE("nested script tags", "[JSNormalizer]")
     SECTION("multiple patterns - matched")
     {
         NORMALIZE(unexpected_tag_buf23);
-        VALIDATE_FAIL(unexpected_tag_buf23, unexpected_tag_expected23, JSTokenizer::OPENING_TAG, 65);
+        VALIDATE_FAIL(unexpected_tag_buf23, unexpected_tag_expected23, JSTokenizer::OPENING_TAG, 66);
     }
     SECTION("mixed lower and upper case")
     {
         NORMALIZE(unexpected_tag_buf24);
-        VALIDATE_FAIL(unexpected_tag_buf24, unexpected_tag_expected24, JSTokenizer::OPENING_TAG, 39);
+        VALIDATE_FAIL(unexpected_tag_buf24, unexpected_tag_expected24, JSTokenizer::OPENING_TAG, 40);
+    }
+}
+
+TEST_CASE("opening tag sequence", "[JSNormalizer]")
+{
+    SECTION("incomplete")
+    {
+        const char src[] = "<script";
+        const char exp[] = "<script";
+
+        NORMALIZE(src);
+        VALIDATE(src, exp);
+    }
+    SECTION("valid 1")
+    {
+        const char src[] = "<scripts";
+        const char exp[] = "<scripts";
+
+        NORMALIZE(src);
+        VALIDATE(src, exp);
+    }
+    SECTION("valid 2")
+    {
+        const char src[] = "<script.";
+        const char exp[] = "<script.";
+
+        NORMALIZE(src);
+        VALIDATE(src, exp);
+    }
+    SECTION("tabulation")
+    {
+        const char src[] = "<script\x9";
+        const char exp[] = "";
+
+        NORMALIZE(src);
+        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+    }
+    SECTION("line feed")
+    {
+        const char src[] = "<script\xA";
+        const char exp[] = "";
+
+        NORMALIZE(src);
+        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+    }
+    SECTION("form feed")
+    {
+        const char src[] = "<script\xC";
+        const char exp[] = "";
+
+        NORMALIZE(src);
+        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+    }
+    SECTION("space")
+    {
+        const char src[] = "<script\x20";
+        const char exp[] = "";
+
+        NORMALIZE(src);
+        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+    }
+    SECTION("solidus")
+    {
+        const char src[] = "<script\x2F";
+        const char exp[] = "";
+
+        NORMALIZE(src);
+        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+    }
+    SECTION("greater than")
+    {
+        const char src[] = "<script\x3E";
+        const char exp[] = "";
+
+        NORMALIZE(src);
+        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+    }
+}
+
+TEST_CASE("nested script tags in an external script", "[JSNormalizer]")
+{
+    SECTION("explicit open tag - simple")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf0);
+        VALIDATE_FAIL(unexpected_tag_buf0, unexpected_tag_expected0_ext, JSTokenizer::OPENING_TAG, 19);
+    }
+    SECTION("explicit open tag - complex")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf1);
+        VALIDATE_FAIL(unexpected_tag_buf1, unexpected_tag_expected1_ext, JSTokenizer::OPENING_TAG, 19);
+    }
+    SECTION("open tag within literal - start")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf2);
+        VALIDATE(unexpected_tag_buf2, unexpected_tag_expected2_ext);
+    }
+    SECTION("open tag within literal - mid")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf3);
+        VALIDATE(unexpected_tag_buf3, unexpected_tag_expected3_ext);
+    }
+    SECTION("open tag within literal - end")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf4);
+        VALIDATE(unexpected_tag_buf4, unexpected_tag_expected4_ext);
+    }
+    SECTION("close tag within literal - start")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf5);
+        VALIDATE(unexpected_tag_buf5, unexpected_tag_expected5_ext);
+    }
+    SECTION("close tag within literal - mid")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf6);
+        VALIDATE(unexpected_tag_buf6, unexpected_tag_expected6_ext);
+    }
+    SECTION("close tag within literal - end")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf7);
+        VALIDATE(unexpected_tag_buf7, unexpected_tag_expected7_ext);
+    }
+    SECTION("open tag within literal - escaped")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf8);
+        VALIDATE(unexpected_tag_buf8, unexpected_tag_expected8_ext);
+    }
+    SECTION("close tag within literal - escaped")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf9);
+        VALIDATE(unexpected_tag_buf9, unexpected_tag_expected9_ext);
+    }
+    SECTION("open tag within single-line comment - start")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf10);
+        VALIDATE(unexpected_tag_buf10, unexpected_tag_expected10_ext);
+    }
+    SECTION("open tag within single-line comment - mid")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf11);
+        VALIDATE(unexpected_tag_buf11, unexpected_tag_expected11_ext);
+    }
+    SECTION("open tag within single-line comment - end")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf12);
+        VALIDATE(unexpected_tag_buf12, unexpected_tag_expected12_ext);
+    }
+    SECTION("open tag within multi-line comment - start")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf13);
+        VALIDATE(unexpected_tag_buf13, unexpected_tag_expected13_ext);
+    }
+    SECTION("open tag within multi-line comment - mid")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf14);
+        VALIDATE(unexpected_tag_buf14, unexpected_tag_expected14_ext);
+    }
+    SECTION("open tag within multi-line comment - end")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf15);
+        VALIDATE(unexpected_tag_buf15, unexpected_tag_expected15_ext);
+    }
+    SECTION("close tag within single-line comment - start")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf16);
+        VALIDATE(unexpected_tag_buf16, unexpected_tag_expected16_ext);
+    }
+    SECTION("close tag within single-line comment - mid")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf17);
+        VALIDATE(unexpected_tag_buf17, unexpected_tag_expected17_ext);
+    }
+    SECTION("close tag within single-line comment - end")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf18);
+        VALIDATE(unexpected_tag_buf18, unexpected_tag_expected18_ext);
+    }
+    SECTION("close tag within multi-line comment - start")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf19);
+        VALIDATE(unexpected_tag_buf19, unexpected_tag_expected19_ext);
+    }
+    SECTION("close tag within multi-line comment - mid")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf20);
+        VALIDATE(unexpected_tag_buf20, unexpected_tag_expected20_ext);
+    }
+    SECTION("close tag within multi-line comment - end")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf21);
+        VALIDATE(unexpected_tag_buf21, unexpected_tag_expected21_ext);
+    }
+    SECTION("multiple patterns - not matched")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf22);
+        VALIDATE(unexpected_tag_buf22, unexpected_tag_expected22_ext);
+    }
+    SECTION("multiple patterns - matched")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf23);
+        VALIDATE(unexpected_tag_buf23, unexpected_tag_expected23_ext);
+    }
+    SECTION("mixed lower and upper case")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf24);
+        VALIDATE(unexpected_tag_buf24, unexpected_tag_expected24_ext);
     }
 }
 
@@ -2096,7 +2461,7 @@ TEST_CASE("split in opening tag", "[JSNormalizer]")
     SECTION("< script")
     {
         const char dat1[] = "<";
-        const char dat2[] = "script";
+        const char dat2[] = "script>";
         const char exp1[] = "<";
         const char exp2[] = "";
         const char exp[] = "";
@@ -2107,7 +2472,7 @@ TEST_CASE("split in opening tag", "[JSNormalizer]")
     SECTION("str='<s cript'")
     {
         const char dat1[] = "var str ='<s";
-        const char dat2[] = "cript';";
+        const char dat2[] = "cript>';";
         const char exp1[] = "var str='<s";
         const char exp2[] = "";
         const char exp[]  = "var str='";
@@ -2118,7 +2483,7 @@ TEST_CASE("split in opening tag", "[JSNormalizer]")
     SECTION("str='<scrip t'")
     {
         const char dat1[] = "var str ='<scrip";
-        const char dat2[] = "t';";
+        const char dat2[] = "t>';";
         const char exp1[] = "var str='<scrip";
         const char exp2[] = "";
         const char exp[] = "var str='";
@@ -2130,7 +2495,7 @@ TEST_CASE("split in opening tag", "[JSNormalizer]")
     {
         const char dat1[] = "<";
         const char dat2[] = "scr";
-        const char dat3[] = "ipt";
+        const char dat3[] = "ipt>";
         const char exp1[] = "<";
         const char exp2[] = "scr";
         const char exp3[] = "";
@@ -2143,7 +2508,7 @@ TEST_CASE("split in opening tag", "[JSNormalizer]")
     {
         const char dat1[] = "var str =\"<sc";
         const char dat2[] = "rip";
-        const char dat3[] = "t\";";
+        const char dat3[] = "t>\";";
         const char exp1[] = "var str=\"<sc";
         const char exp2[] = "rip";
         const char exp3[] = "";
@@ -2314,8 +2679,8 @@ TEST_CASE("split in string literal", "[JSNormalizer]")
         const char dat1[] = "var str =\"any\\";
         const char dat2[] = "u1234tx\";";
         const char exp1[] = "var str=\"any\\";
-        const char exp2[] = "u1234tx\";";
-        const char exp[] = "var str=\"any\\u1234tx\";";
+        const char exp2[] = "\u1234tx\";";
+        const char exp[] = "var str=\"any\u1234tx\";";
 
         NORMALIZE_2(dat1, dat2, exp1, exp2);
         NORM_COMBINED_2(dat1, dat2, exp);
@@ -2325,8 +2690,8 @@ TEST_CASE("split in string literal", "[JSNormalizer]")
         const char dat1[] = "var str =\"any\\u";
         const char dat2[] = "1234tx\";";
         const char exp1[] = "var str=\"any\\u";
-        const char exp2[] = "1234tx\";";
-        const char exp[] = "var str=\"any\\u1234tx\";";
+        const char exp2[] = "\u1234tx\";";
+        const char exp[] = "var str=\"any\u1234tx\";";
 
         NORMALIZE_2(dat1, dat2, exp1, exp2);
         NORM_COMBINED_2(dat1, dat2, exp);
@@ -2417,7 +2782,7 @@ TEST_CASE("split and continuation combined", "[JSNormalizer]")
         char dst3[sizeof(exp3)];
         char dst4[sizeof(exp4)];
 
-        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids);
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids, s_ignored_props);
         JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth);
 
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);
@@ -2452,7 +2817,7 @@ TEST_CASE("split and continuation combined", "[JSNormalizer]")
         char dst2[sizeof(exp2)];
         char dst3[sizeof(exp3)];
 
-        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids);
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids, s_ignored_props);
         JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth);
 
         TRY(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1, JSTokenizer::SCRIPT_CONTINUE);
@@ -3030,6 +3395,179 @@ TEST_CASE("scope tail handling", "[JSNormalizer]")
     }
 }
 
+TEST_CASE("scope regex groups", "[JSNormalizer]")
+{
+    SECTION("parentheses")
+    {
+        const char dat1[] = "a=/()/;";
+        const char dat2[] = "b=/()()()/;";
+        const char dat3[] = "c=/((()))/;";
+        const char exp1[] = "a=/()/;";
+        const char exp2[] = "b=/()()()/;";
+        const char exp3[] = "c=/((()))/;";
+
+        NORMALIZE_1(dat1, exp1);
+        NORMALIZE_1(dat2, exp2);
+        NORMALIZE_1(dat3, exp3);
+    }
+    SECTION("curly braces")
+    {
+        const char dat1[] = "a=/{}/;";
+        const char dat2[] = "b=/{}{}{}/;";
+        const char dat3[] = "c=/{{{}}}/;";
+        const char exp1[] = "a=/{}/;";
+        const char exp2[] = "b=/{}{}{}/;";
+        const char exp3[] = "c=/{{{}}}/;";
+
+        NORMALIZE_1(dat1, exp1);
+        NORMALIZE_1(dat2, exp2);
+        NORMALIZE_1(dat3, exp3);
+    }
+    SECTION("square brackets")
+    {
+        const char dat1[] = "a=/[]/;";
+        const char dat2[] = "b=/[][][]/;";
+        const char dat3[] = "c=/[[[[[]/;";
+        const char dat4[] = "d=/[/]/;";
+        const char exp1[] = "a=/[]/;";
+        const char exp2[] = "b=/[][][]/;";
+        const char exp3[] = "c=/[[[[[]/;";
+        const char exp4[] = "d=/[/]/;";
+
+        NORMALIZE_1(dat1, exp1);
+        NORMALIZE_1(dat2, exp2);
+        NORMALIZE_1(dat3, exp3);
+        NORMALIZE_1(dat4, exp4);
+    }
+    SECTION("mix of brackets")
+    {
+        const char dat1[] = "a=/(){}[]/";
+        const char dat2[] = "b=/({})[]/";
+        const char dat3[] = "c=/(){[]}/";
+        const char exp1[] = "a=/(){}[]/";
+        const char exp2[] = "b=/({})[]/";
+        const char exp3[] = "c=/(){[]}/";
+
+        NORMALIZE_1(dat1, exp1);
+        NORMALIZE_1(dat2, exp2);
+        NORMALIZE_1(dat3, exp3);
+    }
+    SECTION("parentheses - wrong closing symbol")
+    {
+        const char dat1[] = "/({ (} })/";
+        const char dat2[] = "/({ (] })/";
+        const char exp1[] = "/({ (";
+        const char exp2[] = "/({ (";
+
+        NORM_BAD_1(dat1, exp1, JSTokenizer::BAD_TOKEN);
+        NORM_BAD_1(dat2, exp2, JSTokenizer::BAD_TOKEN);
+    }
+    SECTION("curly braces - wrong closing symbol")
+    {
+        const char dat1[] = "/({ {) })/";
+        const char dat2[] = "/({ {] })/";
+        const char exp1[] = "/({ {";
+        const char exp2[] = "/({ {";
+
+        NORM_BAD_1(dat1, exp1, JSTokenizer::BAD_TOKEN);
+        NORM_BAD_1(dat2, exp2, JSTokenizer::BAD_TOKEN);
+    }
+    SECTION("square brackets - raw bracket")
+    {
+        const char dat1[] = "/]/";
+        const char dat2[] = "/[]]/";
+        const char dat3[] = "/][]]/g";
+        const char exp1[] = "/]/";
+        const char exp2[] = "/[]]/";
+        const char exp3[] = "/][]]/g";
+
+        NORMALIZE_1(dat1, exp1);
+        NORMALIZE_1(dat2, exp2);
+        NORMALIZE_1(dat3, exp3);
+    }
+    SECTION("parentheses - mismatch")
+    {
+        const char dat1[] = "/)/";
+        const char dat2[] = "/())/";
+        const char dat3[] = "/({{ ()) }})/";
+        const char exp1[] = "/";
+        const char exp2[] = "/()";
+        const char exp3[] = "/({{ ()";
+
+        NORM_BAD_1(dat1, exp1, JSTokenizer::BAD_TOKEN);
+        NORM_BAD_1(dat2, exp2, JSTokenizer::BAD_TOKEN);
+        NORM_BAD_1(dat3, exp3, JSTokenizer::BAD_TOKEN);
+    }
+    SECTION("curly braces - mismatch")
+    {
+        const char dat1[] = "/}/";
+        const char dat2[] = "/{}}/";
+        const char dat3[] = "/({( {}} )})/";
+        const char exp1[] = "/";
+        const char exp2[] = "/{}";
+        const char exp3[] = "/({( {}";
+
+        NORM_BAD_1(dat1, exp1, JSTokenizer::BAD_TOKEN);
+        NORM_BAD_1(dat2, exp2, JSTokenizer::BAD_TOKEN);
+        NORM_BAD_1(dat3, exp3, JSTokenizer::BAD_TOKEN);
+    }
+    SECTION("parentheses - continuation")
+    {
+        const char dat1[] = "/((";
+        const char dat2[] = "))/";
+        const char exp1[] = "/((";
+        const char exp2[] = "))/";
+        const char exp[] = "/(())/";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("curly braces - continuation")
+    {
+        const char dat1[] = "/{{";
+        const char dat2[] = "}}/";
+        const char exp1[] = "/{{";
+        const char exp2[] = "}}/";
+        const char exp[] = "/{{}}/";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("square brackets - continuation")
+    {
+        const char dat1[] = "/[[";
+        const char dat2[] = "[]/";
+        const char exp1[] = "/[[";
+        const char exp2[] = "[]/";
+        const char exp[] = "/[[[]/";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("parentheses - mismatch in continuation")
+    {
+        const char dat1[] = "/(";
+        const char dat2[] = "))/";
+        const char exp1[] = "/(";
+        const char exp2[] = ")";
+        const char exp[] = "/()";
+
+        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::BAD_TOKEN);
+        NORM_COMBINED_BAD_2(dat1, dat2, exp, JSTokenizer::BAD_TOKEN);
+    }
+    SECTION("curly braces - mismatch in continuation")
+    {
+        const char dat1[] = "/{";
+        const char dat2[] = "}}/";
+        const char exp1[] = "/{";
+        const char exp2[] = "}";
+        const char exp[] = "/{}";
+
+        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::BAD_TOKEN);
+        NORM_COMBINED_BAD_2(dat1, dat2, exp, JSTokenizer::BAD_TOKEN);
+    }
+}
+
 TEST_CASE("ignored identifiers", "[JSNormalizer]")
 {
     // 'console' 'eval' 'document' are in the ignore list
@@ -3500,6 +4038,274 @@ TEST_CASE("ignored identifier scope tracking", "[JSNormalizer]")
     }
 }
 
+TEST_CASE("ignored properties", "[JSNormalizer]")
+{
+    SECTION("basic")
+    {
+        const char dat1[] = "foo.bar ;";
+        const char dat2[] = "foo.bar() ;";
+        const char dat3[] = "foo.watch ;";
+        const char dat4[] = "foo.unwatch() ;";
+        const char dat5[] = "console.watch ;";
+        const char dat6[] = "console.unwatch() ;";
+        const char dat7[] = "console.foo.watch ;";
+        const char dat8[] = "console.foo.unwatch() ;";
+        const char dat9[] = "foo.console.watch ;";
+        const char dat10[] = "foo.console.unwatch() ;";
+
+        const char dat11[] = "foo['bar'] ;";
+        const char dat12[] = "foo[\"bar\"]() ;";
+        const char dat13[] = "foo['watch'] ;";
+        const char dat14[] = "foo[\"unwatch\"]() ;";
+        const char dat15[] = "console['watch'] ;";
+        const char dat16[] = "console[\"unwatch\"]() ;";
+        const char dat17[] = "console['foo']['watch'] ;";
+        const char dat18[] = "console[\"foo\"][\"unwatch\"]() ;";
+        const char dat19[] = "foo['console']['watch'] ;";
+        const char dat20[] = "foo[\"console\"][\"unwatch\"]() ;";
+
+        const char exp1[] = "var_0000.var_0001;";
+        const char exp2[] = "var_0000.var_0001();";
+        const char exp3[] = "var_0000.watch;";
+        const char exp4[] = "var_0000.unwatch();";
+        const char exp5[] = "console.watch;";
+        const char exp6[] = "console.unwatch();";
+        const char exp7[] = "console.foo.watch;";
+        const char exp8[] = "console.foo.unwatch();";
+        const char exp9[] = "var_0000.var_0001.watch;";
+        const char exp10[] = "var_0000.var_0001.unwatch();";
+
+        const char exp11[] = "var_0000['bar'];";
+        const char exp12[] = "var_0000[\"bar\"]();";
+        const char exp13[] = "var_0000['watch'];";
+        const char exp14[] = "var_0000[\"unwatch\"]();";
+        const char exp15[] = "console['watch'];";
+        const char exp16[] = "console[\"unwatch\"]();";
+        const char exp17[] = "console['foo']['watch'];";
+        const char exp18[] = "console[\"foo\"][\"unwatch\"]();";
+        const char exp19[] = "var_0000['console']['watch'];";
+        const char exp20[] = "var_0000[\"console\"][\"unwatch\"]();";
+
+        NORMALIZE_S(dat1, exp1);
+        NORMALIZE_S(dat2, exp2);
+        NORMALIZE_S(dat3, exp3);
+        NORMALIZE_S(dat4, exp4);
+        NORMALIZE_S(dat5, exp5);
+        NORMALIZE_S(dat6, exp6);
+        NORMALIZE_S(dat7, exp7);
+        NORMALIZE_S(dat8, exp8);
+        NORMALIZE_S(dat9, exp9);
+        NORMALIZE_S(dat10, exp10);
+
+        NORMALIZE_S(dat11, exp11);
+        NORMALIZE_S(dat12, exp12);
+        NORMALIZE_S(dat13, exp13);
+        NORMALIZE_S(dat14, exp14);
+        NORMALIZE_S(dat15, exp15);
+        NORMALIZE_S(dat16, exp16);
+        NORMALIZE_S(dat17, exp17);
+        NORMALIZE_S(dat18, exp18);
+        NORMALIZE_S(dat19, exp19);
+        NORMALIZE_S(dat20, exp20);
+    }
+
+    SECTION("chain tracking")
+    {
+        const char dat1[] = "foo.watch.bar ;";
+        const char dat2[] = "foo['watch'].bar ;";
+        const char dat3[] = "foo.bar.watch.bar ;";
+        const char dat4[] = "foo['bar'].watch['bar'] ;";
+        const char dat5[] = "foo['bar'].watch['bar'].baz ;";
+
+        const char dat6[] = "foo.unwatch().bar ;";
+        const char dat7[] = "foo['unwatch']().bar ;";
+        const char dat8[] = "foo.bar.unwatch().bar ;";
+        const char dat9[] = "foo['bar'].unwatch()['bar'] ;";
+        const char dat10[] = "foo['bar'].unwatch()['bar'].baz ;";
+
+        const char dat11[] = "foo . watch \n . bar ;";
+        const char dat12[] = "foo ['watch'] \n . bar ;";
+        const char dat13[] = "foo . /*multiline*/ watch //oneline\n . bar ;";
+
+        const char dat14[] = "foo . unwatch () \n . bar ;";
+        const char dat15[] = "foo ['unwatch'] () \n . bar ;";
+        const char dat16[] = "foo /*multiline*/ . unwatch ( ) . // oneline \n bar ;";
+
+        const char dat17[] = "foo . + watch . bar ;";
+        const char dat18[] = "foo . + ['watch'] . bar ;";
+
+        const char dat19[] = "foo . + unwatch() . bar ;";
+        const char dat20[] = "foo . + ['unwatch']() . bar ;";
+
+        // FIXIT-L: add support for proper tracking of bracket accessors.
+        // Current behavior: foo['watch'].bar -> var_0000['watch'].var_0001
+        // Expected behavior: foo['watch'].bar -> var_0000['watch'].bar
+        const char exp1[] = "var_0000.watch.bar;";
+        const char exp2[] = "var_0000['watch'].var_0001;";
+        const char exp3[] = "var_0000.var_0001.watch.bar;";
+        const char exp4[] = "var_0000['bar'].watch['bar'];";
+        const char exp5[] = "var_0000['bar'].watch['bar'].baz;";
+
+        const char exp6[] = "var_0000.unwatch().bar;";
+        const char exp7[] = "var_0000['unwatch']().var_0001;";
+        const char exp8[] = "var_0000.var_0001.unwatch().bar;";
+        const char exp9[] = "var_0000['bar'].unwatch()['bar'];";
+        const char exp10[] = "var_0000['bar'].unwatch()['bar'].baz;";
+
+        const char exp11[] = "var_0000.watch.bar;";
+        const char exp12[] = "var_0000['watch'].var_0001;";
+        const char exp13[] = "var_0000.watch.bar;";
+
+        const char exp14[] = "var_0000.unwatch().bar;";
+        const char exp15[] = "var_0000['unwatch']().var_0001;";
+        const char exp16[] = "var_0000.unwatch().bar;";
+
+        const char exp17[] = "var_0000.+var_0001.var_0002;";
+        const char exp18[] = "var_0000.+['watch'].var_0001;";
+
+        const char exp19[] = "var_0000.+var_0001().var_0002;";
+        const char exp20[] = "var_0000.+['unwatch']().var_0001;";
+
+        NORMALIZE_S(dat1, exp1);
+        NORMALIZE_S(dat2, exp2);
+        NORMALIZE_S(dat3, exp3);
+        NORMALIZE_S(dat4, exp4);
+        NORMALIZE_S(dat5, exp5);
+
+        NORMALIZE_S(dat6, exp6);
+        NORMALIZE_S(dat7, exp7);
+        NORMALIZE_S(dat8, exp8);
+        NORMALIZE_S(dat9, exp9);
+        NORMALIZE_S(dat10, exp10);
+
+        NORMALIZE_S(dat11, exp11);
+        NORMALIZE_S(dat12, exp12);
+        NORMALIZE_S(dat13, exp13);
+
+        NORMALIZE_S(dat14, exp14);
+        NORMALIZE_S(dat15, exp15);
+        NORMALIZE_S(dat16, exp16);
+
+        NORMALIZE_S(dat17, exp17);
+        NORMALIZE_S(dat18, exp18);
+
+        NORMALIZE_S(dat19, exp19);
+        NORMALIZE_S(dat20, exp20);
+    }
+
+    SECTION("scope tracking")
+    {
+        const char dat1[] = "foo.(watch).bar ;";
+        const char dat2[] = "foo(['watch']).bar ;";
+
+        const char dat3[] = "foo.bar(baz.unwatch.eval).eval ;";
+        const char dat4[] = "foo.bar(baz['unwatch'].eval).eval ;";
+
+        const char exp1[] = "var_0000.(var_0001).var_0002;";
+        const char exp2[] = "var_0000(['watch']).var_0001;";
+
+        const char exp3[] = "var_0000.var_0001(var_0002.unwatch.eval).var_0003;";
+        const char exp4[] = "var_0000.var_0001(var_0002['unwatch'].var_0003).var_0003;";
+
+        NORMALIZE_S(dat1, exp1);
+        NORMALIZE_S(dat2, exp2);
+
+        NORMALIZE_S(dat3, exp3);
+        NORMALIZE_S(dat4, exp4);
+    }
+
+    SECTION("corner cases")
+    {
+        const char dat1[] = ".watch ;";
+        const char dat2[] = ".unwatch() ;";
+
+        const char dat3[] = "'foo'.watch ;";
+        const char dat4[] = "\"foo\".unwatch() ;";
+
+        const char dat5[] = "''.split('').reverse().join('') ;";
+        const char dat6[] = "\"\".split(\"\").reverse().join(\"\") ;";
+
+        const char dat7[] = "watch () ;";
+        const char dat8[] = "watch.watch() ;";
+
+        // 'name' is present in both ignore lists
+        const char dat9[] = "name.foo ;";
+        const char dat10[] = "foo.name ;";
+        const char dat11[] = "name.name ;";
+        const char dat12[] = "name ;";
+
+        const char dat13[] = "foo.foo ;";
+        const char dat14[] = "console.console; console;";
+        const char dat15[] = "watch.watch; watch;";
+        const char dat16[] = "foo.console; console.foo; foo.watch; watch.foo ;";
+        const char dat17[] = "console.foo; foo.console; watch.foo; foo.watch ;";
+
+        const char dat18[] = "a.a ;";
+        const char dat19[] = "u.u; u;";
+        const char dat20[] = "w.w; w;";
+        const char dat21[] = "a.u; u.a; a.w; w.a ;";
+        const char dat22[] = "u.a; a.u; w.a; a.w ;";
+
+        const char exp1[] = ".watch;";
+        const char exp2[] = ".unwatch();";
+
+        const char exp3[] = "'foo'.watch;";
+        const char exp4[] = "\"foo\".unwatch();";
+
+        const char exp5[] = "''.split('').reverse().join('');";
+        const char exp6[] = "\"\".split(\"\").reverse().join(\"\");";
+
+        const char exp7[] = "var_0000();";
+        const char exp8[] = "var_0000.watch();";
+
+        const char exp9[] = "name.foo;";
+        const char exp10[] = "var_0000.name;";
+        const char exp11[] = "name.name;";
+        const char exp12[] = "name;";
+
+        const char exp13[] = "var_0000.var_0000;";
+        const char exp14[] = "console.console;console;";
+        const char exp15[] = "var_0000.watch;var_0000;";
+        const char exp16[] = "var_0000.var_0001;console.foo;var_0000.watch;var_0002.var_0000;";
+        const char exp17[] = "console.foo;var_0000.var_0001;var_0002.var_0000;var_0000.watch;";
+
+        const char exp18[] = "var_0000.var_0000;";
+        const char exp19[] = "u.u;u;";
+        const char exp20[] = "var_0000.w;var_0000;";
+        const char exp21[] = "var_0000.var_0001;u.a;var_0000.w;var_0002.var_0000;";
+        const char exp22[] = "u.a;var_0000.var_0001;var_0002.var_0000;var_0000.w;";
+
+        NORMALIZE_S(dat1, exp1);
+        NORMALIZE_S(dat2, exp2);
+
+        NORMALIZE_S(dat3, exp3);
+        NORMALIZE_S(dat4, exp4);
+
+        NORMALIZE_S(dat5, exp5);
+        NORMALIZE_S(dat6, exp6);
+
+        NORMALIZE_S(dat7, exp7);
+        NORMALIZE_S(dat8, exp8);
+
+        NORMALIZE_S(dat9, exp9);
+        NORMALIZE_S(dat10, exp10);
+        NORMALIZE_S(dat11, exp11);
+        NORMALIZE_S(dat12, exp12);
+
+        NORMALIZE_S(dat13, exp13);
+        NORMALIZE_S(dat14, exp14);
+        NORMALIZE_S(dat15, exp15);
+        NORMALIZE_S(dat16, exp16);
+        NORMALIZE_S(dat17, exp17);
+
+        NORMALIZE_S(dat18, exp18);
+        NORMALIZE_S(dat19, exp19);
+        NORMALIZE_S(dat20, exp20);
+        NORMALIZE_S(dat21, exp21);
+        NORMALIZE_S(dat22, exp22);
+    }
+}
+
 TEST_CASE("ignored identifier split", "[JSNormalizer]")
 {
 
@@ -3669,6 +4475,214 @@ TEST_CASE("ignored identifier split", "[JSNormalizer]")
 
         NORMALIZE_T(dat5, dat6, exp7, exp8);
         NORM_COMBINED_S_2(dat5, dat6, exp9);
+    }
+
+    SECTION("normalized word in the previous PDU")
+    {
+        const char dat1[] = "!foo";
+        const char dat2[] = "()";
+        const char exp1[] = "!var_0000";
+        const char exp2[] = "()";
+
+        NORMALIZE_T(dat1, dat2, exp1, exp2);
+    }
+
+    SECTION("ignored word in the previous PDU")
+    {
+        const char dat1[] = "!eval";
+        const char dat2[] = "()";
+        const char exp1[] = "!eval";
+        const char exp2[] = "()";
+
+        NORMALIZE_T(dat1, dat2, exp1, exp2);
+    }
+}
+
+TEST_CASE("ignored properties split", "[JSNormalizer]")
+{
+
+#if JSTOKENIZER_MAX_STATES != 8
+#error "ignored properties split" tests are designed for 8 states depth
+#endif
+
+    SECTION("a standalone property")
+    {
+        const char dat1[] = "foo.un";
+        const char dat2[] = "watch ;";
+        const char exp1[] = "var_0000.var_0001";
+        const char exp2[] = "unwatch;";
+        const char exp_comb_1[] = "var_0000.unwatch;";
+
+        const char dat3[] = "foo. un";
+        const char dat4[] = "watch () ;";
+        const char exp3[] = "var_0000.var_0001";
+        const char exp4[] = "unwatch();";
+        const char exp_comb_2[] = "var_0000.unwatch();";
+
+        const char dat5[] = "fo";
+        const char dat6[] = "o . watch ;";
+        const char exp5[] = "var_0000";
+        const char exp6[] = "var_0001.watch;";
+        const char exp_comb_3[] = "var_0001.watch;";
+
+        const char dat7[] = "foo. ";
+        const char dat8[] = "watch ;";
+        const char exp7[] = "var_0000.";
+        const char exp8[] = "watch;";
+        const char exp_comb_4[] = "var_0000.watch;";
+
+        const char dat9[] = "foo ";
+        const char dat10[] = ". watch ;";
+        const char exp9[] = "var_0000";
+        const char exp10[] = ".watch;";
+        const char exp_comb_5[] = "var_0000.watch;";
+
+        NORMALIZE_T(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_S_2(dat1, dat2, exp_comb_1);
+
+        NORMALIZE_T(dat3, dat4, exp3, exp4);
+        NORM_COMBINED_S_2(dat3, dat4, exp_comb_2);
+
+        NORMALIZE_T(dat5, dat6, exp5, exp6);
+        NORM_COMBINED_S_2(dat5, dat6, exp_comb_3);
+
+        NORMALIZE_T(dat7, dat8, exp7, exp8);
+        NORM_COMBINED_S_2(dat7, dat8, exp_comb_4);
+
+        NORMALIZE_T(dat9, dat10, exp9, exp10);
+        NORM_COMBINED_S_2(dat9, dat10, exp_comb_5);
+    }
+
+    SECTION("chain tracking")
+    {
+        const char dat1[] = "foo.un";
+        const char dat2[] = "watch.bar ;";
+        const char exp1[] = "var_0000.var_0001";
+        const char exp2[] = "unwatch.bar;";
+        const char exp_comb_1[] = "var_0000.unwatch.bar;";
+
+        const char dat3[] = "foo.un";
+        const char dat4[] = "watch().bar ;";
+        const char exp3[] = "var_0000.var_0001";
+        const char exp4[] = "unwatch().bar;";
+        const char exp_comb_2[] = "var_0000.unwatch().bar;";
+
+        const char dat5[] = "foo['un";
+        const char dat6[] = "watch'].bar ;";
+        const char exp5[] = "var_0000['un";
+        const char exp6[] = "unwatch'].var_0001;";
+        const char exp_comb_3[] = "var_0000['unwatch'].var_0001;";
+
+        const char dat7[] = "foo['un";
+        const char dat8[] = "watch']().bar ;";
+        const char exp7[] = "var_0000['un";
+        const char exp8[] = "unwatch']().var_0001;";
+        const char exp_comb_4[] = "var_0000['unwatch']().var_0001;";
+
+        const char dat9[] = "foo. /*multi";
+        const char dat10[] = "line*/ watch . bar ;";
+        const char exp9[] = "var_0000.";
+        const char exp10[] = "watch.bar;";
+        const char exp_comb_5[] = "var_0000.watch.bar;";
+
+        const char dat11[] = "foo //one";
+        const char dat12[] = "line \n . watch . bar ;";
+        const char exp11[] = "var_0000";
+        const char exp12[] = ".watch.bar;";
+        const char exp_comb_6[] = "var_0000.watch.bar;";
+
+        const char dat13[] = ".";
+        const char dat14[] = "watch ( ) . bar ;";
+        const char exp13[] = ".";
+        const char exp14[] = "watch().bar;";
+        const char exp_comb_7[] = ".watch().bar;";
+
+        const char dat15[] = ".un";
+        const char dat16[] = "watch ( ) . bar ;";
+        const char exp15[] = ".var_0000";
+        const char exp16[] = "unwatch().bar;";
+        const char exp_comb_8[] = ".unwatch().bar;";
+
+        const char dat17[] = "foo.watch ";
+        const char dat18[] = "+ bar ;";
+        const char exp17[] = "var_0000.watch";
+        const char exp18[] = "+var_0001;";
+        const char exp_comb_9[] = "var_0000.watch+var_0001;";
+
+        const char dat19[] = "foo.unwatch ( ) +";
+        const char dat20[] = "bar ;";
+        const char exp19[] = "var_0000.unwatch()+";
+        const char exp20[] = "var_0001;";
+        const char exp_comb_10[] = "var_0000.unwatch()+var_0001;";
+
+        NORMALIZE_T(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_S_2(dat1, dat2, exp_comb_1);
+
+        NORMALIZE_T(dat3, dat4, exp3, exp4);
+        NORM_COMBINED_S_2(dat3, dat4, exp_comb_2);
+
+        NORMALIZE_T(dat5, dat6, exp5, exp6);
+        NORM_COMBINED_S_2(dat5, dat6, exp_comb_3);
+
+        NORMALIZE_T(dat7, dat8, exp7, exp8);
+        NORM_COMBINED_S_2(dat7, dat8, exp_comb_4);
+
+        NORMALIZE_T(dat9, dat10, exp9, exp10);
+        NORM_COMBINED_S_2(dat9, dat10, exp_comb_5);
+
+        NORMALIZE_T(dat11, dat12, exp11, exp12);
+        NORM_COMBINED_S_2(dat11, dat12, exp_comb_6);
+
+        NORMALIZE_T(dat13, dat14, exp13, exp14);
+        NORM_COMBINED_S_2(dat13, dat14, exp_comb_7);
+
+        NORMALIZE_T(dat15, dat16, exp15, exp16);
+        NORM_COMBINED_S_2(dat15, dat16, exp_comb_8);
+
+        NORMALIZE_T(dat17, dat18, exp17, exp18);
+        NORM_COMBINED_S_2(dat17, dat18, exp_comb_9);
+
+        NORMALIZE_T(dat19, dat20, exp19, exp20);
+        NORM_COMBINED_S_2(dat19, dat20, exp_comb_10);
+    }
+
+    SECTION("scope tracking")
+    {
+        const char dat1[] = "foo.(un";
+        const char dat2[] = "watch).bar ;";
+        const char exp1[] = "var_0000.(var_0001";
+        const char exp2[] = "var_0002).var_0003;";
+        const char exp_comb_1[] = "var_0000.(var_0002).var_0003;";
+
+        const char dat3[] = "foo(['un";
+        const char dat4[] = "watch']).bar ;";
+        const char exp3[] = "var_0000(['un";
+        const char exp4[] = "unwatch']).var_0001;";
+        const char exp_comb_2[] = "var_0000(['unwatch']).var_0001;";
+
+        const char dat5[] = "foo.bar(baz.un";
+        const char dat6[] = "watch() . bar ) . foo ;";
+        const char exp5[] = "var_0000.var_0001(var_0002.var_0003";
+        const char exp6[] = "unwatch().bar).var_0000;";
+        const char exp_comb_3[] = "var_0000.var_0001(var_0002.unwatch().bar).var_0000;";
+
+        const char dat7[] = "foo.bar(baz['un";
+        const char dat8[] = "watch']() . bar ) . foo ;";
+        const char exp7[] = "var_0000.var_0001(var_0002['un";
+        const char exp8[] = "unwatch']().var_0001).var_0000;";
+        const char exp_comb_4[] = "var_0000.var_0001(var_0002['unwatch']().var_0001).var_0000;";
+
+        NORMALIZE_T(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_S_2(dat1, dat2, exp_comb_1);
+
+        NORMALIZE_T(dat3, dat4, exp3, exp4);
+        NORM_COMBINED_S_2(dat3, dat4, exp_comb_2);
+
+        NORMALIZE_T(dat5, dat6, exp5, exp6);
+        NORM_COMBINED_S_2(dat5, dat6, exp_comb_3);
+
+        NORMALIZE_T(dat7, dat8, exp7, exp8);
+        NORM_COMBINED_S_2(dat7, dat8, exp_comb_4);
     }
 }
 
@@ -4164,13 +5178,694 @@ TEST_CASE("Scope tracking - error handling", "[JSNormalizer]")
         const char exp[] = "function(){if";
         uint32_t scope_depth = 2;
 
-        JSIdentifierCtx ident_ctx(norm_depth, scope_depth, s_ignored_ids);
+        JSIdentifierCtx ident_ctx(norm_depth, scope_depth, s_ignored_ids, s_ignored_props);
         JSNormalizer normalizer(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth);
         auto ret = normalizer.normalize(src, strlen(src));
         std::string dst(normalizer.get_script(), normalizer.script_size());
 
         CHECK(ret == JSTokenizer::SCOPE_NESTING_OVERFLOW);
         CHECK(dst == exp);
+    }
+}
+
+TEST_CASE("Function call tracking - basic", "[JSNormalizer]")
+{
+    JSTokenizerTester tester(norm_depth, max_scope_depth, s_ignored_ids, s_ignored_props, 
+        max_template_nesting, max_bracket_depth);
+
+    using FuncType = JSTokenizerTester::FuncType;
+
+    SECTION("Global only")
+    {
+        tester.test_function_scopes({{ "", "", {FuncType::NOT_FUNC}}});
+    }
+    SECTION("General function call")
+    {
+        SECTION("in arguments")
+        {
+            tester.test_function_scopes({
+                {"general(", "var_0000(", {FuncType::NOT_FUNC, FuncType::GENERAL}}
+            });
+        }
+        SECTION("separated identifier and call")
+        {
+            tester.test_function_scopes({
+                {"general  /*comment*/  (", "var_0000(", {FuncType::NOT_FUNC, FuncType::GENERAL}}
+            });
+        }
+        SECTION("complete call")
+        {
+            tester.test_function_scopes({
+                {"general('%62%61%72')", "var_0000('%62%61%72')", {FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("as named function definition")
+        {
+            tester.test_function_scopes({
+                {"general(){", "var_0000(){", {FuncType::NOT_FUNC, FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("after defined function identifier")
+        {
+            tester.test_function_scopes({
+                {"unescape;hello(", "unescape;var_0000(", {FuncType::NOT_FUNC, FuncType::GENERAL}}
+            });
+        }
+        SECTION("fake defined function identifier")
+        {
+            tester.test_function_scopes({
+                {"fake_unescape(", "var_0000(", {FuncType::NOT_FUNC, FuncType::GENERAL}}
+            });
+        }
+        SECTION("ignored fake defined function identifier")
+        {
+            const std::unordered_set<std::string> s_ignored_ids_fake {"fake_unescape"};
+            JSTokenizerTester tester_fake(norm_depth, max_scope_depth, s_ignored_ids_fake, 
+                s_ignored_props, max_template_nesting, max_bracket_depth);
+            tester_fake.test_function_scopes({
+                {"fake_unescape(", "fake_unescape(", {FuncType::NOT_FUNC, FuncType::GENERAL}}
+            });
+        }
+        SECTION("as a template literal substitution")
+        {
+            tester.test_function_scopes({
+                {"`unescape ${general(", "`unescape ${var_0000(",
+                {FuncType::NOT_FUNC, FuncType::NOT_FUNC, FuncType::GENERAL}}
+            });
+        }
+    }
+    SECTION("unescape function call")
+    {
+        SECTION("in arguments")
+        {
+            tester.test_function_scopes({
+                {"unescape(", "", {FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+        SECTION("separated identifier and call")
+        {
+            tester.test_function_scopes({
+                {"unescape  /*comment*/  (", "", {FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+        SECTION("complete call")
+        {
+            tester.test_function_scopes({
+                {"unescape('%62%61%72')", "'bar'", {FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("as named function definition")
+        {
+            tester.test_function_scopes({
+                {"function unescape(){", "function unescape(){",
+                {FuncType::NOT_FUNC, FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("after assignment substitution")
+        {
+            tester.test_function_scopes({
+                {"var a = unescape; a(", "var var_0000=unescape;",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+        SECTION("literal")
+        {
+            tester.test_function_scopes({
+                {"`unescape(", "`unescape(", {FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("as a template literal substitution")
+        {
+            tester.test_function_scopes({
+                {"`literal ${unescape(", "`literal ${",
+                {FuncType::NOT_FUNC, FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+    }
+    SECTION("decodeURI function call")
+    {
+        SECTION("in arguments")
+        {
+            tester.test_function_scopes({
+                {"decodeURI(", "", {FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+        SECTION("separated identifier and call")
+        {
+            tester.test_function_scopes({
+                {"decodeURI  /*comment*/  (", "",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+        SECTION("complete call")
+        {
+            tester.test_function_scopes({
+                {"decodeURI('%62%61%72')", "'bar'", {FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("as named function definition")
+        {
+            tester.test_function_scopes({
+                {"function decodeURI(){", "function decodeURI(){",
+                {FuncType::NOT_FUNC, FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("after assignment substitution")
+        {
+            tester.test_function_scopes({
+                {"var a = decodeURI; a(", "var var_0000=decodeURI;",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+        SECTION("literal")
+        {
+            tester.test_function_scopes({
+                {"`decodeURI(", "`decodeURI(", {FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("as a template literal substitution")
+        {
+            tester.test_function_scopes({
+                {"`literal ${decodeURI(", "`literal ${",
+                {FuncType::NOT_FUNC, FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+    }
+    SECTION("decodeURIComponent function call")
+    {
+        SECTION("in arguments")
+        {
+            tester.test_function_scopes({
+                {"decodeURIComponent(", "",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+        SECTION("separated identifier and call")
+        {
+            tester.test_function_scopes({
+                {"decodeURIComponent  /*comment*/  (", "",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+        SECTION("complete call")
+        {
+            tester.test_function_scopes({
+                {"decodeURIComponent('%62%61%72')", "'bar'",
+                {FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("as named function definition")
+        {
+            tester.test_function_scopes({
+                {"function decodeURIComponent(){", "function decodeURIComponent(){",
+                {FuncType::NOT_FUNC, FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("after assignment substitution")
+        {
+            tester.test_function_scopes({
+                {"var a = decodeURIComponent; a(", "var var_0000=decodeURIComponent;",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+        SECTION("literal")
+        {
+            tester.test_function_scopes({
+                {"`decodeURIComponent(", "`decodeURIComponent(", {FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("as a template literal substitution")
+        {
+            tester.test_function_scopes({
+                {"`literal ${decodeURIComponent(", "`literal ${",
+                {FuncType::NOT_FUNC, FuncType::NOT_FUNC, FuncType::UNESCAPE}}
+            });
+        }
+    }
+    SECTION("String.fromCharCode method call")
+    {
+        SECTION("in arguments")
+        {
+            tester.test_function_scopes({
+                {"String.fromCharCode(", "'",
+                {FuncType::NOT_FUNC, FuncType::CHAR_CODE}}
+            });
+        }
+        SECTION("separated identifier and call")
+        {
+            tester.test_function_scopes({
+                {"String.fromCharCode  /*comment*/  (", "'",
+                {FuncType::NOT_FUNC, FuncType::CHAR_CODE}}
+            });
+        }
+        SECTION("complete call")
+        {
+            tester.test_function_scopes({
+                {"String.fromCharCode( 65, 0x42 )", "'AB'",
+                {FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("as named function definition")
+        {
+            tester.test_function_scopes({
+                {"function String.fromCharCode(){", "function String.fromCharCode(){",
+                {FuncType::NOT_FUNC, FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("after class name assignment substitution")
+        {
+            tester.test_function_scopes({
+                {"var a = String; a.fromCharCode(", "var var_0000=String;'",
+                {FuncType::NOT_FUNC, FuncType::CHAR_CODE}}
+            });
+        }
+        SECTION("after assignment substitution")
+        {
+            tester.test_function_scopes({
+                {"var a = String.fromCharCode; a(",
+                "var var_0000=String.fromCharCode;'",
+                {FuncType::NOT_FUNC, FuncType::CHAR_CODE}}
+            });
+        }
+        SECTION("not a Sting class member call")
+        {
+            tester.test_function_scopes({
+                {"fromCharCode(",
+                "var_0000(",
+                {FuncType::NOT_FUNC, FuncType::GENERAL}}
+            });
+        }
+        SECTION("literal")
+        {
+            tester.test_function_scopes({
+                {"`String.fromCharCode(", "`String.fromCharCode(", {FuncType::NOT_FUNC}}
+            });
+        }
+        SECTION("as a template literal substitution")
+        {
+            tester.test_function_scopes({
+                {"`literal ${String.fromCharCode(", "`literal ${'",
+                {FuncType::NOT_FUNC, FuncType::NOT_FUNC, FuncType::CHAR_CODE}}
+            });
+        }
+    }
+}
+
+TEST_CASE("Function call tracking - nesting", "[JSNormalizer]")
+{
+    JSTokenizerTester tester(norm_depth, max_scope_depth, s_ignored_ids, s_ignored_props,
+        max_template_nesting, max_bracket_depth);
+
+    using FuncType = JSTokenizerTester::FuncType;
+
+    SECTION("Opening")
+    {
+        SECTION("Multiple general functions")
+        {
+            tester.test_function_scopes({
+                { "general( general( general(", "var_0000(var_0000(var_0000(",
+                { FuncType::NOT_FUNC, FuncType::GENERAL, FuncType::GENERAL, FuncType::GENERAL}}
+            });
+            CHECK(!tester.is_unescape_nesting_seen());
+        }
+        SECTION("Multiple unescape functions")
+        {
+            tester.test_function_scopes({
+                {"unescape( unescape( unescape(", "",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE, FuncType::UNESCAPE, FuncType::UNESCAPE}}
+            });
+            CHECK(tester.is_unescape_nesting_seen());
+        }
+        SECTION("Multiple different unescape functions")
+        {
+            tester.test_function_scopes({
+                {"unescape( decodeURI( decodeURIComponent(", "",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE, FuncType::UNESCAPE, FuncType::UNESCAPE}}
+            });
+            CHECK(tester.is_unescape_nesting_seen());
+        }
+        SECTION("Multiple String.fromCharCode functions")
+        {
+            tester.test_function_scopes({
+                {"String.fromCharCode( String.fromCharCode( String.fromCharCode(", "'' '' '",
+                {FuncType::NOT_FUNC, FuncType::CHAR_CODE, FuncType::CHAR_CODE, FuncType::CHAR_CODE}}
+            });
+            CHECK(!tester.is_unescape_nesting_seen());
+        }
+        SECTION("Mixed function calls")
+        {
+            tester.test_function_scopes({
+                {"general( unescape( String.fromCharCode(", "var_0000('",
+                {FuncType::NOT_FUNC, FuncType::GENERAL, FuncType::UNESCAPE, FuncType::CHAR_CODE}}
+            });
+            CHECK(!tester.is_unescape_nesting_seen());
+        }
+    }
+    SECTION("Closing")
+    {
+        SECTION("Multiple general functions")
+        {
+            tester.test_function_scopes({
+                {"general( general( general( a ) )", "var_0000(var_0000(var_0000(var_0001))",
+                {FuncType::NOT_FUNC, FuncType::GENERAL}}
+            });
+        }
+        SECTION("Multiple unescape functions")
+        {
+            tester.test_function_scopes({
+                {"unescape( unescape( unescape( '%62%61%72' ) )", "'bar'",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE }}
+            });
+        }
+        SECTION("Multiple different unescape functions")
+        {
+            tester.test_function_scopes({
+                {"unescape( decodeURI( decodeURIComponent( '%62%61%72' ) )", "'bar'",
+                {FuncType::NOT_FUNC, FuncType::UNESCAPE }}
+            });
+        }
+        SECTION("Multiple String.fromCharCode methods")
+        {
+            tester.test_function_scopes({
+                {"String.fromCharCode( String.fromCharCode( String.fromCharCode( 65, 0x42 ) )",
+                "'' '' 'AB'",
+                {FuncType::NOT_FUNC, FuncType::CHAR_CODE}}
+            });
+        }
+        SECTION("Mixed function calls")
+        {
+            tester.test_function_scopes({
+                {"general( unescape( String.fromCharCode( 65, 0x42 ) )",
+                "var_0000('AB'",
+                {FuncType::NOT_FUNC, FuncType::GENERAL}}
+            });
+        }
+    }
+}
+
+TEST_CASE("Function call tracking - over multiple PDU", "[JSNormalizer]")
+{
+    JSTokenizerTester tester(norm_depth, max_scope_depth, s_ignored_ids, s_ignored_props,
+        max_template_nesting, max_bracket_depth);
+
+    using FuncType = JSTokenizerTester::FuncType;
+
+    SECTION("split in the middle of the identifier")
+    {
+        tester.test_function_scopes({
+            {"un",          "var_0000",     {FuncType::NOT_FUNC}},
+            {"escape",      "unescape",     {FuncType::NOT_FUNC}},
+            {"(",           "",             {FuncType::NOT_FUNC,
+                                             FuncType::UNESCAPE}},
+            {")",           "",             {FuncType::NOT_FUNC}},
+        });
+    }
+    SECTION("split between identifier and parenthesis")
+    {
+        tester.test_function_scopes({
+            {"decodeURI",   "decodeURI",    {FuncType::NOT_FUNC}},
+            {"(",           "",             {FuncType::NOT_FUNC,
+                                             FuncType::UNESCAPE}},
+            {")",           "",             {FuncType::NOT_FUNC}},
+        });
+    }
+    SECTION("comment between identifier and parenthesis")
+    {
+        tester.test_function_scopes({
+            {"unescape",                "unescape",     {FuncType::NOT_FUNC}},
+            {"//String.fromCharCode\n", "unescape",     {FuncType::NOT_FUNC}},
+            {"(",                       "",             {FuncType::NOT_FUNC,
+                                                         FuncType::UNESCAPE}},
+            {")",                       "",             {FuncType::NOT_FUNC}},
+        });
+    }
+    SECTION("split in arguments")
+    {
+        tester.test_function_scopes({
+            {"general",         "var_0000",                         {FuncType::NOT_FUNC}},
+            {"(",               "var_0000(",                        {FuncType::NOT_FUNC,
+                                                                     FuncType::GENERAL}},
+            {"a",               "var_0000(var_0001",                {FuncType::NOT_FUNC,
+                                                                     FuncType::GENERAL}},
+            {"+ b",             "var_0000(var_0001+var_0002",       {FuncType::NOT_FUNC,
+                                                                     FuncType::GENERAL}},
+            {")",               "var_0000(var_0001+var_0002)",      {FuncType::NOT_FUNC}},
+        });
+    }
+    SECTION("literal in arguments")
+    {
+        tester.test_function_scopes({
+            {"String",          "String",                               {FuncType::NOT_FUNC}},
+            {".fromCharCode",   "String.fromCharCode",                  {FuncType::NOT_FUNC}},
+            {"(`",              "'' `",                                 {FuncType::NOT_FUNC,
+                                                                         FuncType::CHAR_CODE}},
+            {"un",              "'' `un",                               {FuncType::NOT_FUNC,
+                                                                         FuncType::CHAR_CODE}},
+            {"escape(",         "'' `unescape(",                        {FuncType::NOT_FUNC,
+                                                                         FuncType::CHAR_CODE}},
+            {"`)",              "'' `unescape(`",                       {FuncType::NOT_FUNC}},
+        });
+    }
+    SECTION("Nesting - Mixed function calls")
+    {
+        tester.test_function_scopes({
+            {"decode",                      "var_0000",                 {FuncType::NOT_FUNC}},
+            {"URI",                         "decodeURI",                {FuncType::NOT_FUNC}},
+            {"Component",                   "decodeURIComponent",       {FuncType::NOT_FUNC}},
+            {"(",                           "",                         {FuncType::NOT_FUNC,
+                                                                         FuncType::UNESCAPE}},
+            {" a, ",                        "var_0001,",
+                                                                        {FuncType::NOT_FUNC,
+                                                                         FuncType::UNESCAPE}},
+            {" String.fromCharCode( ar",    "var_0001,'' var_0002",
+                                                                        {FuncType::NOT_FUNC,
+                                                                         FuncType::UNESCAPE,
+                                                                         FuncType::CHAR_CODE}},
+
+            {"g ), b, foo",                 "var_0001,'' var_0003,var_0004,var_0005",
+                                                                        {FuncType::NOT_FUNC,
+                                                                         FuncType::UNESCAPE}},
+
+            {"bar( ",                       "var_0001,'' var_0003,var_0004,var_0006(",
+                                                                        {FuncType::NOT_FUNC,
+                                                                         FuncType::UNESCAPE,
+                                                                         FuncType::GENERAL}},
+
+            {"))",                          "var_0001,'' var_0003,var_0004,var_0006()",
+                                                                        {FuncType::NOT_FUNC}}
+        });
+    }
+}
+
+TEST_CASE("String Concatenation - Basic", "[JSNormalizer]")
+{
+    SECTION("Two strings")
+    {
+        SECTION("single quoted strings")
+            test_normalization("'foo' + 'bar'", "'foobar'");
+
+        SECTION("double quoted strings")
+            test_normalization("\"foo\" + \"bar\"", "\"foobar\"");
+
+        SECTION("double quoted string + single quoted string")
+            test_normalization("\"foo\" + 'bar'", "\"foobar'");
+
+        SECTION("single quoted string + double quoted string")
+            test_normalization("'foo' + \"bar\"", "'foobar\"");
+
+        SECTION("string + function call")
+            test_normalization("'foo' + general('bar')", "'foo'+var_0000('bar')");
+
+        SECTION("function call + string")
+            test_normalization("general('bar') + 'foo'", "var_0000('bar')+'foo'");
+
+        SECTION("inside function call arguments")
+            test_normalization("general('foo' + 'bar')", "var_0000('foobar')");
+
+        SECTION("with concatenation inside")
+            test_normalization("'\"foo\"' + '+\"bar\"')", "'\"foo\"+\"bar\"'");
+
+        SECTION("terminated concatenation")
+            test_normalization("'foo' + '!</script>')", "'foo!");
+    }
+    SECTION("Three strings")
+    {
+        SECTION("single quoted strings")
+            test_normalization("'foo' + 'bar' + 'baz'", "'foobarbaz'");
+
+        SECTION("double quoted strings")
+            test_normalization("\"foo\" + \"bar\" + \"baz\"", "\"foobarbaz\"");
+
+        SECTION("single quoted string + double quoted string + double quoted string")
+            test_normalization("'foo' + \"bar\" + \"baz\"", "'foobarbaz\"");
+
+        SECTION("double quoted string + double quoted string + single quoted string")
+            test_normalization("\"foo\" + \"bar\" + 'baz'", "\"foobarbaz'");
+
+        SECTION("double quoted string + single quoted string + double quoted string")
+            test_normalization("\"foo\" + 'bar' + \"baz\"", "\"foobarbaz\"");
+
+        SECTION("function call between literals")
+            test_normalization("'foo' + general('bar') + \"baz\"", "'foo'+var_0000('bar')+\"baz\"");
+    }
+    SECTION("multiline comment before the plus symbol")
+        test_normalization("'foo' /*comment*/ + 'bar'", "'foobar'");
+
+    SECTION("single line comment before the plus symbol")
+        test_normalization("'foo' //comment\n + 'bar'", "'foobar'");
+
+    SECTION("HTML comment before the plus symbol")
+        test_normalization("'foo' <!-- HTML comment\n + 'bar'", "'foobar'");
+
+    SECTION("tab after the plus symbol")
+        test_normalization("'foo' + \t 'bar'", "'foobar'");
+
+    SECTION("comment after the plus symbol")
+        test_normalization("'foo' + /*comment*/ 'bar'", "'foobar'");
+
+    SECTION("with a non-string literal in chain")
+        test_normalization("'foo' + 'bar' + 2", "'foobar'+2");
+
+    SECTION("with a non-string literal between strings")
+        test_normalization("'foo' + 2 + 'bar'", "'foo'+2+'bar'");
+
+    SECTION("with a template literal")
+        test_normalization("\"foo\" + `bar`", "\"foo\"+`bar`");
+
+    SECTION("with a template literal substitution")
+        test_normalization("\"foo\" + `bar${a + 1}`", "\"foo\"+`bar${var_0000+1}`");
+
+    SECTION("inside a template literal substitution")
+        test_normalization("`literal${\"foo\" + \"bar\"}`", "`literal${\"foobar\"}`");
+
+    SECTION("automatic semicolon insertion after concatenation")
+        test_normalization("'foo' + 'bar'\nvar a = 5;", "'foobar';var var_0000=5;");
+}
+
+TEST_CASE("String Concatenation - With unescape", "[JSNormalizer]")
+{
+    SECTION("unescape")
+    {
+        SECTION("single quoted string + single quoted unescape")
+            test_normalization("'foo' + unescape('%62%61%72')", "'foobar'");
+
+        SECTION("double quoted string + single quoted unescape")
+            test_normalization("\"foo\" + unescape('%62%61%72')", "\"foobar'");
+
+        SECTION("single quoted unescape + single quoted string")
+            test_normalization("unescape('%66%6f%6f') + 'bar'", "'foobar'");
+
+        SECTION("double quoted unescape + double quoted string")
+            test_normalization("unescape(\"%66%6f%6f\") + \"bar\"", "\"foobar\"");
+
+        SECTION("string + unescape + string")
+            test_normalization("'foo' + unescape('%62%61%72') + 'baz'", "'foobarbaz'");
+
+        SECTION("unescape + unescape")
+            test_normalization("unescape('%66%6f%6f') + unescape('%62%61%72')", "'foobar'");
+
+        SECTION("inside function call arguments")
+            test_normalization("unescape('foo' + '%62' + '%61' + '%72')", "'foobar'");
+
+        SECTION("Latin-1 encoding - string + unescape")
+            test_normalization("'foo ' + unescape('%eb')", "'foo \xEB'");
+
+        SECTION("Latin-1 encoding - unescape + string")
+            test_normalization("unescape('%eb') + ' foo'", "'\xEB foo'");
+
+        SECTION("Latin-1 encoding - unescape + unescape")
+            test_normalization("unescape('%eb') + unescape('%eb')", "'\xEB\xEB'");
+    }
+    SECTION("String.fromCharCode")
+    {
+        SECTION("single quoted string + String.fromCharCode")
+            test_normalization("'foo' + String.fromCharCode(98, 97, 114)", "'foobar'");
+
+        SECTION("double quoted string + String.fromCharCode")
+            test_normalization("\"foo\" + String.fromCharCode(98, 97, 114)", "\"foobar'");
+
+        SECTION("String.fromCharCode + single quoted string")
+            test_normalization("String.fromCharCode(102, 111, 111) + 'bar'", "'foobar'");
+
+        SECTION("String.fromCharCode + double quoted string")
+            test_normalization("String.fromCharCode(102, 111, 111) + \"bar\"", "'foobar\"");
+        SECTION("Inside function call arguments")
+            test_normalization(" String.fromCharCode('foo' + 'bar')", "'' 'foobar'");
+    }
+}
+
+TEST_CASE("String Concatenation - Multiple PDU", "[JSNormalizer]")
+{
+    SECTION("Two single quoted strings")
+    {
+        test_normalization({
+            {"'",   "'"         },
+            {"foo", "'foo"      },
+            {"'",   "'foo'"     },
+            {" +",  "'foo'+"    },
+            {" '",  "'foo"      },
+            {"bar", "'foobar"   },
+            {"'",   "'foobar'"  }
+        });
+    }
+    SECTION("Three double quoted strings")
+    {
+        test_normalization({
+            {"\"foo",       "\"foo"         },
+            {"\" + \"",     "\"foo"         },
+            {"bar\"",       "\"foobar\""    },
+            {"+ \"baz\"",   "\"foobarbaz\"" }
+
+        });
+    }
+    SECTION("single quoted string + double quoted string")
+    {
+        test_normalization({
+            {"'foo",    "'foo"      },
+            {"'",       "'foo'"     },
+            {" + \"",   "\'foo"     },
+            {"bar",     "'foobar"   },
+            {"\"",      "'foobar\"" }
+        });
+    }
+    SECTION("With a non-string literal between strings")
+    {
+        test_normalization({
+            {"\"fo",    "\"fo"                  },
+            {"o\"",     "\"foo\""               },
+            {" + i",    "\"foo\"+var_0000"      },
+            {"d + ",    "\"foo\"+var_0001+"     },
+            {"'ba",     "\"foo\"+var_0001+'ba"  },
+            {"r'",      "\"foo\"+var_0001+'bar'"}
+        });
+    }
+    SECTION("With unescape")
+    {
+        test_normalization({
+            {"'fo",         "'fo"               },
+            {"o'",          "'foo'"             },
+            {" + ",         "'foo'+"            },
+            {"unescape",    "'foo'+unescape"    },
+            {"(",           "'foo'+"            },
+            {"'%62%61%72",  "'foobar"           },
+            {"'+",          "'foobar'+"         },
+            {"'baz",        "'foobarbaz"        },
+            {"'",           "'foobarbaz'"       }
+        });
+    }
+    SECTION("With String.fromCharCode")
+    {
+        test_normalization({
+            {"'foo",            "'foo"                      },
+            {"' + ",            "'foo'+"                    },
+            {"String",          "'foo'+String"              },
+            {".fromCharCode",   "'foo'+String.fromCharCode" },
+            {"(",               "'foo"                      },
+            {"98,97,114",       "'foobar"                   },
+            {")+",              "'foobar'+"                 },
+            {"'",               "'foobar"                   },
+            {"baz'",            "'foobarbaz'"               }
+        });
     }
 }
 
@@ -4215,7 +5910,7 @@ TEST_CASE("JS Normalizer, literals by 8 K", "[JSNormalizer]")
 {
     JSIdentifierCtxStub ident_ctx;
     JSNormalizer normalizer(ident_ctx, unlim_depth, max_template_nesting, max_bracket_depth);
-    char dst[DEPTH];
+    char dst[norm_depth];
 
     constexpr size_t size = 1 << 13;
 
@@ -4255,7 +5950,7 @@ TEST_CASE("JS Normalizer, literals by 64 K", "[JSNormalizer]")
 {
     JSIdentifierCtxStub ident_ctx;
     JSNormalizer normalizer(ident_ctx, unlim_depth, max_template_nesting, max_scope_depth);
-    char dst[DEPTH];
+    char dst[norm_depth];
 
     constexpr size_t size = 1 << 16;
 
@@ -4295,10 +5990,10 @@ TEST_CASE("JS Normalizer, id normalization", "[JSNormalizer]")
 {
     // around 11 000 identifiers
     std::string input;
-    for (int it = 0; it < DEPTH; ++it)
+    for (int it = 0; it < norm_depth; ++it)
         input.append("n" + std::to_string(it) + " ");
 
-    input.resize(DEPTH - strlen(s_closing_tag));
+    input.resize(norm_depth - strlen(s_closing_tag));
     input.append(s_closing_tag, strlen(s_closing_tag));
 
     JSIdentifierCtxStub ident_ctx_mock;
@@ -4313,7 +6008,8 @@ TEST_CASE("JS Normalizer, id normalization", "[JSNormalizer]")
     };
 
     const std::unordered_set<std::string> ids{};
-    JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, ids);
+    const std::unordered_set<std::string> props{};
+    JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, ids, props);
     JSNormalizer normalizer_w_ident(ident_ctx, unlim_depth, max_template_nesting, max_bracket_depth);
 
     REQUIRE(norm_ret(normalizer_w_ident, input) == JSTokenizer::SCRIPT_ENDED);
@@ -4324,7 +6020,8 @@ TEST_CASE("JS Normalizer, id normalization", "[JSNormalizer]")
     };
 
     const std::unordered_set<std::string> ids_n { "n" };
-    JSIdentifierCtx ident_ctx_ids_n(norm_depth, max_scope_depth, ids_n);
+    const std::unordered_set<std::string> props_n { "n" };
+    JSIdentifierCtx ident_ctx_ids_n(norm_depth, max_scope_depth, ids_n, props_n);
     JSNormalizer normalizer_iids(ident_ctx_ids_n, unlim_depth,
         max_template_nesting, max_bracket_depth);
 
@@ -4378,14 +6075,14 @@ TEST_CASE("JS Normalizer, scope tracking", "[JSNormalizer]")
 
 TEST_CASE("JS Normalizer, automatic semicolon", "[JSNormalizer]")
 {
-    auto w_semicolons = make_input("", "a;\n", "", depth);
-    auto wo_semicolons = make_input("", "a \n", "", depth);
+    auto w_semicolons = make_input("", "a;\n", "", norm_depth);
+    auto wo_semicolons = make_input("", "a \n", "", norm_depth);
     const char* src_w_semicolons = w_semicolons.c_str();
     const char* src_wo_semicolons = wo_semicolons.c_str();
     size_t src_len = w_semicolons.size();
 
     JSIdentifierCtxStub ident_ctx_mock;
-    JSNormalizer normalizer_wo_ident(ident_ctx_mock, unlim_depth, max_template_nesting, depth);
+    JSNormalizer normalizer_wo_ident(ident_ctx_mock, unlim_depth, max_template_nesting, norm_depth);
 
     REQUIRE(norm_ret(normalizer_wo_ident, w_semicolons) == JSTokenizer::SCRIPT_ENDED);
     BENCHMARK("without semicolon insertion")
@@ -4401,4 +6098,31 @@ TEST_CASE("JS Normalizer, automatic semicolon", "[JSNormalizer]")
         return normalizer_wo_ident.normalize(src_wo_semicolons, src_len);
     };
 }
+
+TEST_CASE("JS Normalizer, unescape", "[JSNormalizer]")
+{
+    auto str_unescape = make_input("'", "\\u0061", "'", norm_depth);
+    auto f_unescape = make_input_repeat("unescape('')", norm_depth);
+    const char* src_str_unescape = str_unescape.c_str();
+    const char* src_f_unescape = f_unescape.c_str();
+    size_t src_len = norm_depth;
+
+    JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids, s_ignored_props);
+    JSNormalizer norm(ident_ctx, unlim_depth, max_template_nesting, norm_depth);
+
+    REQUIRE(norm_ret(norm, str_unescape) == JSTokenizer::SCRIPT_ENDED);
+    BENCHMARK("unescape sequence")
+    {
+        norm.rewind_output();
+        return norm.normalize(src_str_unescape, src_len);
+    };
+
+    REQUIRE(norm_ret(norm, f_unescape) == JSTokenizer::SCRIPT_ENDED);
+    BENCHMARK("unescape function tracking")
+    {
+        norm.rewind_output();
+        return norm.normalize(src_f_unescape, src_len);
+    };
+}
+
 #endif // BENCHMARK_TEST

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,7 +32,9 @@
 
 using namespace snort;
 
-static THREAD_LOCAL XHash* detection_filter_hash = nullptr;
+THREAD_LOCAL ProfileStats snort::detectionFilterPerfStats;
+
+XHash* detection_filter_hash = nullptr;
 
 DetectionFilterConfig* DetectionFilterConfigNew()
 {
@@ -55,6 +57,8 @@ void DetectionFilterConfigFree(DetectionFilterConfig* config)
 
 int detection_filter_test(void* pv, const SfIp* sip, const SfIp* dip, long curtime)
 {
+    RuleProfile profile(detectionFilterPerfStats);
+
     if (pv == nullptr)
         return 0;
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -571,7 +571,7 @@ inline bool Binding::check_tenant(const Packet* p) const
     if (!when.has_criteria(BindWhen::Criteria::BWC_TENANTS))
         return true;
 
-    return when.tenants.count(p->pkth->address_space_id) != 0;
+    return when.tenants.count(p->pkth->tenant_id) != 0;
 }
 
 inline bool Binding::check_service(const Flow& flow) const

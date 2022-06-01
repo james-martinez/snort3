@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -47,11 +47,14 @@ public:
     void tear_down(snort::SnortConfig*) override;
     void eval(snort::Packet*) override;
     AppIdContext& get_ctxt() const;
+    const AppIdConfig& get_config() const { return *config; }
 
 private:
     const AppIdConfig* config = nullptr;
     AppIdContext* ctxt = nullptr;
 };
+
+extern const snort::InspectApi appid_inspector_api;
 
 extern THREAD_LOCAL OdpThreadContext* odp_thread_local_ctxt;
 extern THREAD_LOCAL OdpContext* pkt_thread_odp_ctxt;

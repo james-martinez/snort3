@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,7 @@
 #include "dce_smb2_tree.h"
 
 #include "dce_smb2_session.h"
+#include <memory>
 
 using namespace snort;
 
@@ -36,11 +37,11 @@ uint64_t Smb2Mid(const Smb2Hdr* hdr)
     return alignedNtohq(&(hdr->message_id));
 }
 
-Dce2Smb2FileTracker* Dce2Smb2TreeTracker::open_file(const uint64_t file_id,
+Dce2Smb2FileTrackerPtr Dce2Smb2TreeTracker::open_file(const uint64_t file_id,
     const uint32_t current_flow_key)
 {
-    Dce2Smb2FileTracker* ftracker = new Dce2Smb2FileTracker(file_id, current_flow_key, this,
-        this->get_parent()->get_session_id());
+    std::shared_ptr<Dce2Smb2FileTracker> ftracker =  std::make_shared<Dce2Smb2FileTracker> (
+        file_id, current_flow_key, this, this->get_parent()->get_session_id());
     tree_tracker_mutex.lock();
     opened_files.insert(std::make_pair(file_id, ftracker));
     tree_tracker_mutex.unlock();
@@ -48,7 +49,7 @@ Dce2Smb2FileTracker* Dce2Smb2TreeTracker::open_file(const uint64_t file_id,
     return ftracker;
 }
 
-Dce2Smb2FileTracker* Dce2Smb2TreeTracker::find_file(uint64_t file_id)
+Dce2Smb2FileTrackerPtr Dce2Smb2TreeTracker::find_file(uint64_t file_id)
 {
     std::lock_guard<std::mutex> guard(tree_tracker_mutex);
     auto it_file = opened_files.find(file_id);
@@ -63,12 +64,12 @@ void Dce2Smb2TreeTracker::close_file(uint64_t file_id, bool destroy)
     auto it_file = opened_files.find(file_id);
     if (it_file != opened_files.end())
     {
-        Dce2Smb2FileTracker* file = it_file->second;
+        Dce2Smb2FileTrackerPtr file = it_file->second;
+        it_file->second->set_parent(nullptr);
         if (opened_files.erase(file_id) and destroy)
         {
             parent_session->decrease_size(sizeof(Dce2Smb2FileTracker));
             tree_tracker_mutex.unlock();
-            delete file;
             return;
         }
     }
@@ -108,7 +109,9 @@ void Dce2Smb2TreeTracker::process_set_info_request(const Smb2Hdr* smb_header)
         uint64_t file_size = alignedNtohq((const uint64_t*)((const uint8_t*)
             set_info_hdr + SMB2_SET_INFO_REQUEST_STRUC_SIZE - 1));
         uint64_t file_id = alignedNtohq(&(set_info_hdr->fileId_persistent));
-        Dce2Smb2FileTracker* file_tracker = find_file(file_id);
+
+        do_not_delete_tree = true;
+        Dce2Smb2FileTrackerPtr file_tracker = find_file(file_id);
         if (file_tracker)
             file_tracker->set_info(nullptr, 0, file_size);
         else
@@ -118,6 +121,7 @@ void Dce2Smb2TreeTracker::process_set_info_request(const Smb2Hdr* smb_header)
                 GET_CURRENT_PACKET, "%s_REQ: ftracker missing\n",
                 smb2_command_string[SMB2_COM_SET_INFO]);
         }
+        do_not_delete_tree = false;
     }
     else
     {
@@ -134,20 +138,27 @@ void Dce2Smb2TreeTracker::process_close_request(const Smb2Hdr* smb_header,
     const uint8_t* smb_data = (const uint8_t*)smb_header + SMB2_HEADER_LENGTH;
     uint64_t file_id = alignedNtohq(&(((const Smb2CloseRequestHdr*)
         smb_data)->fileId_persistent));
-    Dce2Smb2FileTracker* file_tracker = find_file(file_id);
+
+    do_not_delete_tree = true;
+    Dce2Smb2FileTrackerPtr file_tracker = find_file(file_id);
     if (!file_tracker)
     {
         dce2_smb_stats.v2_cls_req_ftrkr_misng++;
         SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, 
 	        GET_CURRENT_PACKET, "%s_REQ: ftracker missing %" PRIu64 "\n",
             smb2_command_string[SMB2_COM_CLOSE], file_id);
+        do_not_delete_tree = false;
         return;
     }
     if (file_tracker->close(current_flow_key))
-        close_file(file_id);
+        close_file(file_id, true);
+
+    do_not_delete_tree = false;
 
     if (share_type != SMB2_SHARE_TYPE_DISK)
+    {
         DCE2_CoCleanTracker(co_tracker);
+    }
 }
 
 uint64_t Dce2Smb2TreeTracker::get_durable_file_id(
@@ -208,14 +219,15 @@ void Dce2Smb2TreeTracker::process_create_response(const uint64_t message_id,
 	    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, 
             GET_CURRENT_PACKET, "%s_RESP: not processing for directory\n",
         smb2_command_string[SMB2_COM_CREATE]);
-        close_file(file_id);
+        close_file(file_id, true);
     }
     else
     {
+        do_not_delete_tree = true;
         Dce2Smb2RequestTracker* create_request = find_request(message_id, current_flow_key);
         if (create_request)
         {
-            Dce2Smb2FileTracker* file_tracker = find_file(file_id);
+            Dce2Smb2FileTrackerPtr file_tracker = find_file(file_id);
             if (!file_tracker)
                 file_tracker = open_file(file_id, current_flow_key);
 
@@ -231,6 +243,7 @@ void Dce2Smb2TreeTracker::process_create_response(const uint64_t message_id,
                 smb2_command_string[SMB2_COM_CREATE]);
             dce2_smb_stats.v2_crt_rtrkr_misng++;
         }
+        do_not_delete_tree = false;
     }
 }
 
@@ -278,7 +291,8 @@ void Dce2Smb2TreeTracker::process_create_request(const uint64_t message_id,
     {
         SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL,
             GET_CURRENT_PACKET, "requested file_id %lu\n", file_id);
-        Dce2Smb2FileTracker* file_tracker = find_file(file_id);
+        do_not_delete_tree = true;
+        Dce2Smb2FileTrackerPtr file_tracker = find_file(file_id);
         if (!file_tracker)
         {
             file_tracker = open_file(file_id, current_flow_key);
@@ -287,6 +301,7 @@ void Dce2Smb2TreeTracker::process_create_request(const uint64_t message_id,
                 file_tracker->set_info(file_name, name_len, 0);
             }
         }
+        do_not_delete_tree = false;
     }
 }
 
@@ -295,15 +310,6 @@ void Dce2Smb2TreeTracker::process_read_response(const uint64_t message_id,
 {
     const uint8_t* smb_data = (const uint8_t*)smb_header + SMB2_HEADER_LENGTH;
     const Smb2ReadResponseHdr* read_resp_hdr = (const Smb2ReadResponseHdr*)smb_data;
-
-    Dce2Smb2RequestTracker* read_request = find_request(message_id, current_flow_key);
-    if (!read_request)
-    {
-	    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL,
-            GET_CURRENT_PACKET, "SMB2_COM_READ_RESP: request tracker missing\n");
-        dce2_smb_stats.v2_read_rtrkr_misng++;
-        return;
-    }
 
     uint16_t data_offset = alignedNtohs((const uint16_t*)(&(read_resp_hdr->data_offset)));
     Dce2Smb2SessionData* current_flow = parent_session->get_flow(current_flow_key);
@@ -315,7 +321,20 @@ void Dce2Smb2TreeTracker::process_read_response(const uint64_t message_id,
             dce_alert(GID_DCE2, DCE2_SMB_BAD_OFF, (dce2CommonStats*)&dce2_smb_stats,
                 *current_flow->get_dce2_session_data());
     }
-    Dce2Smb2FileTracker* file_tracker = find_file(read_request->get_file_id());
+
+    do_not_delete_tree = true;
+
+    Dce2Smb2RequestTracker* read_request = find_request(message_id, current_flow_key);
+    if (!read_request)
+    {
+            SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL,
+            GET_CURRENT_PACKET, "SMB2_COM_READ_RESP: request tracker missing\n");
+        dce2_smb_stats.v2_read_rtrkr_misng++;
+        do_not_delete_tree = false;
+        return;
+    }
+
+    Dce2Smb2FileTrackerPtr file_tracker = find_file(read_request->get_file_id());
     if (file_tracker)
     {
         const uint8_t* file_data =  (const uint8_t*)read_resp_hdr +
@@ -329,7 +348,7 @@ void Dce2Smb2TreeTracker::process_read_response(const uint64_t message_id,
         {
             if ((uint32_t)data_size < alignedNtohl((const uint32_t*)&(read_resp_hdr->length)))
             {
-                file_tracker->accept_raw_data_from(current_flow);
+                file_tracker->accept_raw_data_from(current_flow, 0, file_tracker);
             }
         }
     }
@@ -338,6 +357,7 @@ void Dce2Smb2TreeTracker::process_read_response(const uint64_t message_id,
 	    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL,
 	        GET_CURRENT_PACKET, "SMB2_COM_READ_RESP: file tracker missing\n");
     }
+    do_not_delete_tree = false;
 }
 
 void Dce2Smb2TreeTracker::process_read_request(const uint64_t message_id,
@@ -354,19 +374,21 @@ void Dce2Smb2TreeTracker::process_read_request(const uint64_t message_id,
 	        GET_CURRENT_PACKET, "SMB2_COM_READ_REQ: store failed\n");
         delete read_request;
     }
-    Dce2Smb2FileTracker* file_tracker = find_file(file_id);
+    do_not_delete_tree = true;
+    Dce2Smb2FileTrackerPtr file_tracker = find_file(file_id);
     Dce2Smb2SessionData* current_flow = parent_session->get_flow(current_flow_key);
     if (file_tracker)
     {
         SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL,
             GET_CURRENT_PACKET, "SMB2_COM_READ_REQ: start accepting Raw Data\n");
-        file_tracker->accept_raw_data_from(current_flow,offset);
+        file_tracker->accept_raw_data_from(current_flow,offset, file_tracker);
     }
     else
     {
         SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL,
             GET_CURRENT_PACKET, "SMB2_COM_READ_REQ: file tracker missing\n");
     }
+    do_not_delete_tree = false;
 }
 
 void Dce2Smb2TreeTracker::process_write_request(const uint64_t message_id,
@@ -393,7 +415,8 @@ void Dce2Smb2TreeTracker::process_write_request(const uint64_t message_id,
         delete write_request;
     }
     const uint8_t* file_data = (const uint8_t*)write_req_hdr + SMB2_WRITE_REQUEST_STRUC_SIZE - 1;
-    Dce2Smb2FileTracker* file_tracker = find_file(file_id);
+    do_not_delete_tree = true;
+    Dce2Smb2FileTrackerPtr file_tracker = find_file(file_id);
     if (file_tracker)
     {
         file_tracker->set_direction(FILE_UPLOAD);
@@ -407,7 +430,7 @@ void Dce2Smb2TreeTracker::process_write_request(const uint64_t message_id,
         {
             if ((uint32_t)data_size < alignedNtohl((const uint32_t*)&(write_req_hdr->length)))
             {
-                file_tracker->accept_raw_data_from(current_flow);
+                file_tracker->accept_raw_data_from(current_flow, 0, file_tracker);
             }
         }
     }
@@ -416,6 +439,7 @@ void Dce2Smb2TreeTracker::process_write_request(const uint64_t message_id,
 	    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL,
 	        GET_CURRENT_PACKET,"SMB2_COM_WRITE_REQ: file tracker missing\n");
     }
+    do_not_delete_tree = false;
 }
 
 void Dce2Smb2TreeTracker::process_ioctl_command(const uint8_t command_type,
@@ -424,7 +448,25 @@ void Dce2Smb2TreeTracker::process_ioctl_command(const uint8_t command_type,
     const uint8_t* smb_data = (const uint8_t*)smb_header + SMB2_HEADER_LENGTH;
     const uint8_t structure_size = (command_type == SMB2_CMD_TYPE_REQUEST) ?
         SMB2_IOCTL_REQUEST_STRUC_SIZE : SMB2_IOCTL_RESPONSE_STRUC_SIZE;
+    if (SMB2_CMD_TYPE_REQUEST == command_type)
+    {
+        const Smb2IoctlRequestHdr* ioctl_req = (const Smb2IoctlRequestHdr*)smb_data;
+        if ((ioctl_req->ctl_code != FSCTL_PIPE_PEEK) and (ioctl_req->ctl_code !=
+            FSCTL_PIPE_WAIT) and (ioctl_req->ctl_code != FSCTL_PIPE_TRANSCEIVE))
+        {
+            return;
+        }
+    }
 
+    if (SMB2_CMD_TYPE_RESPONSE == command_type)
+    {
+        const Smb2IoctlResponseHdr* ioctl_response = (const Smb2IoctlResponseHdr*)smb_data;
+        if ((ioctl_response->ctl_code != FSCTL_PIPE_PEEK) and (ioctl_response->ctl_code !=
+            FSCTL_PIPE_WAIT) and (ioctl_response->ctl_code != FSCTL_PIPE_TRANSCEIVE))
+        {
+            return;
+        }
+    }
     const uint8_t* file_data = (const uint8_t*)smb_data + structure_size - 1;
     int data_size = end - file_data;
     Dce2Smb2SessionData* current_flow = parent_session->get_flow(current_flow_key);
@@ -432,8 +474,12 @@ void Dce2Smb2TreeTracker::process_ioctl_command(const uint8_t command_type,
     {
         data_size = UINT16_MAX;
     }
-
-    DCE2_CoProcess(current_flow->get_dce2_session_data(), co_tracker, file_data, data_size);
+    if (co_tracker)
+    {
+        parent_session->co_tracker_mutex.lock();
+        DCE2_CoProcess(current_flow->get_dce2_session_data(), co_tracker, file_data, data_size);
+        parent_session->co_tracker_mutex.unlock();
+    }
 }
 
 void Dce2Smb2TreeTracker::process(uint16_t command, uint8_t command_type,
@@ -489,9 +535,11 @@ void Dce2Smb2TreeTracker::process(uint16_t command, uint8_t command_type,
             dce2_smb_stats.v2_read_err_resp++;
 	        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL,
 	            GET_CURRENT_PACKET, "%s_RESP: error\n", smb2_command_string[command]);
+            do_not_delete_tree = true;
             Dce2Smb2RequestTracker* request = find_request(message_id, current_flow_key);
             if (request)
-                close_file(request->get_file_id());
+                close_file(request->get_file_id(), true);
+            do_not_delete_tree = false;
         }
         else if (SMB2_CMD_TYPE_REQUEST == command_type)
             process_read_request(message_id, current_flow_key, smb_header);
@@ -504,9 +552,11 @@ void Dce2Smb2TreeTracker::process(uint16_t command, uint8_t command_type,
             dce2_smb_stats.v2_wrt_err_resp++;
 	        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL,
                 GET_CURRENT_PACKET, "%s_RESP: error\n", smb2_command_string[command]);
+            do_not_delete_tree = true;
             Dce2Smb2RequestTracker* request = find_request(message_id, current_flow_key);
             if (request)
-                close_file(request->get_file_id());
+                close_file(request->get_file_id(), true);
+            do_not_delete_tree = false;
         }
         else if (SMB2_CMD_TYPE_REQUEST == command_type)
             process_write_request(message_id, current_flow_key, smb_header, end);
@@ -527,13 +577,10 @@ void Dce2Smb2TreeTracker::process(uint16_t command, uint8_t command_type,
         remove_request(message_id, current_flow_key);
 }
 
-Dce2Smb2TreeTracker::~Dce2Smb2TreeTracker()
+Dce2Smb2TreeTracker::~Dce2Smb2TreeTracker(void)
 {
-    if (smb_module_is_up and (is_packet_thread()))
-    {
-	    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
-	        GET_CURRENT_PACKET, "tree tracker %" PRIu32 " terminating\n", tree_id);
-    }
+    if (do_not_delete_tree == true)
+        return;
 
     if (co_tracker != nullptr)
     {
@@ -546,25 +593,17 @@ Dce2Smb2TreeTracker::~Dce2Smb2TreeTracker()
 
     if (active_requests.size())
     {
-        if (smb_module_is_up and (is_packet_thread()))
-        {
-            SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
-	            GET_CURRENT_PACKET, "cleanup pending requests for below MIDs:\n");
-        }
         for (auto it_request : active_requests)
         {
-            if (smb_module_is_up and (is_packet_thread()))
-            {
-		        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
-		            GET_CURRENT_PACKET, "mid %" PRIu64 "\n", it_request.first.mid);
-            }
             delete it_request.second;
         }
     }
 
     for (auto it_file : opened_files)
     {
-        delete it_file.second;
+        get_parent()->clean_file_context_from_flow(it_file.second->get_file_id(),
+            it_file.second->get_file_name_hash());
+        it_file.second->set_parent(nullptr);
         parent_session->decrease_size(sizeof(Dce2Smb2FileTracker));
     }
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -66,6 +66,7 @@ bool TcpStateTimeWait::data_seg_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker
 
 bool TcpStateTimeWait::fin_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
+    trk.set_fin_seq_status_seen(tsd);
     trk.update_tracker_ack_recv(tsd);
     if ( SEQ_GT(tsd.get_seq(), trk.get_fin_final_seq() ) )
     {

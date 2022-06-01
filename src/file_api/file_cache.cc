@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -224,7 +224,10 @@ FileVerdict FileCache::check_verdict(Packet* p, FileInfo* file,
 {
     assert(file);
 
+    file->user_file_data_mutex.lock();
     FileVerdict verdict = policy->type_lookup(p, file);
+    file->user_file_data_mutex.unlock();
+
     FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p,
         "check_verdict:verdict after type lookup %d\n", verdict);
 
@@ -235,7 +238,9 @@ FileVerdict FileCache::check_verdict(Packet* p, FileInfo* file,
 
     if ( file->get_file_sig_sha256() and verdict == FILE_VERDICT_UNKNOWN )
     {
+        file->user_file_data_mutex.lock();
         verdict = policy->signature_lookup(p, file);
+        file->user_file_data_mutex.unlock();
     }
 
     FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p,

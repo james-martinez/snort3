@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -38,6 +38,8 @@ void Module::show_interval_stats(std::vector<unsigned int, std::allocator<unsign
 {}
 void LogMessage(const char*,...) {}
 void WarningMessage(const char*,...) {}
+DataBus::DataBus() = default;
+DataBus::~DataBus() = default;
 SnortConfig::SnortConfig(const SnortConfig* const, const char*) {}
 SnortConfig::~SnortConfig() = default;
 time_t packet_time() { return 0; }
@@ -55,7 +57,7 @@ void set_tcp_fp_processor(TcpFpProcessor*) { }
 TcpFingerprint::TcpFingerprint(const RawFingerprint&) { }
 
 UaFpProcessor::~UaFpProcessor() = default;
-void UaFpProcessor::make_mpse(SnortConfig*) { }
+void UaFpProcessor::make_mpse(bool) { }
 void UaFpProcessor::push(RawFingerprint const&) { }
 
 void UdpFpProcessor::push(RawFingerprint const&) { }

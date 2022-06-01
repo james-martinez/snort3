@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -38,7 +38,8 @@ public:
         int tmp_cap_size = JSTOKENIZER_BUF_MAX_SIZE);
     ~JSNormalizer();
 
-    JSTokenizer::JSRet normalize(const char* src, size_t src_len);
+    JSTokenizer::JSRet normalize(const char* src, size_t src_len,
+        bool external_script = false);
 
     const char* get_src_next() const
     { return src_next; }
@@ -47,7 +48,7 @@ public:
     { rem_bytes = depth; }
 
     const char* take_script()
-    { return out_buf.take_data(); }
+    { tokenizer.reset_output(); return out_buf.take_data(); }
 
     const char* get_script() const
     { return out_buf.data(); }
@@ -58,12 +59,20 @@ public:
     static size_t size()
     { return sizeof(JSNormalizer) + 16834; /* YY_BUF_SIZE */ }
 
-#ifdef CATCH_TEST_BUILD
+    bool is_unescape_nesting_seen() const
+    { return tokenizer.is_unescape_nesting_seen(); }
+
+    bool is_mixed_encoding_seen() const
+    { return tokenizer.is_mixed_encoding_seen(); }
+
+#if defined(CATCH_TEST_BUILD) || defined(BENCHMARK_TEST)
     const char* get_tmp_buf() const
     { return tmp_buf; }
     size_t get_tmp_buf_size() const
     { return tmp_buf_size; }
-#endif
+    const JSTokenizer& get_tokenizer() const
+    { return tokenizer; }
+#endif // CATCH_TEST_BUILD || BENCHMARK_TEST
 
 #ifdef BENCHMARK_TEST
     void rewind_output()

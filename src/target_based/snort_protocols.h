@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2006-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -81,7 +81,7 @@ public:
     bool operator()(SnortProtocolId a, SnortProtocolId b);
 
 private:
-    std::vector<std::string> id_map;
+    std::vector<const char*> id_map;
     std::vector<SnortProtocolId> ind_map;
     std::unordered_map<std::string, SnortProtocolId> ref_table;
 
@@ -89,6 +89,10 @@ private:
 
     void init(const ProtocolReference* old_proto_ref);
 };
+
+void protocol_reference_global_init();
+void protocol_reference_global_term();
+
 }
 #endif
 

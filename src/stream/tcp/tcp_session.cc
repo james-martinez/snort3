@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -133,6 +133,9 @@ void TcpSession::restart(Packet* p)
     {
         talker = &server;
         listener = &client;
+
+        if ( server.get_splitter()->sync_on_start() )
+            flush_tracker(server, p, PKT_FROM_CLIENT, false);
     }
     else
     {

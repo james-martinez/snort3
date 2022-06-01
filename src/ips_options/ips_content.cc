@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -192,7 +192,6 @@ uint32_t ContentOption::hash() const
 
     mix(a,b,c);
 
-    a += config->pmd.pm_type;
     b += IpsOption::hash();
 
     mix(a, b, c);
@@ -255,7 +254,6 @@ bool ContentOption::operator==(const IpsOption& ips) const
         (left.pmd.depth == right.pmd.depth) and
         (left.pmd.fp_offset == right.pmd.fp_offset) and
         (left.pmd.fp_length == right.pmd.fp_length) and
-        (left.pmd.pm_type == right.pmd.pm_type) and
         (left.match_delta == right.match_delta) and
         (left.offset_var == right.offset_var) and
         (left.depth_var == right.depth_var) )
@@ -681,6 +679,9 @@ bool ContentModule::end(const char*, int, SnortConfig*)
     }
     cd->setup_bm();
 
+    if ( !cd->pmd.has_alpha() )
+        cd->pmd.set_no_case();
+
     if ( cd->pmd.is_negated() )
     {
         cd->pmd.last_check = (PmdLastCheck*)snort_calloc(
@@ -740,11 +741,10 @@ static void mod_dtor(Module* m)
     delete m;
 }
 
-static IpsOption* content_ctor(Module* p, OptTreeNode* otn)
+static IpsOption* content_ctor(Module* p, OptTreeNode*)
 {
     ContentModule* m = (ContentModule*)p;
     ContentData* cd = m->get_data();
-    cd->pmd.pm_type = otn->sticky_buf;
     return new ContentOption(cd);
 }
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -371,7 +371,7 @@ bool HostCacheModule::end(const char* fqn, int, SnortConfig* sc)
     if ( memcap and !strcmp(fqn, HOST_CACHE_NAME) )
     {
         if ( Snort::is_reloading() )
-            sc->register_reload_resource_tuner(new HostCacheReloadTuner(memcap));
+            sc->register_reload_handler(new HostCacheReloadTuner(memcap));
         else
             host_cache.set_max_size(memcap);
     }
@@ -456,6 +456,9 @@ string HostCacheModule::get_host_cache_stats()
 
     host_cache.lock();
 
+    host_cache.stats.bytes_in_use = host_cache.current_size;
+    host_cache.stats.items_in_use = host_cache.list.size();
+
     PegCount* counts = (PegCount*) host_cache.get_counts();
     const PegInfo* pegs = host_cache.get_pegs();
 
@@ -483,6 +486,11 @@ PegCount* HostCacheModule::get_counts() const
 void HostCacheModule::sum_stats(bool accumulate_now_stats)
 {
     host_cache.lock();
+    // These could be set in prep_counts but we set them here
+    // to save an extra cache lock.
+    host_cache.stats.bytes_in_use = host_cache.current_size;
+    host_cache.stats.items_in_use = host_cache.list.size();
+
     Module::sum_stats(accumulate_now_stats);
     host_cache.unlock();
 }

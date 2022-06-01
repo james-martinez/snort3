@@ -1,3 +1,247 @@
+2022/05/19 - 3.1.30.0
+
+build: Update dependent libdaq version to 3.0.7
+doc: update clone link in README. Thanks to billchenchina.
+doc: user documentation update for obfuscate_pii and --help-module
+framework: add method to get unquoted string from configuration value
+http2_inspect: Templatize variable length integer decoding of integer and string
+http_inspect: add ignoring defined object properties for Enchanced JS normalizer
+http_inspect: avoid sending compressed data to JS normalizer
+http_inspect: check if input available before JavaScript normalization
+mime: set partial_header to null after deletion
+perf_monitor: remove unused flatbuffers support
+piglets: remove unused test harness
+smb: handle file context cleanup
+snort3: remove SMB detection from service_netbios.cc
+stream: refactor flush_queued_segments
+stream_tcp: add null check for get_current_wire_packet() in dce too
+stream_tcp, pop: add sync_on_start method to StreamSplitter
+stream_tcp: provide a context and a wire packet where needed, when calling into reassembly from outside regular processing (handle_timeouts)
+utils: add Latin-1 decoding of JavaScript unescape-like functions
+utils: allow regex literals after operator
+utils: fix regex char classes parsing
+utils: turn debug-build assertion into a product-build code
+wizard: fix code style
+
+2022/05/04 - 3.1.29.0
+
+appid: add alpn matchers
+dce_rpc: update address space id in the smb keys
+doc: rule text updates
+flow, network_inspectors, policy_selectors, stream: make address space id 32 bits and add a tenant id to the daq header
+flow, side_channel, utils: fix clang issues
+flow: add inline cppcheck suppressions
+flow: change the padding and bits in the flow key to make it more clear
+http_inspect: install header files, create a virtual base class for http_inspect and http_stream_splitter
+http_inspect: move mime processing outside of file and detect depth
+main: update analyzer command log message to copy the variable arguments before using them for the remote response
+wizard: update glob storage due to shared memory
+
+2022/04/25 - 3.1.28.0
+
+appid: add bytes_in_use and items_in_use peg counts
+appid: ssl service detection for segmented server hello done
+binder: add binder actions to flow reassignment. Thanks to Meridoff for the original report of the issue.
+bufferlen: add missing relative override
+conf: add cip and s7commplus to the default snort.lua
+content: auto no-case non-alpha patterns
+dce_rpc: Handling only named ioctls for smb
+detection: add missing fast pattern buffer translations
+detection: make CursorActionType generic
+detection: map buffers to services
+detection: rearrange startup rule counts
+detection: remove now obsolete get buf support
+doc: add clarification on default bindings in developer notes and user notes
+events: add action logging to the event
+flow, managers, binder: only publish flow state reloaded event from internal execute
+flow: only select policies when deleting flow data if there is a policy selector
+flow, snort_config: change service back to a pointer and add a method to return a non-volatile pointer for service
+flow: use a flag instead off shared pointer use count for has service check
+framework: make Cursor SO_PUBLIC
+ftp: fix FTP response parsing
+ftp: flush FTP cmds ending in just carriage return
+host_cache: bytes_in_use and items_in_use peg counts
+host_cache: fix unit test broken on some platforms
+inspectors: add / update api buffer lists
+ips: eliminate direct dependence on get_fp_buf of all ibt (by using rule options)
+ips: eliminate PM_TYPE_* to make fast pattern buffers generic
+ips: further limit port group rules
+ips_options: eliminate obsolete RULE_OPTION_TYPE_BUFFER_*
+ips_options: fix cursor action type overrides
+main: check policy exists instead of index when setting network policy by id
+mime: handle MIME header lines split between inspection sections and improve folded header line processing
+mms: add check that BerElement argument isn't null before calling BerReader::read
+mms: adding manual updates for the new service inspector for the IEC61850 MMS protocol
+mms: adding new service inspector for the IEC61850 MMS protocol
+mms_data: make a fast pattern buffer
+mms: moved creation of TpktFlowData inspector ID to process init
+module_manager: fix memory pegs display issue during packet processing, while also correctly computing the memory pegs in Analyzer::term
+netflow: framework for netflow V5 and V9 events
+packet_io: add rewrite action logging
+parser: update dev notes
+raw_data: only search pkt_data if no alt buffer or raw_data rules included in group
+service inspectors: update fast pattern access
+sfip: improve warning suppression
+smtp: SMTPData initialization changed from memset to constructor
+smtp: STARTTLS command injection event processing
+stream: add can_set_no_ack() api to check if policy allows no-ack mode
+stream: add current_flows, uni_flows and uni_ip_flows peg counts
+utils: limit JS regex stack size
+utils: track groups and escaped symbols in JavaScript regex literals
+
+2022/04/07 - 3.1.27.0
+
+ac_full: refactor api access
+ac_full: remove cruft
+ac_std: fix case translation buffer size
+alerts: remove obsolete stateful parameter
+appid: provide client appid set by encrypted visibility engine to ssl through the ssl appid lookup api
+build: compile against libatomic if present. Thanks to W. Michael Petullo <mike@flyn.org>
+control, shell: add a command to set the network policy to be used by subsequent commands
+dce_rpc: handle cleanup path and race conditions for dce traffic
+detection: do not check ips policy when builtin events are queued
+detection: fixup dump of detection option tree
+detection: minor refactoring of rule header access
+detection: override match queue limit for offload
+detection: remove cruft
+detection: skip match deduplication for hyperscan
+file_api: handle user_file_data cleanup
+hext: change stdin designation from tty to - since the trough uses dash
+http2_inspect: reduce holes in objects
+http_inspect: add unescape text processing for Enhanced JS Normalizer
+http_inspect: decode String.fromCodePoint() JavaScript function
+http_inspect: delete alerts 119:279 and 119:280
+http_inspect: provide current packet to trace
+http_inspect: support headers Restrict-Access-To-Tenants, Restrict-Access-Context
+hyperscan: ensure adequate scratch when deserializing
+rate_filter: move to inspection policy
+search_engine: add fast pattern only count at startup
+search_engine: always build ac_full since it is a hard default case
+search_engine: fix .debug = true output
+search_engine: fix adjustment for fast_pattern_offset
+search_engine: fix fast pattern only eligibility check
+search_engine: remove obsolete warning on max_pattern_len change
+search_engine: remove search_optimize parameter (always true)
+search_engine: truncated patterns not eligible as fast pattern only contents
+search_engines: add and refactor unit tests
+search_engines: ensure SearchTool with hyperscan gets multi-match mode
+search_engines: remove the legacy ac_banded algorithm
+search_engines: remove the legacy ac_sparse algorithm
+search_engines: remove the legacy ac_sparse_bands algorithm
+search_engines: remove the legacy ac_std algorithm
+sfip: suppress compiler warning
+utils: add string concatenation for Enchanced JS Normalizer
+utils: allow opening/closing tags in external scripts
+utils: fix JS Normalizer benchmark build
+utils: fix tracking variable when the output buffer is reset
+utils: harden script opening tag sequence
+
+2022/03/23 - 3.1.26.0
+
+actions: revert bf62a22d43bb2d15b7425c5ec3e3118ead470e8d
+actions: set a delayed action on Reject IPS Action hit
+analyzer: avoid distilling sticky verdicts
+appid: appid api to provide the path to appid detector directory
+appid: make appid a global inspector
+appid: sum stats at tterm and null the thread local stats pointer after delete
+control: make sure reload commands with empty argument is handled correctly
+event: add new static member update_and_get_event_id()
+file_api: Handling user_file_data cleanup
+flow: make service a shared pointer to handle reload properly
+framework: update base API version to 13
+http_inspect: do file decompression and utf decoding on non-MIME uploads
+http_inspect, mime: VBA macro decompression for HTTP MIME file uploads
+inspector, main, inspector_manager: add support for thread local data in inspectors and commands updating reload_id
+main: add the control connection to the analyzer command and a method to log a message to both console and the remote connection
+main: fix and reenable the distill_verdict unit test
+managers: add a faster get_inspectors method
+managers: add get_inspector unit tests
+managers: move inspection policies into the corresponding network policy
+packet_io: fix active action so the first reset occurred takes effect
+policy_selectors: add a method to select policies based on DAQ_FlowStats_t
+reputation: add a command to reload repuation data
+stream: reusable stream splitter
+
+2022/03/09 - 3.1.25.0
+
+appid: do not add duplicate process to client app mapping for the same process name
+file_id: remove unused decompression and decode depth parameters
+http_inspect: add http_header_test, http_trailer_test rule options
+http_inspect: add override to fix warning
+http_inspect: add unescape function tracking for Enhanced JS Normalizer
+http_inspect: call mime in a loop for each attachment
+http_inspect: remove feature to disable raw detection upon flow depth
+http_inspect: use http_inspect decompression config parameters for HTTP MIME traffic instead of file_id
+mime: fix resetting state after every attachment and check state instead of decode object
+mime: return at the end of each attachment and set the file_data for http
+process: add watchdog to detect packet threads dead lock or dead loop
+ssh: NULL check for session pointer before access
+stream_tcp: call final flush only when the seglist has no gaps
+stream_tcp: clarify small segments help text and remove usage from lua
+utils: check for NULL before calling fclose()
+utils: check more likely branches at first
+utils: combine ignore list with normalization map
+utils: fix compilation issues in js_tokenizer
+utils: improve Flex matching patterns
+utils: pre-compute ID normalized names
+utils: refactor the alias lookup
+utils: wrap unordered set with a fast lookup table
+watchdog: remove unused code
+
+2022/02/23 - 3.1.24.0
+
+detection_filter: update dev notes to show multithreaded behavior
+doc: fix typos in text. Thanks to Greg Myers <myersg86> for reporting the issue.
+http_inspect: refactor HttpIpsOption
+latency: disabling time out functionality on implicit enable
+mime: stop setting the file_data buffer for raw non-file MIME parts
+netflow: add dev_notes.txt
+sfdaq: fix for underflow of outstanding counter
+stream: Remove preemptive prunes peg count
+
+2022/02/09 - 3.1.23.0
+
+detection: add dir abort check in skip_raw_tcp
+doc: add notes about CLI/Lua precedence
+doc: fix incorrect http builtin rule sid
+event: make apis SO_PUBLIC to access in .so
+filters: allow detection filter to sum events across threads
+http_inspect: HttpStreamSplitter::reassemble verifies gzip file magic and checks for FEXTRA flag
+main: ignore Snort module's option if it duplicates CLI option
+main: parse snort module before others
+main: remove default values for other-module parameters in snort module
+main: stop with error on include(nil) attempt
+packet_io: decrease daq module's parameters priority
+stream: defer flush_queued_segments() if flow->clouseau
+stream_tcp: better place for setting delayed_finish_flag
+stream_tcp: fix a bug in which in some cases we did not call splitter finish() in each direction, by calling flush_queued_segments() in perform_fin_recv_flush() on FIN with data packets
+stream_tcp: introduce TcpStreamTracker::delayed_finish_flag and call splitter finish from flush_on_data_policy if delayed_finish_flag is true
+stream_tcp: wrap flow->clouseau in searching_for_service()
+
+2022/01/31 - 3.1.22.0
+
+appid: give priority to custom process to app mappings over ODP mappings
+appid: rename efp (encrypted fingerprint) to eve (encrypted visibility engine)
+detection: change output format of dump-rule-state
+pub_sub: export assistant_gadget_event.h header file
+stream: set the max number of flows pruned while idle to 400
+
+2022/01/25 - 3.1.21.0
+
+appid: do not delay detection of SMB service for the sake of version detection
+control: fix macro definitions
+copyright: Update year to 2022
+http_inspect: correct comment regarding header splitting rules
+http_inspect: forward 0.9 request lines to detection
+http_inspect: http_version_match uses msg section version id
+http_inspect: webroot traversal
+main: move policy selector and flow tracking from snort config to policy map
+main: only add policies to the user policy map at the end of table processing
+policy: add a file_policy to the network policy and use it
+stream: QUIC stream dependent changes
+stream_tcp: ensure that we call splitter finish() only once per flow, per direction
+wizard: remove extra semicolon
+
 2022/01/12 - 3.1.20.0
 
 appid: handle SNI in efp event

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -246,28 +246,4 @@ void CodecManager::dump_plugins()
     for ( CodecApiWrapper& wrap : s_codecs )
         d.dump(wrap.api->base.name, wrap.api->base.version);
 }
-
-#ifdef PIGLET
-const CodecApi* CodecManager::find_api(const char* name)
-{
-    for ( auto wrap : CodecManager::s_codecs )
-        if ( !strcmp(wrap.api->base.name, name) )
-            return wrap.api;
-
-    return nullptr;
-}
-
-CodecWrapper* CodecManager::instantiate(const char* name, Module* m, SnortConfig*)
-{
-    auto api = find_api(name);
-    if ( !api )
-        return nullptr;
-
-    auto p = api->ctor(m);
-    if ( !p )
-        return nullptr;
-
-    return new CodecWrapper(api, p);
-}
-#endif
 

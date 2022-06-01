@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,7 +22,7 @@
 #define RNA_MODULE_H
 
 #include "framework/module.h"
-#include "main/snort_config.h"
+#include "main/reload_tuner.h"
 #include "main/snort_debug.h"
 #include "profiler/profiler.h"
 
@@ -30,6 +30,11 @@
 #include "rna_fingerprint.h"
 #include "rna_mac_cache.h"
 #include "rna_name.h"
+
+namespace snort
+{
+struct SnortConfig;
+}
 
 struct RnaStats
 {
@@ -49,6 +54,7 @@ struct RnaStats
     PegCount dhcp_data;
     PegCount dhcp_info;
     PegCount smb;
+    PegCount netflow_record;
 };
 
 extern THREAD_LOCAL RnaStats rna_stats;

@@ -223,17 +223,19 @@ During message body analysis the Enhanced Normalizer does one of the following:
 Enhanced Normalizer is a stateful JavaScript whitespace and identifiers normalizer.
 Normalizer will remove all extraneous whitespace and newlines, keeping a single space where 
 syntactically necessary. Comments will be removed, but contents of string literals will
-be kept intact. Semicolons will be inserted, if not already present, according to ECMAScript
+be kept intact. Any string literals, added by the plus operator,
+will be concatenated. This also works for functions that result in string
+literals. Semicolons will be inserted, if not already present, according to ECMAScript
 automatic semicolon insertion rules.
-All JavaScript identifier names, except those from the ignore list,
+All JavaScript identifier names, except those from the ident_ignore or prop_ignore lists,
 will be substituted with unified names in the following format: var_0000 -> var_ffff.
 So, the number of unique identifiers available is 65536 names per HTTP transaction.
 If Normalizer overruns the configured limit, built-in alert is generated.
 A config option to set the limit manually:
  * http_inspect.js_norm_identifier_depth.
 
-Identifiers from the ignore list will be placed as is, without substitution. Starting with 
-the listed identifier, any chain of dot acessors, brackets and function calls will be kept
+Identifiers from the ident_ignore list will be placed as is, without substitution. Starting with 
+the listed identifier, any chain of dot accessors, brackets and function calls will be kept
 intact.
 For example:
  * console.log("bar")
@@ -254,6 +256,55 @@ For example:
 
     var a = console.log
     a("hello") // will be substituted to 'console.log("hello")'
+
+For properties and methods of objects that can be created implicitly, there is a
+js_norm_prop_ignore list. All names in the call chain after the first property or
+method from the list has been occurred will not be normalized.
+
+Note that identifiers are normalized by name, i.e. an identifier and a property with the same name
+will be normalized to the same value. However, the ignore lists act separately on identifiers
+and properties.
+
+For example:
+
+   http_inspect.js_norm_prop_ignore = { 'split' }
+
+   in: "string".toUpperCase().split("").reverse().join("");
+   out: "string".var_0000().split("").reverse().join("");
+
+In addition to the scope tracking, JS Normalizer specifically tracks unescape-like JavaScript
+functions (unescape, decodeURI, decodeURIComponent, String.fromCharCode, String.fromCodePoint).
+This allows detection of unescape functions nested within other unescape functions, which is
+a potential indicator of a multilevel obfuscation. The definition of a function call depends on
+identifier substitution, so such identifiers must be included in the ignore list in
+order to use this feature. After determining the unescape sequence, it is decoded into the
+corresponding string, and the name of unescape function will not be present in the output.
+Single-byte escape sequences within the string and template literals which are arguments of
+unescape, decodeURI and decodeURIComponent functions will be decoded according to ISO/IEC 8859-1
+(Latin-1) charset. Except these cases, escape sequences and code points will be decoded to UTF-8
+format.
+
+For example:
+
+   unescape('\u0062\u0061\u0072')              -> 'bar'
+   decodeURI('%62%61%72')                      -> 'bar'
+   decodeURIComponent('\x62\x61\x72')          -> 'bar'
+   String.fromCharCode(98, 0x0061, 0x72)       -> 'bar'
+   String.fromCodePoint(65600, 65601, 0x10042) -> '𐁀𐁁𐁂'
+
+Supported formats follow
+
+   \xXX
+   \uXXXX
+   \u{XXXX}
+   %XX
+   \uXX
+   %uXXXX
+   decimal code point
+   hexadecimal code point
+
+JS Normalizer is able to decode mixed encoding sequences. However, a built-in alert rises
+in such case.
 
 JS Normalizer's syntax parser follows ECMA-262 standard. For various features,
 tracking of variable scope and individual brackets is done in accordance to the standard.
@@ -335,6 +386,12 @@ generated and processing continues normally. If there is no separator at all tha
 
 Then we return to #1 as the next chunk begins. In particular extra separators beyond the two
 expected are attributed to the beginning of the next chunk.
+
+Rule options:
+
+HttpIpsOption is the base class for http rule options. It supports the commonly used parameters: 
+field, request, with_body, with_header and with_trailer. HttpBufferIpsOption is a rule option that 
+sets a buffer. It implements most of the rule options.
 
 Test tool usage instructions:
 

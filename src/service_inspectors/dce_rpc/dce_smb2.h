@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -68,6 +68,10 @@ extern const char* smb2_command_string[SMB2_COM_MAX];
 #define SMB2_CMD_TYPE_REQUEST        1
 #define SMB2_CMD_TYPE_RESPONSE       2
 #define SMB2_CMD_TYPE_INVALID        3
+
+#define FSCTL_PIPE_WAIT 0x00110018
+#define FSCTL_PIPE_TRANSCEIVE 0x0011C017
+#define FSCTL_PIPE_PEEK 0x0011400C
 
 struct Smb2Hdr
 {
@@ -251,6 +255,38 @@ struct Smb2TreeConnectResponseHdr
     uint32_t maximal_access;          /* maximal access for the user */
 };
 
+struct Smb2IoctlRequestHdr
+{
+    uint16_t structure_size;          /* This MUST be set to 57 */
+    uint16_t reserved;
+    uint32_t ctl_code;
+    uint64_t fileId_persistent;       /* fileId that is persistent */
+    uint64_t fileId_volatile;
+    uint32_t input_offset;
+    uint32_t input_count;
+    uint32_t max_input_response;
+    uint32_t output_offset;
+    uint32_t output_count;
+    uint32_t max_output_response;
+    uint32_t flags;
+    uint32_t reserved2;
+};
+
+struct Smb2IoctlResponseHdr
+{
+    uint16_t structure_size;           /* This MUST be set to 49 */
+    uint16_t reserved;
+    uint32_t ctl_code;
+    uint64_t fileId_persistent;       /* fileId that is persistent */
+    uint64_t fileId_volatile;
+    uint32_t input_offset;
+    uint32_t input_count;
+    uint32_t output_offset;
+    uint32_t output_count;
+    uint32_t flags;
+    uint32_t reserved2;
+};
+
 #define SMB2_HEADER_LENGTH 64
 
 #define SMB2_ERROR_RESPONSE_STRUC_SIZE 9
@@ -299,16 +335,19 @@ using Dce2Smb2SessionTrackerPtr = std::shared_ptr<Dce2Smb2SessionTracker>;
 using Dce2Smb2SessionTrackerMap =
     std::unordered_map<uint64_t, Dce2Smb2SessionTrackerPtr, std::hash<uint64_t> >;
 
+using Dce2Smb2FileTrackerPtr = std::shared_ptr<Dce2Smb2FileTracker>;
+using Dce2Smb2FileTrackerMap =
+    std::unordered_map<uint64_t, Dce2Smb2FileTrackerPtr, std::hash<uint64_t> >;
+
 PADDING_GUARD_BEGIN
 struct Smb2SessionKey
 {
     uint32_t cip[4];
     uint32_t sip[4];
     uint64_t sid;
+    uint32_t asid;
     int16_t cgroup;
     int16_t sgroup;
-    uint16_t asid;
-    uint16_t padding;
 
     bool operator==(const Smb2SessionKey& other) const
     {
@@ -332,12 +371,13 @@ struct Smb2FlowKey
     uint32_t ip_l[4];   // Low IP
     uint32_t ip_h[4];   // High IP
     uint32_t mplsLabel;
+    uint32_t addressSpaceId;
     uint16_t port_l;    // Low Port - 0 if ICMP
     uint16_t port_h;    // High Port - 0 if ICMP
     int16_t group_l;
     int16_t group_h;
     uint16_t vlan_tag;
-    uint16_t addressSpaceId;
+    uint16_t padding16;
     uint8_t ip_protocol;
     uint8_t pkt_type;
     uint8_t version;
@@ -387,7 +427,7 @@ private:
         a += d[3]; b += d[4];  c += d[5];  mix(a, b, c);
         a += d[6]; b += d[7];  c += d[8];  mix(a, b, c);
         a += d[9]; b += d[10]; c += d[11]; mix(a, b, c);
-        a += d[12]; finalize(a, b, c);
+        a += d[12]; b += d[13]; finalize(a, b, c);
         return c;
     }
 
@@ -447,23 +487,29 @@ public:
     void process() override;
     void remove_session(uint64_t, bool = false);
     void handle_retransmit(FilePosition, FileVerdict) override { }
-    void reset_matching_tcp_file_tracker(Dce2Smb2FileTracker*);
+    void reset_matching_tcp_file_tracker(Dce2Smb2FileTrackerPtr);
     void set_reassembled_data(uint8_t*, uint16_t) override;
     uint32_t get_flow_key() { return flow_key; }
-    void set_tcp_file_tracker(Dce2Smb2FileTracker* file_tracker)
+    void set_tcp_file_tracker(Dce2Smb2FileTrackerPtr file_tracker)
     {
         std::lock_guard<std::mutex> guard(session_data_mutex);
         tcp_file_tracker = file_tracker;
     }
 
+    Dce2Smb2FileTrackerPtr get_tcp_file_tracker()
+    {
+        return tcp_file_tracker;
+    }
+
+    Dce2Smb2SessionTrackerPtr find_session(uint64_t);
+
 private:
     void process_command(const Smb2Hdr*, const uint8_t*);
     Smb2SessionKey get_session_key(uint64_t);
     Dce2Smb2SessionTrackerPtr create_session(uint64_t);
-    Dce2Smb2SessionTrackerPtr find_session(uint64_t);
 
+    Dce2Smb2FileTrackerPtr tcp_file_tracker;
     uint32_t flow_key;
-    Dce2Smb2FileTracker* tcp_file_tracker;
     Dce2Smb2SessionTrackerMap connected_sessions;
     std::mutex session_data_mutex;
     std::mutex tcp_file_tracker_mutex;

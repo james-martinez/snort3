@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -42,23 +42,6 @@ struct OutputSet;
 
 //-------------------------------------------------------------------------
 
-#ifdef PIGLET
-struct LoggerWrapper
-{
-    LoggerWrapper(const snort::LogApi* a, snort::Logger* p) :
-        api { a }, instance { p } { }
-
-    ~LoggerWrapper()
-    {
-        if ( api && instance && api->dtor )
-            api->dtor(instance);
-    }
-
-    const snort::LogApi* api;
-    snort::Logger* instance;
-};
-#endif
-
 class EventManager
 {
 public:
@@ -83,10 +66,6 @@ public:
 
     static void enable_alerts(bool b) { alert_enabled = b; }
     static void enable_logs(bool b) { log_enabled = b; }
-
-#ifdef PIGLET
-    static LoggerWrapper* instantiate(const char* name, snort::Module*, snort::SnortConfig*);
-#endif
 
 private:
     static void instantiate(struct Output*, snort::Module*, snort::SnortConfig*);

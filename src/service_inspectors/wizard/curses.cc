@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -16,12 +16,15 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 // curses.cc author Maya Dagon <mdagon@cisco.com>
+// mms curse author Jared Rittle <jared.rittle@cisco.com>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
 #include "curses.h"
+
+#include <assert.h>
 
 using namespace std;
 
@@ -70,7 +73,7 @@ static bool dce_udp_curse(const uint8_t* data, unsigned len, CurseTracker*)
     const uint8_t dcerpc_cl_hdr_len = 80;
     const uint8_t cl_len_offset = 74;
 
-    if (len >= dcerpc_cl_hdr_len)
+    if ( len >= dcerpc_cl_hdr_len )
     {
         uint8_t version = data[0];
         uint8_t pdu_type = data[1];
@@ -78,22 +81,22 @@ static bool dce_udp_curse(const uint8_t* data, unsigned len, CurseTracker*)
         uint16_t cl_len;
 
 #ifdef WORDS_BIGENDIAN
-        if (!little_endian)
+        if ( !little_endian )
 #else
-        if (little_endian)
+        if ( little_endian )
 #endif  /* WORDS_BIGENDIAN */
             cl_len = (data[cl_len_offset+1] << 8) | data[cl_len_offset];
         else
             cl_len = (data[cl_len_offset] << 8) | data[cl_len_offset+1];
 
-        if ((version == DCERPC_PROTO_MAJOR_VERS__4) &&
-            ((pdu_type == DCERPC_PDU_TYPE__REQUEST) ||
-            (pdu_type == DCERPC_PDU_TYPE__RESPONSE) ||
-            (pdu_type == DCERPC_PDU_TYPE__FAULT) ||
-            (pdu_type == DCERPC_PDU_TYPE__REJECT) ||
-            (pdu_type == DCERPC_PDU_TYPE__FACK)) &&
-            ((cl_len != 0) &&
-            (cl_len + (unsigned)dcerpc_cl_hdr_len) <= len))
+        if ( (version == DCERPC_PROTO_MAJOR_VERS__4) and
+            ((pdu_type == DCERPC_PDU_TYPE__REQUEST) or
+            (pdu_type == DCERPC_PDU_TYPE__RESPONSE) or
+            (pdu_type == DCERPC_PDU_TYPE__FAULT) or
+            (pdu_type == DCERPC_PDU_TYPE__REJECT) or
+            (pdu_type == DCERPC_PDU_TYPE__FACK)) and
+            ((cl_len != 0) and
+            (cl_len + (unsigned)dcerpc_cl_hdr_len) <= len) )
             return true;
     }
 
@@ -106,40 +109,47 @@ static bool dce_tcp_curse(const uint8_t* data, unsigned len, CurseTracker* track
     CurseTracker::DCE& dce = tracker->dce;
 
     uint32_t n = 0;
-    while (n < len)
+    while ( n < len )
     {
-        switch (dce.state)
+        switch ( dce.state )
         {
         case STATE_0: // check major version
-            if (data[n] != DCERPC_PROTO_MAJOR_VERS__5)
+            if ( data[n] != DCERPC_PROTO_MAJOR_VERS__5 )
             {
                 // go to bad state
                 dce.state = STATE_10;
+
                 return false;
             }
+
             dce.state = (DCE_State)((int)dce.state + 1);
             break;
 
         case STATE_1: // check minor version
-            if (data[n] != DCERPC_PROTO_MINOR_VERS__0)
+            if ( data[n] != DCERPC_PROTO_MINOR_VERS__0 )
             {
                 // go to bad state
                 dce.state = STATE_10;
+
                 return false;
             }
+
             dce.state = (DCE_State)((int)dce.state + 1);
             break;
 
         case STATE_2: // pdu_type
         {
             uint8_t pdu_type = data[n];
-            if ((pdu_type != DCERPC_PDU_TYPE__BIND) &&
-                (pdu_type != DCERPC_PDU_TYPE__BIND_ACK))
+
+            if ( (pdu_type != DCERPC_PDU_TYPE__BIND) and
+                (pdu_type != DCERPC_PDU_TYPE__BIND_ACK) )
             {
                 // go to bad state
                 dce.state = STATE_10;
+
                 return false;
             }
+
             dce.state = (DCE_State)((int)dce.state + 1);
             break;
         }
@@ -154,9 +164,9 @@ static bool dce_tcp_curse(const uint8_t* data, unsigned len, CurseTracker* track
             break;
         case STATE_9:
 #ifdef WORDS_BIGENDIAN
-            if (!(dce.helper >> 24))
+            if ( !(dce.helper >> 24) )
 #else
-            if (dce.helper >> 24)
+            if ( dce.helper >> 24 )
 #endif  /* WORDS_BIGENDIAN */
                 dce.helper = (data[n] << 8) | (dce.helper & 0XFF);
             else
@@ -165,7 +175,7 @@ static bool dce_tcp_curse(const uint8_t* data, unsigned len, CurseTracker* track
                 dce.helper |= data[n];
             }
 
-            if (dce.helper >= dce_rpc_co_hdr_len)
+            if ( dce.helper >= dce_rpc_co_hdr_len )
                 return true;
 
             dce.state = STATE_10;
@@ -178,6 +188,7 @@ static bool dce_tcp_curse(const uint8_t* data, unsigned len, CurseTracker* track
             dce.state = (DCE_State)((int)dce.state + 1);
             break;
         }
+
         n++;
     }
 
@@ -188,39 +199,41 @@ static bool dce_smb_curse(const uint8_t* data, unsigned len, CurseTracker* track
 {
     const uint32_t dce_smb_id = 0xff534d42;  /* \xffSMB */
     const uint32_t dce_smb2_id = 0xfe534d42;  /* \xfeSMB */
-    const uint8_t session_request = 0x81, session_response = 0x82,
-                  session_message = 0x00;
+    const uint8_t session_request = 0x81, session_response = 0x82, session_message = 0x00;
     CurseTracker::DCE& dce = tracker->dce;
 
     uint32_t n = 0;
-    while (n < len)
+    while ( n < len )
     {
-        switch (dce.state)
+        switch ( dce.state )
         {
         case STATE_0:
-            if (data[n] == session_message)
+            if ( data[n] == session_message )
             {
                 dce.state = (DCE_State)((int)dce.state + 2);
                 break;
             }
 
-            if (data[n] == session_request || data[n] == session_response)
+            if ( data[n] == session_request or data[n] == session_response )
             {
                 dce.state = (DCE_State)((int)dce.state + 1);
+
                 return false;
             }
 
             dce.state = STATE_9;
+
             return false;
 
         case STATE_1:
-            if (data[n] == session_message)
+            if ( data[n] == session_message )
             {
                 dce.state = (DCE_State)((int)dce.state + 1);
                 break;
             }
 
             dce.state = STATE_9;
+
             return false;
 
         case STATE_5:
@@ -238,7 +251,8 @@ static bool dce_smb_curse(const uint8_t* data, unsigned len, CurseTracker* track
         case STATE_8:
             dce.helper <<= 8;
             dce.helper |= data[n];
-            if ((dce.helper == dce_smb_id) || (dce.helper == dce_smb2_id))
+
+            if ( (dce.helper == dce_smb_id) or (dce.helper == dce_smb2_id) )
                 return true;
 
             dce.state = (DCE_State)((int)dce.state + 1);
@@ -252,11 +266,233 @@ static bool dce_smb_curse(const uint8_t* data, unsigned len, CurseTracker* track
             dce.state = (DCE_State)((int)dce.state + 1);
             break;
         }
+
         n++;
     }
 
     return false;
 }
+
+
+static bool mms_curse(const uint8_t* data, unsigned len, CurseTracker* tracker)
+{
+    // peg the tracker to MMS
+    CurseTracker::MMS& mms = tracker->mms;
+
+    // if the state is set to MMS_STATE__SEARCH it means we most likely
+    // have a split pipelined message coming through and will need to
+    // reset the state
+    if ( mms.state == MMS_STATE__SEARCH )
+    {
+        mms.state = mms.last_state;
+    }
+
+    // define all known MMS tags to check for
+    enum 
+    {
+        MMS_CONFIRMED_REQUEST_TAG    = 0xA0,
+        MMS_CONFIRMED_RESPONSE_TAG   = 0xA1,
+        MMS_CONFIRMED_ERROR_TAG      = 0xA2,
+        MMS_UNCONFIRMED_TAG          = 0xA3,
+        MMS_REJECT_TAG               = 0xA4,
+        MMS_CANCEL_REQUEST_TAG       = 0x85,
+        MMS_CANCEL_RESPONSE_TAG      = 0x86,
+        MMS_CANCEL_ERROR_TAG         = 0xA7,
+        MMS_INITIATE_REQUEST_TAG     = 0xA8,
+        MMS_INITIATE_RESPONSE_TAG    = 0xA9,
+        MMS_INITIATE_ERROR_TAG       = 0xAA,
+        MMS_CONCLUDE_REQUEST_TAG     = 0x8B,
+        MMS_CONCLUDE_RESPONSE_TAG    = 0x8C,
+        MMS_CONCLUDE_ERROR_TAG       = 0xAD,
+    };
+
+    uint32_t idx = 0;
+    while ( idx < len )
+    {
+        switch ( mms.state )
+        {
+            case MMS_STATE__TPKT_VER:
+            {
+                mms.state = MMS_STATE__TPKT_RES;
+                break;
+            }
+
+            case MMS_STATE__TPKT_RES:
+            {
+                mms.state = MMS_STATE__TPKT_LEN1;
+                break;
+            }
+
+            case MMS_STATE__TPKT_LEN1:
+            {
+                mms.state = MMS_STATE__TPKT_LEN2;
+                break;
+            }
+
+            case MMS_STATE__TPKT_LEN2:
+            {
+                mms.state = MMS_STATE__COTP_LEN;
+                break;
+            }
+
+            case MMS_STATE__COTP_LEN:
+            {
+                mms.state = MMS_STATE__COTP_PDU;
+                break;
+            }
+
+            case MMS_STATE__COTP_PDU:
+            {
+                // 7 6 5 4 3 2 1 0
+                // ---------------
+                // . . . . x x x x   Destination Reference
+                // x x x x . . . .   PDU Type
+                const uint32_t MMS_COTP_PDU_DT_DATA = 0x0F;
+
+                if ( data[idx] >> 0x04 != MMS_COTP_PDU_DT_DATA )
+                {
+                    mms.state = MMS_STATE__NOT_FOUND;
+                    break;
+                }
+
+                mms.state = MMS_STATE__COTP_TPDU_NUM;
+                break;
+            }
+
+            case MMS_STATE__COTP_TPDU_NUM:
+            {
+                mms.state = MMS_STATE__OSI_SESSION_SPDU;
+                break;
+            }
+
+            case MMS_STATE__OSI_SESSION_SPDU:
+            {
+                // define all known OSI Session layer SPDU tags to check
+                enum 
+                {
+                    MMS_OSI_SESSION_SPDU_GT_DT = 0x01,
+                    MMS_OSI_SESSION_SPDU_CN = 0x0D,
+                    MMS_OSI_SESSION_SPDU_AC = 0x0E,
+                };
+
+                switch ( data[idx] )
+                {
+                    // check for a known MMS message tag in the event Session/Pres/ACSE aren't used
+                    case MMS_CONFIRMED_REQUEST_TAG:    // fallthrough intentional
+                    case MMS_CONFIRMED_RESPONSE_TAG:   // fallthrough intentional
+                    case MMS_CONFIRMED_ERROR_TAG:      // fallthrough intentional
+                    case MMS_UNCONFIRMED_TAG:          // fallthrough intentional
+                    case MMS_REJECT_TAG:               // fallthrough intentional
+                    case MMS_CANCEL_REQUEST_TAG:       // fallthrough intentional
+                    case MMS_CANCEL_RESPONSE_TAG:      // fallthrough intentional
+                    case MMS_CANCEL_ERROR_TAG:         // fallthrough intentional
+                    case MMS_INITIATE_REQUEST_TAG:     // fallthrough intentional
+                    case MMS_INITIATE_RESPONSE_TAG:    // fallthrough intentional
+                    case MMS_INITIATE_ERROR_TAG:       // fallthrough intentional
+                    case MMS_CONCLUDE_REQUEST_TAG:     // fallthrough intentional
+                    case MMS_CONCLUDE_RESPONSE_TAG:    // fallthrough intentional
+                    case MMS_CONCLUDE_ERROR_TAG:
+                    {
+                        // if an MMS tag exists in the remaining data,
+                        // hand off to the MMS service inspector
+                        mms.state = MMS_STATE__FOUND;
+                        break;
+                    }
+
+                    // if mms isn't found, search for an OSI Session layer 
+                    case MMS_OSI_SESSION_SPDU_GT_DT: // fallthrough intentional      
+                    case MMS_OSI_SESSION_SPDU_CN:    // fallthrough intentional   
+                    case MMS_OSI_SESSION_SPDU_AC:
+                    {
+                        mms.state = MMS_STATE__MMS;
+                        break;
+                    }
+
+                    // if neither are found, it is most likely not MMS
+                    default:
+                    {
+                        mms.state = MMS_STATE__NOT_FOUND;
+                    }
+                }
+
+                break;
+            }            
+
+            case MMS_STATE__MMS:
+            {
+                // loop through the remaining bytes in the buffer checking for known MMS tags
+                for ( uint32_t i=idx; i < len; i++ )
+                {
+                    // for each remaining byte check to see if it is in the known tag map
+                    switch ( data[i] )
+                    {
+                        case MMS_CONFIRMED_REQUEST_TAG:    // fallthrough intentional
+                        case MMS_CONFIRMED_RESPONSE_TAG:   // fallthrough intentional
+                        case MMS_CONFIRMED_ERROR_TAG:      // fallthrough intentional
+                        case MMS_UNCONFIRMED_TAG:          // fallthrough intentional
+                        case MMS_REJECT_TAG:               // fallthrough intentional
+                        case MMS_CANCEL_REQUEST_TAG:       // fallthrough intentional
+                        case MMS_CANCEL_RESPONSE_TAG:      // fallthrough intentional
+                        case MMS_CANCEL_ERROR_TAG:         // fallthrough intentional
+                        case MMS_INITIATE_REQUEST_TAG:     // fallthrough intentional
+                        case MMS_INITIATE_RESPONSE_TAG:    // fallthrough intentional
+                        case MMS_INITIATE_ERROR_TAG:       // fallthrough intentional
+                        case MMS_CONCLUDE_REQUEST_TAG:     // fallthrough intentional
+                        case MMS_CONCLUDE_RESPONSE_TAG:    // fallthrough intentional
+                        case MMS_CONCLUDE_ERROR_TAG:
+                        {
+                            // if an MMS tag exists in the remaining data,
+                            // hand off to the MMS service inspector
+                            mms.state = MMS_STATE__FOUND;
+                            break;
+                        }
+                        // no default here as it we don't know when we would hit 
+                        // the first MMS tag without doing full parsing 
+                    }
+
+                    // exit the loop when a state has been determined
+                    if ( mms.state == MMS_STATE__NOT_FOUND
+                        or mms.state == MMS_STATE__SEARCH 
+                        or mms.state == MMS_STATE__FOUND )
+                    {
+                        break;
+                    }
+                }
+
+                break;
+            }
+
+            case MMS_STATE__FOUND:
+            {
+                mms.state = MMS_STATE__TPKT_VER;
+
+                return true;
+            }
+
+            case MMS_STATE__NOT_FOUND:
+            {
+                mms.state = MMS_STATE__TPKT_VER;
+
+                return false;
+            }
+
+            default:
+            {
+                mms.state = MMS_STATE__NOT_FOUND;
+                assert(false);
+                break;
+            }
+        }
+
+        idx++;
+    }
+
+    mms.last_state = mms.state;
+    mms.state = MMS_STATE__SEARCH;
+
+    return false;
+}
+
 
 namespace SSL_Const
 {
@@ -271,66 +507,72 @@ static bool ssl_v2_curse(const uint8_t* data, unsigned len, CurseTracker* tracke
 {
     CurseTracker::SSL& ssl = tracker->ssl;
 
-    if (ssl.state == SSL_State::SSL_NOT_FOUND)
-    {
+    if ( ssl.state == SSL_State::SSL_NOT_FOUND )
         return false;
-    }
-    else if (ssl.state == SSL_State::SSL_FOUND)
-    {
+    else if ( ssl.state == SSL_State::SSL_FOUND )
         return true;
-    }
 
-    for (unsigned i = 0; i < len; ++i)
+    for ( unsigned i = 0; i < len; ++i )
     {
         uint8_t val = data[i];
 
-        switch (ssl.state)
+        switch ( ssl.state )
         {
         case SSL_State::BYTE_0_LEN_MSB:
-            if ((val & SSL_Const::sslv2_msb_set) == 0)
+            if ( (val & SSL_Const::sslv2_msb_set) == 0 )
             {
                 ssl.state = SSL_State::SSL_NOT_FOUND;
+
                 return false;
             }
+
             ssl.total_len = (val & (~SSL_Const::sslv2_msb_set)) << 8;
             ssl.state = SSL_State::BYTE_1_LEN_LSB;
             break;
 
         case SSL_State::BYTE_1_LEN_LSB:
             ssl.total_len |= val;
-            if (ssl.total_len < SSL_Const::hdr_len)
+            if ( ssl.total_len < SSL_Const::hdr_len )
             {
                 ssl.state = SSL_State::SSL_NOT_FOUND;
+
                 return false;
             }
+
             ssl.total_len -= SSL_Const::hdr_len;
             ssl.state = SSL_State::BYTE_2_CLIENT_HELLO;
             break;
 
         case SSL_State::BYTE_2_CLIENT_HELLO:
-            if (val != SSL_Const::client_hello)
+            if ( val != SSL_Const::client_hello )
             {
                 ssl.state = SSL_State::SSL_NOT_FOUND;
+
                 return false;
             }
+
             ssl.state = SSL_State::BYTE_3_MAX_MINOR_VER;
             break;
 
         case SSL_State::BYTE_3_MAX_MINOR_VER:
-            if (val > SSL_Const::sslv3_max_minor_ver)
+            if ( val > SSL_Const::sslv3_max_minor_ver )
             {
                 ssl.state = SSL_State::SSL_NOT_FOUND;
+
                 return false;
             }
+
             ssl.state = SSL_State::BYTE_4_V3_MAJOR;
             break;
 
         case SSL_State::BYTE_4_V3_MAJOR:
-            if (val > SSL_Const::sslv3_major_ver)
+            if ( val > SSL_Const::sslv3_major_ver )
             {
                 ssl.state = SSL_State::SSL_NOT_FOUND;
+
                 return false;
             }
+
             ssl.state = SSL_State::BYTE_5_SPECS_LEN_MSB;
             break;
 
@@ -341,11 +583,14 @@ static bool ssl_v2_curse(const uint8_t* data, unsigned len, CurseTracker* tracke
 
         case SSL_State::BYTE_6_SPECS_LEN_LSB:
             ssl.specs_len |= val;
-            if (ssl.total_len < ssl.specs_len)
+
+            if ( ssl.total_len < ssl.specs_len )
             {
                 ssl.state = SSL_State::SSL_NOT_FOUND;
+
                 return false;
             }
+
             ssl.total_len -= ssl.specs_len;
             ssl.state = SSL_State::BYTE_7_SSNID_LEN_MSB;
             break;
@@ -357,11 +602,14 @@ static bool ssl_v2_curse(const uint8_t* data, unsigned len, CurseTracker* tracke
 
         case SSL_State::BYTE_8_SSNID_LEN_LSB:
             ssl.ssnid_len |= val;
-            if (ssl.total_len < ssl.ssnid_len)
+
+            if ( ssl.total_len < ssl.ssnid_len )
             {
                 ssl.state = SSL_State::SSL_NOT_FOUND;
+
                 return false;
             }
+
             ssl.total_len -= ssl.ssnid_len;
             ssl.state = SSL_State::BYTE_9_CHLNG_LEN_MSB;
             break;
@@ -373,12 +621,16 @@ static bool ssl_v2_curse(const uint8_t* data, unsigned len, CurseTracker* tracke
 
         case SSL_State::BYTE_10_CHLNG_LEN_LSB:
             ssl.chlng_len |= val;
-            if (ssl.total_len < ssl.chlng_len)
+
+            if ( ssl.total_len < ssl.chlng_len )
             {
                 ssl.state = SSL_State::SSL_NOT_FOUND;
+
                 return false;
             }
+
             ssl.state = SSL_State::SSL_FOUND;
+
             return true;
 
         default:
@@ -394,32 +646,36 @@ static bool ssl_v2_curse(const uint8_t* data, unsigned len, CurseTracker* tracke
 static vector<CurseDetails> curse_map
 {
     // name      service        alg            is_tcp
-    { "dce_udp", "dcerpc",      dce_udp_curse, false },
-    { "dce_tcp", "dcerpc",      dce_tcp_curse, true  },
+    { "dce_udp", "dcerpc"     , dce_udp_curse, false },
+    { "dce_tcp", "dcerpc"     , dce_tcp_curse, true  },
+    { "mms"    , "mms"        , mms_curse    , true  },
     { "dce_smb", "netbios-ssn", dce_smb_curse, true  },
-    { "sslv2"  , "ssl",         ssl_v2_curse , true  }
+    { "sslv2"  , "ssl"        , ssl_v2_curse , true  }
 };
 
 bool CurseBook::add_curse(const char* key)
 {
-    for (const CurseDetails& curse : curse_map)
+    for ( const CurseDetails& curse : curse_map )
     {
-        if (curse.name == key)
+        if ( curse.name == key )
         {
-            if (curse.is_tcp)
+            if ( curse.is_tcp )
                 tcp_curses.emplace_back(&curse);
             else
                 non_tcp_curses.emplace_back(&curse);
+
             return true;
         }
     }
+
     return false;
 }
 
 const vector<const CurseDetails*>& CurseBook::get_curses(bool tcp) const
 {
-    if (tcp)
+    if ( tcp )
         return tcp_curses;
+
     return non_tcp_curses;
 }
 
@@ -454,9 +710,9 @@ TEST_CASE("sslv2 detect", "[SslV2Curse]")
     auto test = [&](uint32_t incr_by,const uint8_t* ch)
         {
             uint32_t i = 0;
-            while (i <= max_detect)
+            while ( i <= max_detect )
             {
-                if ((i + incr_by - 1) < max_detect)
+                if ( (i + incr_by - 1) < max_detect )
                 {
                     CHECK(tracker.ssl.state == static_cast<SSL_State>(i));
                     CHECK_FALSE(ssl_v2_curse(&ch[i],sizeof(uint8_t) * incr_by,&tracker));
@@ -466,6 +722,7 @@ TEST_CASE("sslv2 detect", "[SslV2Curse]")
                     CHECK(ssl_v2_curse(&ch[i],sizeof(uint8_t) * incr_by,&tracker));
                     CHECK(tracker.ssl.state == SSL_State::SSL_FOUND);
                 }
+
                 i += incr_by;
             }
             //subsequent checks must return found
@@ -512,9 +769,9 @@ TEST_CASE("sslv2 not found", "[SslV2Curse]")
 
             ch_data[fail_at_byte] = bad_data[fail_at_byte];
 
-            for (uint32_t i = 0; i <= fail_at_byte; i++)
+            for ( uint32_t i = 0; i <= fail_at_byte; i++ )
             {
-                if (i < fail_at_byte)
+                if ( i < fail_at_byte )
                 {
                     CHECK(tracker.ssl.state == static_cast<SSL_State>(i));
                     CHECK_FALSE(ssl_v2_curse(&ch_data[i],sizeof(uint8_t),&tracker));

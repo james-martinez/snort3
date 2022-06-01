@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -67,7 +67,7 @@ public:
     unsigned delete_flows(unsigned num_to_delete);
     bool prune_one(PruneReason, bool do_cleanup);
     snort::Flow* stale_flow_cleanup(FlowCache*, snort::Flow*, snort::Packet*);
-    void timeout_flows(time_t cur_time);
+    void timeout_flows(unsigned int, time_t cur_time);
     void check_expected_flow(snort::Flow*, snort::Packet*);
     bool is_expected(snort::Packet*);
 
@@ -93,6 +93,10 @@ public:
     PegCount get_total_deletes() const;
     PegCount get_deletes(FlowDeleteState state) const;
     void clear_counts();
+
+    PegCount get_uni_flows() const;
+    PegCount get_uni_ip_flows() const;
+    PegCount get_num_flows() const;
 
 private:
     void set_key(snort::FlowKey*, snort::Packet*);

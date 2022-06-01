@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -193,7 +193,9 @@ bool AppIdApi::ssl_app_group_id_lookup(Flow* flow, const char* server_name,
 
         service_id = asd->get_api().get_service_app_id();
 
-        if (client_id == APP_ID_NONE)
+        if (asd->use_eve_client_app_id())
+            client_id = asd->get_eve_client_app_id();
+        else if (client_id == APP_ID_NONE)
             client_id = asd->get_api().get_client_app_id();
         else
             asd->set_client_id(client_id);
@@ -259,9 +261,18 @@ bool AppIdApi::is_inspection_needed(const Inspector& inspector) const
         return false;
 
     SnortProtocolId id = inspector.get_service();
-    AppIdConfig& config = appid_inspector->get_ctxt().config;
+    const AppIdConfig& config = appid_inspector->get_ctxt().config;
     if (id == config.snort_proto_ids[PROTO_INDEX_HTTP2] or id == config.snort_proto_ids[PROTO_INDEX_SSH])
         return true;
 
     return false;
+}
+
+const char* AppIdApi::get_appid_detector_directory() const
+{
+    AppIdInspector* inspector = (AppIdInspector*) InspectorManager::get_inspector(MOD_NAME, true);
+    if (!inspector)
+        return "";
+
+    return inspector->get_config().app_detector_dir;
 }

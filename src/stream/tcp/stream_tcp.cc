@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -73,16 +73,10 @@ bool StreamTcp::configure(SnortConfig* sc)
 }
 
 void StreamTcp::tinit()
-{
-    TcpHAManager::tinit();
-    TcpSession::sinit();
-}
+{ TcpHAManager::tinit(); }
 
 void StreamTcp::tterm()
-{
-    TcpHAManager::tterm();
-    TcpSession::sterm();
-}
+{ TcpHAManager::tterm(); }
 
 NORETURN_ASSERT void StreamTcp::eval(Packet*)
 {
@@ -129,6 +123,12 @@ static void stream_tcp_pterm()
     TcpNormalizerFactory::term();
 }
 
+static void stream_tcp_tinit()
+{ TcpSession::sinit(); }
+
+static void stream_tcp_tterm()
+{ TcpSession::sterm(); }
+
 static Session* tcp_ssn(Flow* lws)
 { return new TcpSession(lws); }
 
@@ -152,8 +152,8 @@ static const InspectApi tcp_api =
     nullptr,  // service
     stream_tcp_pinit,  // pinit
     stream_tcp_pterm,  // pterm
-    nullptr,  // tinit,
-    nullptr,  // tterm,
+    stream_tcp_tinit,  // tinit,
+    stream_tcp_tterm,  // tterm,
     tcp_ctor,
     tcp_dtor,
     tcp_ssn,

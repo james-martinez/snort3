@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,6 +32,7 @@
 
 #include "detection_options.h"
 #include "fp_create.h"
+#include "fp_utils.h"
 #include "ips_context.h"
 #include "pattern_match_data.h"
 
@@ -86,12 +87,11 @@ void print_pkt_info(Packet* p, const char* task)
 void print_pattern(const PatternMatchData* pmd, Packet* p)
 {
     string hex, txt, opts;
+    get_pattern_info(pmd, hex, txt, opts);
 
-    get_pattern_info(pmd, pmd->pattern_buf, pmd->pattern_size, hex, txt, opts);
     debug_logf(detection_trace, TRACE_RULE_EVAL, p,
         "Fast pattern %s[%u] = '%s' |%s| %s\n",
-        pm_type_strings[pmd->pm_type],  pmd->pattern_size,
-        txt.c_str(), hex.c_str(), opts.c_str());
+        pmd->sticky_buf,  pmd->pattern_size, txt.c_str(), hex.c_str(), opts.c_str());
 }
 
 void dump_buffer(const uint8_t* buff, unsigned len, Packet* p)

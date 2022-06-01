@@ -76,14 +76,19 @@ will be removed.
 Having ips option 'js_data' in the rules automatically enables Enhanced
 Normalizer. The Enhanced Normalizer can normalize inline/external scripts.
 It supports scripts over multiple PDUs. It is a stateful JavaScript whitespace
-and identifiers normalizer. All JavaScript identifier names, except those from
-the ignore list, will be substituted with unified names in the following
-format: var_0000 -> var_ffff. Moreover, Normalizer validates the syntax
-concerning ECMA-262 Standard, including scope tracking and restrictions
+and identifiers normalizer. Normalizer concatenates string literals whenever 
+it's possible to do. This also works with any other normalizations that result
+in string literals. All JavaScript identifier names, except those from
+the ignore lists, will be substituted with unified names in the following
+format: var_0000 -> var_ffff. But the unescape-like function names will be removed
+from the normalized data. The Normalizer tries to expand an escaped text,
+so it will appear in a usual form in the output. Moreover, Normalizer validates
+the syntax concerning ECMA-262 Standard, including scope tracking and restrictions
 for script elements. For more information on how additionally configure
 Enhanced Normalizer check with the following configuration options:
 js_norm_bytes_depth, js_norm_identifier_depth, js_norm_max_tmpl_nest,
-js_norm_max_bracket_depth, js_norm_max_scope_depth, js_norm_ident_ignore.
+js_norm_max_bracket_depth, js_norm_max_scope_depth, js_norm_ident_ignore,
+js_norm_prop_ignore.
 Eventually Enhanced Normalizer will completely replace Legacy Normalizer.
 
 ==== Configuration
@@ -154,27 +159,32 @@ feature is on by default: normalize_utf = false will deactivate it.
 ===== decompress_pdf
 
 decompress_pdf = true will enable decompression of compressed portions of
-PDF files encountered in a response body. http_inspect will examine the
-response body for PDF files that are then parsed to locate PDF streams with
+PDF files encountered in a message body. http_inspect will examine the
+message body for PDF files that are then parsed to locate PDF streams with
 a single /FlateDecode filter. The compressed content is decompressed and
 made available through the file data rule option.
 
 ===== decompress_swf
 
 decompress_swf = true will enable decompression of compressed SWF (Adobe
-Flash content) files encountered in a response body. The available
+Flash content) files encountered in a message body. The available
 decompression modes are ’deflate’ and ’lzma’. http_inspect will search for
 the file signatures CWS for Deflate/ZLIB and ZWS for LZMA. The compressed
 content is decompressed and made available through the file data rule
 option. The compressed SWF file signature is converted to FWS to indicate
 an uncompressed file.
 
+===== decompress_zip
+
+decompress_zip = true will enable decompression of compressed zip archives encountered in a message
+body. The compressed content is decompressed and made available through the file_data rule option.
+
 ===== decompress_vba
 
 decompress_vba = true will enable decompression of RLE (Run Length Encoding)
 compressed vba (Visual Basic for Applications) macro data of MS Office 
-files. The MS office files are PKZIP compressed which are parsed to locate 
-the OLE (Object Linking and Embedding) file embedded with the files 
+files encountered in a message body. The MS office files are PKZIP compressed which are parsed to
+locate the OLE (Object Linking and Embedding) file embedded with the files 
 containing RLE compressed vba macro data. The decompressed vba macro data is
 then made available through the vba_data ips rule option.
 
@@ -270,6 +280,30 @@ For example:
     a("hello") // will be substituted to 'console.log("hello")'
 
 The default list of ignore-identifiers is present in "snort_defaults.lua".
+
+Unescape function names should remain intact in the output. They ought to be
+included in the ignore list. If for some reason the user wants to disable unescape
+related features, then removing function's name from the ignore list does the trick.
+
+===== js_norm_prop_ignore
+
+js_norm_prop_ignore = {<list of ignored properties>} is an option of the enhanced
+JavaScript normalizer that defines a list of object properties and methods that
+will be kept intact during the identifiers normalization. This list should include
+methods and properties of objects that will not be tracked by assignment substitution
+functionality, for example, those that can be created implicitly.
+
+Subsequent accessors, after dot, in square brackets or after function call, will not be
+normalized as well.
+
+For example:
+
+    http_inspect.js_norm_prop_ignore = { 'split' }
+
+    in: "string".toUpperCase().split("").reverse().join("");
+    out: "string".var_0000().split("").reverse().join("");
+
+The default list of ignored properties is present in "snort_defaults.lua".
 
 ===== xff_headers
 
@@ -685,7 +719,7 @@ The vba_data will contain the decompressed Visual Basic for Applications
 (vba) macro data embedded in MS office files. It requires decompress_zip
 and decompress_vba options enabled.
 
-===== num_headers and num_trailers
+===== http_num_headers and http_num_trailers
 
 These rule options are used to check the number of headers and
 trailers, respectively. Checks available: equal to "=" or just value,
@@ -705,6 +739,13 @@ refers to the actual HTTP/2 protocol with framed data. Messages that follow
 the general HTTP/1 format but contain version fields falsely claiming to be
 HTTP/2.0 or HTTP/0.9 will match "other" as described above. The http_version
 rule option is available to examine the actual bytes in the version field.
+
+===== http_header_test and http_trailer_test
+
+Rule options that perform various tests against a specific header and 
+trailer field, respectively. It can perform a range test, check whether the
+value is numeric or whether it is absent. Negative values are considered
+non-numeric. Values with more than 18 digits are considered non-numeric.
 
 ==== Timing issues and combining rule options
 

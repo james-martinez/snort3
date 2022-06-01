@@ -1,9 +1,16 @@
 
+set(HTTP_INCLUDES
+    http_field.h
+    http_common.h
+    http_inspect_base.h
+    http_stream_splitter_base.h
+)
 set (FILE_LIST
+    ${HTTP_INCLUDES}
     ips_http.cc
     ips_http.h
-    http_buffer_info.h
     http_buffer_info.cc
+    http_buffer_info.h
     http_inspect.cc
     http_inspect.h
     http_msg_section.cc
@@ -60,9 +67,7 @@ set (FILE_LIST
     http_transaction.h
     http_test_manager.cc
     http_test_manager.h
-    http_enum.h
     http_field.cc
-    http_field.h
     http_stream_splitter_finish.cc
     http_stream_splitter_reassemble.cc
     http_stream_splitter_scan.cc
@@ -72,6 +77,16 @@ set (FILE_LIST
     http_event.h
     http_js_norm.cc
     http_js_norm.h
+    ips_http_buffer.cc
+    ips_http_buffer.h
+    ips_http_num_hdrs.cc
+    ips_http_num_hdrs.h
+    ips_http_param.cc
+    ips_http_param.h
+    ips_http_test.cc
+    ips_http_test.h
+    ips_http_version.cc
+    ips_http_version.h
 )
 
 #if (STATIC_INSPECTORS)
@@ -81,6 +96,8 @@ set (FILE_LIST
     #add_dynamic_module(http_inspect inspectors ${FILE_LIST})
 
 #endif(STATIC_INSPECTORS)
-
+install(FILES ${HTTP_INCLUDES}
+    DESTINATION "${INCLUDE_INSTALL_PATH}/service_inspectors/http_inspect"
+)
 add_subdirectory ( test )
 

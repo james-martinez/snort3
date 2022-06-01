@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -145,6 +145,12 @@ static void s7commplus_dtor(Inspector* p)
 
 //-------------------------------------------------------------------------
 
+static const char* s7commplus_bufs[] =
+{
+    "s7commplus_content",
+    nullptr
+};
+
 static const InspectApi s7commplus_api =
 {
     {
@@ -161,7 +167,7 @@ static const InspectApi s7commplus_api =
     },
     IT_SERVICE,
     PROTO_BIT__PDU,
-    nullptr,
+    s7commplus_bufs,
     "s7commplus",
     s7commplus_init,
     nullptr,

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -60,9 +60,18 @@ void Event::update_event_id_and_ref(uint16_t log_id)
     event_reference = event_id;
 }
 
+uint32_t Event::update_and_get_event_id(void)
+{
+    /* return event id based on g_event_id. */
+    incr_event_id();
+
+    return calc_event_id(g_event_id,
+        SnortConfig::get_conf()->get_event_log_id());
+}
+
 void Event::set_event(uint32_t gid, uint32_t sid, uint32_t rev,
     uint32_t classification, uint32_t priority, uint16_t event_ref,
-    uint16_t log_id, const struct timeval& tv)
+    uint16_t log_id, const struct timeval& tv, const std::string& act)
 {
     sig_info->gid = gid;
     sig_info->sid = sid;
@@ -70,9 +79,7 @@ void Event::set_event(uint32_t gid, uint32_t sid, uint32_t rev,
     sig_info->class_id = classification;
     sig_info->priority = priority;
 
-    /* update event_id based on g_event_id. */
-    incr_event_id();
-    update_event_id(SnortConfig::get_conf()->get_event_log_id());
+    event_id = update_and_get_event_id();
 
     if (event_ref)
         event_reference = calc_event_id(event_ref, log_id);
@@ -81,5 +88,6 @@ void Event::set_event(uint32_t gid, uint32_t sid, uint32_t rev,
 
     ref_time.tv_sec = tv.tv_sec;
     ref_time.tv_usec = tv.tv_usec;
+    action_string = act;
 }
 

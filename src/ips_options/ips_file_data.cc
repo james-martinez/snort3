@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 1998-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -37,10 +37,10 @@ static THREAD_LOCAL ProfileStats fileDataPerfStats;
 class FileDataOption : public IpsOption
 {
 public:
-    FileDataOption() : IpsOption(s_name, RULE_OPTION_TYPE_BUFFER_SET) { }
+    FileDataOption() : IpsOption(s_name) { }
 
     CursorActionType get_cursor_type() const override
-    { return CAT_SET_FILE; }
+    { return CAT_SET_FAST_PATTERN; }
 
     EvalStatus eval(Cursor&, Packet*) override;
 };

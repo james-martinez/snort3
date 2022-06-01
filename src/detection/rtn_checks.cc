@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -256,10 +256,5 @@ int CheckProto(Packet* p, RuleTreeNode* rtn_idx, RuleFpList*, int)
 int RuleListEnd(Packet*, RuleTreeNode*, RuleFpList*, int)
 {
     return 1;
-}
-
-int OptListEnd(void*, Cursor&, Packet*)
-{
-    return (int)IpsOption::MATCH;
 }
 

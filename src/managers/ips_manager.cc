@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -349,9 +349,6 @@ void IpsManager::reset_options()
 {
     for ( auto& p : s_options )
         p.second->count = 0;
-
-    // this is the default when we start parsing a rule body
-    IpsOption::set_buffer("pkt_data");
 }
 
 void IpsManager::setup_options(const SnortConfig* sc)
@@ -376,30 +373,4 @@ bool IpsManager::verify(SnortConfig* sc)
 
     return true;
 }
-
-#ifdef PIGLET
-
-static const IpsApi* find_api(const char* name)
-{
-    for ( auto& wrap : s_options )
-        if ( !strcmp(wrap.second->api->base.name, name) )
-            return wrap.second->api;
-
-    return nullptr;
-}
-
-IpsOptionWrapper* IpsManager::instantiate(const char* name, Module* m, struct OptTreeNode* otn)
-{
-    auto api = find_api(name);
-    if ( !api || !api->ctor )
-        return nullptr;
-
-    auto p = api->ctor(m, otn);
-    if ( !p )
-        return nullptr;
-
-    return new IpsOptionWrapper(api, p);
-}
-
-#endif
 

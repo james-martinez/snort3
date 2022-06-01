@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -82,9 +82,7 @@ static void opt_dtor(IpsOption* p)
 class SipIpsOption : public IpsOption
 {
 public:
-    SipIpsOption(
-        const char* s, SipIdx psi, CursorActionType c) :
-        IpsOption(s, RULE_OPTION_TYPE_BUFFER_SET)
+    SipIpsOption(const char* s, SipIdx psi, CursorActionType c) : IpsOption(s)
     { key = s; cat = c; idx = psi; }
 
     CursorActionType get_cursor_type() const override
@@ -155,7 +153,7 @@ static Module* header_mod_ctor()
 
 static IpsOption* header_opt_ctor(Module*, OptTreeNode*)
 {
-    return new SipIpsOption(IPS_OPT, SIP_HEADER, CAT_SET_HEADER);
+    return new SipIpsOption(IPS_OPT, SIP_HEADER, CAT_SET_FAST_PATTERN);
 }
 
 static const IpsApi header_api =
@@ -200,7 +198,7 @@ static Module* body_mod_ctor()
 
 static IpsOption* body_opt_ctor(Module*, OptTreeNode*)
 {
-    return new SipIpsOption(IPS_OPT, SIP_BODY, CAT_SET_BODY);
+    return new SipIpsOption(IPS_OPT, SIP_BODY, CAT_SET_FAST_PATTERN);
 }
 
 static const IpsApi body_api =

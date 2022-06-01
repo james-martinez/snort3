@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -58,15 +58,17 @@ public:
 
     ~Dce2Smb2TreeTracker();
 
-    Dce2Smb2FileTracker* open_file(const uint64_t, const uint32_t);
-    void close_file(uint64_t, bool=true);
-    Dce2Smb2FileTracker* find_file(uint64_t);
+    Dce2Smb2FileTrackerPtr open_file(const uint64_t, const uint32_t);
+    void close_file(uint64_t, bool);
+    Dce2Smb2FileTrackerPtr find_file(uint64_t);
     Dce2Smb2RequestTracker* find_request(const uint64_t, const uint32_t);
     void process(uint16_t, uint8_t, const Smb2Hdr*, const uint8_t*, const uint32_t);
     Dce2Smb2SessionTracker* get_parent() { return parent_session; }
     DCE2_CoTracker* get_cotracker() { return co_tracker; }
     uint32_t get_tree_id() { return tree_id; }
     uint8_t get_share_type() { return share_type; }
+    std::atomic<bool> do_not_delete_tree { false };
+    void set_parent(Dce2Smb2SessionTracker* session_tracker) { parent_session = session_tracker; }
 
 private:
     void process_set_info_request(const Smb2Hdr*);

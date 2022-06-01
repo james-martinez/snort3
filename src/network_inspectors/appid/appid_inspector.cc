@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -38,7 +38,7 @@
 #include "appid_dcerpc_event_handler.h"
 #include "appid_debug.h"
 #include "appid_discovery.h"
-#include "appid_efp_process_event_handler.h"
+#include "appid_eve_process_event_handler.h"
 #include "appid_ha.h"
 #include "appid_http_event_handler.h"
 #include "appid_http2_req_body_event_handler.h"
@@ -122,27 +122,27 @@ bool AppIdInspector::configure(SnortConfig* sc)
 
     ctxt->init_appid(sc, *this);
 
-    DataBus::subscribe_network(SIP_EVENT_TYPE_SIP_DIALOG_KEY, new SipEventHandler(*this));
+    DataBus::subscribe_global(SIP_EVENT_TYPE_SIP_DIALOG_KEY, new SipEventHandler(*this), *sc);
 
-    DataBus::subscribe_network(HTTP_REQUEST_HEADER_EVENT_KEY, new HttpEventHandler(
-        HttpEventHandler::REQUEST_EVENT, *this));
+    DataBus::subscribe_global(HTTP_REQUEST_HEADER_EVENT_KEY, new HttpEventHandler(
+        HttpEventHandler::REQUEST_EVENT, *this), *sc);
 
-    DataBus::subscribe_network(HTTP_RESPONSE_HEADER_EVENT_KEY, new HttpEventHandler(
-        HttpEventHandler::RESPONSE_EVENT, *this));
+    DataBus::subscribe_global(HTTP_RESPONSE_HEADER_EVENT_KEY, new HttpEventHandler(
+        HttpEventHandler::RESPONSE_EVENT, *this), *sc);
 
-    DataBus::subscribe_network(HTTP2_REQUEST_BODY_EVENT_KEY, new AppIdHttp2ReqBodyEventHandler());
+    DataBus::subscribe_global(HTTP2_REQUEST_BODY_EVENT_KEY, new AppIdHttp2ReqBodyEventHandler(), *sc);
 
-    DataBus::subscribe_network(DATA_DECRYPT_EVENT, new DataDecryptEventHandler());
+    DataBus::subscribe_global(DATA_DECRYPT_EVENT, new DataDecryptEventHandler(), *sc);
 
-    DataBus::subscribe_network(DCERPC_EXP_SESSION_EVENT_KEY, new DceExpSsnEventHandler());
+    DataBus::subscribe_global(DCERPC_EXP_SESSION_EVENT_KEY, new DceExpSsnEventHandler(), *sc);
 
-    DataBus::subscribe_network(OPPORTUNISTIC_TLS_EVENT, new AppIdOpportunisticTlsEventHandler());
+    DataBus::subscribe_global(OPPORTUNISTIC_TLS_EVENT, new AppIdOpportunisticTlsEventHandler(), *sc);
 
-    DataBus::subscribe_network(EFP_PROCESS_EVENT, new AppIdEfpProcessEventHandler());
+    DataBus::subscribe_global(EVE_PROCESS_EVENT, new AppIdEveProcessEventHandler(*this), *sc);
 
-    DataBus::subscribe_network(SSH_EVENT, new SshEventHandler());
+    DataBus::subscribe_global(SSH_EVENT, new SshEventHandler(), *sc);
 
-    DataBus::subscribe_network(FLOW_NO_SERVICE_EVENT, new AppIdServiceEventHandler(*this));
+    DataBus::subscribe_global(FLOW_NO_SERVICE_EVENT, new AppIdServiceEventHandler(*this), *sc);
 
     return true;
 }
@@ -163,7 +163,7 @@ void AppIdInspector::tinit()
 
     assert(!odp_thread_local_ctxt);
     odp_thread_local_ctxt = new OdpThreadContext();
-    odp_thread_local_ctxt->initialize(*ctxt);
+    odp_thread_local_ctxt->initialize(SnortConfig::get_conf(), *ctxt);
 
     AppIdServiceState::initialize(config->memcap);
     assert(!pkt_thread_tp_appid_ctxt);
@@ -250,6 +250,7 @@ static void appid_inspector_tinit()
 static void appid_inspector_tterm()
 {
     TPLibHandler::tfini();
+    AppIdPegCounts::sum_stats();
     AppIdPegCounts::cleanup_pegs();
     AppIdServiceState::clean();
     delete appidDebug;

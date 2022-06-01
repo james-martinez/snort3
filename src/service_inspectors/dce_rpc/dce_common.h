@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,6 +22,8 @@
 #define DCE_COMMON_H
 
 #include <cassert>
+#include <memory>
+#include <string>
 
 #include "detection/detection_engine.h"
 #include "framework/counts.h"

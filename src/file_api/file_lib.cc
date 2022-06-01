@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -94,8 +94,10 @@ FileInfo::~FileInfo ()
 {
     if (user_file_data)
     {
+        user_file_data_mutex.lock();
         delete user_file_data;
         set_file_data(nullptr);
+        user_file_data_mutex.unlock();
     }
 
     if (sha256)
@@ -308,7 +310,7 @@ FileContext::FileContext ()
     file_signature_context = nullptr;
     file_capture = nullptr;
     file_segments = nullptr;
-    inspector = (FileInspect*)InspectorManager::acquire(FILE_ID_NAME, true);
+    inspector = (FileInspect*)InspectorManager::acquire_file_inspector();
     config = inspector->config;
 }
 
@@ -392,7 +394,7 @@ void FileContext::finish_signature_lookup(Packet* p, bool final_lookup, FilePoli
     if (get_file_sig_sha256())
     {
         verdict = policy->signature_lookup(p, this);
-        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, 
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
             p, "finish signature lookup verdict %d\n", verdict);
         if ( verdict != FILE_VERDICT_UNKNOWN || final_lookup )
         {
@@ -543,7 +545,7 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
     /* file signature calculation */
     if (is_file_signature_enabled())
     {
-        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p, 
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p,
             "file signature is enabled\n");
         if (!sha256)
             process_file_signature_sha256(file_data, data_size, position);
@@ -639,13 +641,13 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
 {
     if ((int64_t)processed_bytes + data_size > config->file_signature_depth)
     {
-        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, GET_CURRENT_PACKET, 
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, GET_CURRENT_PACKET,
             "process_file_signature_sha256:FILE_SIG_DEPTH_FAIL\n");
         file_state.sig_state = FILE_SIG_DEPTH_FAIL;
         return;
     }
 
-    FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+    FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
         "processing file signature position: %d sig state %d \n", position, file_state.sig_state);
     switch (position)
     {
@@ -654,7 +656,7 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
             file_signature_context = snort_calloc(sizeof(SHA256_CTX));
         SHA256_Init((SHA256_CTX*)file_signature_context);
         SHA256_Update((SHA256_CTX*)file_signature_context, file_data, data_size);
-        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
             "position is start of file\n");
         if (file_state.sig_state == FILE_SIG_FLUSH)
         {
@@ -671,7 +673,7 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
         if (!file_signature_context)
             return;
         SHA256_Update((SHA256_CTX*)file_signature_context, file_data, data_size);
-        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
             "position is middle of the file\n");
         if (file_state.sig_state == FILE_SIG_FLUSH)
         {
@@ -693,7 +695,7 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
         sha256 = new uint8_t[SHA256_HASH_SIZE];
         SHA256_Final(sha256, (SHA256_CTX*)file_signature_context);
         file_state.sig_state = FILE_SIG_DONE;
-        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
             "position is end of the file\n");
         break;
 
@@ -705,7 +707,7 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
         sha256 = new uint8_t[SHA256_HASH_SIZE];
         SHA256_Final(sha256, (SHA256_CTX*)file_signature_context);
         file_state.sig_state = FILE_SIG_DONE;
-        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET, 
+        FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
             "position is full file\n");
         break;
 
@@ -747,9 +749,9 @@ void FileContext::update_file_size(int data_size, FilePosition position)
 {
     processed_bytes += data_size;
 
-    FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, 
-        GET_CURRENT_PACKET, 
-        "Updating file size of file_id %lu at position %d with processed_bytes %lu\n", 
+    FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL,
+        GET_CURRENT_PACKET,
+        "Updating file size of file_id %lu at position %d with processed_bytes %lu\n",
         file_id, position, processed_bytes);
     if ((position == SNORT_FILE_END)or (position == SNORT_FILE_FULL))
     {

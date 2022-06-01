@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -22,6 +22,9 @@
 #endif
 
 #include "ftp_data.h"
+
+#include <memory>
+#include <string>
 
 #include "detection/detection_engine.h"
 #include "file_api/file_flows.h"
@@ -345,6 +348,12 @@ static void fd_dtor(Inspector* p)
     delete p;
 }
 
+static const char* fd_bufs[] =
+{
+    "file_data",
+    nullptr
+};
+
 // exported in ftp.cc
 const InspectApi fd_api =
 {
@@ -362,7 +371,7 @@ const InspectApi fd_api =
     },
     IT_SERVICE,
     PROTO_BIT__PDU,
-    nullptr, // buffers
+    fd_bufs,
     fd_svc_name,
     fd_init,
     nullptr, // pterm

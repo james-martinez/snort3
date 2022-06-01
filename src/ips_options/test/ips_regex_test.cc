@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -55,6 +55,9 @@ THREAD_LOCAL SnortConfig* snort_conf = &s_conf;
 
 static std::vector<void *> s_state;
 static ScratchAllocator* scratcher = nullptr;
+
+DataBus::DataBus() = default;
+DataBus::~DataBus() = default;
 
 SnortConfig::SnortConfig(const SnortConfig* const, const char*)
 {
@@ -141,11 +144,9 @@ static IpsOption* get_option(Module* mod, const char* pat)
     mod->end(ips_regex->name, 0, nullptr);
 
     OptTreeNode otn;
-    otn.sticky_buf = 0;
 
     const IpsApi* api = (const IpsApi*) ips_regex;
     IpsOption* opt = api->ctor(mod, &otn);
-    IpsOption::set_buffer("pkt_data");
 
     return opt;
 }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2008-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -21,6 +21,8 @@
 #define TREENODES_H
 
 // rule header (RTN) and body (OTN) nodes
+
+#include <string>
 
 #include "actions/actions.h"
 #include "detection/signature.h"
@@ -173,6 +175,7 @@ struct OptTreeNode
     static constexpr Flag TO_CLIENT  = 0x10;
     static constexpr Flag TO_SERVER  = 0x20;
     static constexpr Flag BIT_CHECK  = 0x40;
+    static constexpr Flag SVC_ONLY   = 0x80;
 
     /* metadata about signature */
     SigInfo sigInfo;
@@ -201,8 +204,6 @@ struct OptTreeNode
     uint16_t longestPatternLen = 0;
     IpsPolicy::Enable enable;
     Flag flags = 0;
-
-    uint8_t sticky_buf = PM_TYPE_PKT; // parsing only
 
     void set_warned_fp()
     { flags |= WARNED_FP; }
@@ -255,13 +256,17 @@ struct OptTreeNode
     bool checks_flowbits() const
     { return (flags & BIT_CHECK) != 0; }
 
+    void set_service_only()
+    { flags |= SVC_ONLY; }
+
+    bool service_only() const
+    { return (flags & SVC_ONLY) != 0; }
+
     void update_fp(snort::IpsOption*);
 };
 
 typedef int (* RuleOptEvalFunc)(void*, Cursor&, snort::Packet*);
 OptFpList* AddOptFuncToList(RuleOptEvalFunc, OptTreeNode*);
-
-void* get_rule_type_data(OptTreeNode*, const char* name);
 
 namespace snort
 {

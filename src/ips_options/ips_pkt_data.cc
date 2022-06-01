@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -36,7 +36,7 @@ static THREAD_LOCAL ProfileStats pktDataPerfStats;
 class PktDataOption : public IpsOption
 {
 public:
-    PktDataOption() : IpsOption(s_name, RULE_OPTION_TYPE_BUFFER_SET) { }
+    PktDataOption() : IpsOption(s_name) { }
 
     CursorActionType get_cursor_type() const override
     { return CAT_SET_RAW; }

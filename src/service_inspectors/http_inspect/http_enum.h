@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -37,6 +37,8 @@ static const int REQUEST_PUBLISH_DEPTH = 2000;
 
 static const uint32_t HTTP_GID = 119;
 static const int GZIP_WINDOW_BITS = 31;
+static const uint8_t GZIP_HEADER_FLAG_OFFSET = 3;
+static const uint8_t GZIP_FLAG_FEXTRA = 0x4;
 static const int DEFLATE_WINDOW_BITS = 15;
 static const int MAX_FIELD_NAME_LENGTH = 100;
 // Plan to support max 8 xff headers
@@ -46,15 +48,8 @@ static const uint8_t MAX_CUSTOM_HEADERS = MAX_XFF_HEADERS;
 // This can grow into a bitmap for the get_buf() form parameter
 static const uint64_t FORM_REQUEST = 0x1;
 
-// Type of message section
-enum SectionType { SEC_DISCARD = -19, SEC_ABORT = -18, SEC__NOT_COMPUTE=-14, SEC__NOT_PRESENT=-11,
-    SEC_REQUEST = 2, SEC_STATUS, SEC_HEADER, SEC_BODY_CL, SEC_BODY_CHUNK, SEC_TRAILER,
-    SEC_BODY_OLD, SEC_BODY_H2 };
-
-enum DetectionStatus { DET_REACTIVATING = 1, DET_ON, DET_DEACTIVATING, DET_OFF };
-
 // HTTP rule options.
-// Lower portion is message buffers available to clients.
+// Lower numbered portion is message buffers available to clients.
 // That part must remain synchronized with HttpApi::classic_buffer_names[]
 enum HTTP_RULE_OPT { HTTP_BUFFER_CLIENT_BODY = 1, HTTP_BUFFER_COOKIE, HTTP_BUFFER_HEADER,
     HTTP_BUFFER_METHOD, HTTP_BUFFER_PARAM, HTTP_BUFFER_RAW_BODY, HTTP_BUFFER_RAW_COOKIE,
@@ -62,7 +57,8 @@ enum HTTP_RULE_OPT { HTTP_BUFFER_CLIENT_BODY = 1, HTTP_BUFFER_COOKIE, HTTP_BUFFE
     HTTP_BUFFER_RAW_TRAILER, HTTP_BUFFER_RAW_URI, HTTP_BUFFER_STAT_CODE, HTTP_BUFFER_STAT_MSG,
     HTTP_BUFFER_TRAILER, HTTP_BUFFER_TRUE_IP, HTTP_BUFFER_URI, HTTP_BUFFER_VERSION,
     BUFFER_JS_DATA, BUFFER_VBA_DATA , HTTP__BUFFER_MAX = BUFFER_VBA_DATA,
-    HTTP_RANGE_NUM_HDRS, HTTP_RANGE_NUM_TRAILERS, HTTP_VERSION_MATCH, HTTP__MAX_RULE_OPTION };
+    HTTP_RANGE_NUM_HDRS, HTTP_RANGE_NUM_TRAILERS, HTTP_VERSION_MATCH,
+    HTTP_HEADER_TEST, HTTP_TRAILER_TEST, HTTP__MAX_RULE_OPTION };
 
 // Peg counts
 // This enum must remain synchronized with HttpModule::peg_names[] in http_tables.cc
@@ -113,6 +109,9 @@ enum UriType { URI__NOT_COMPUTE=-14, URI__PROBLEMATIC=-12, URI_ASTERISK = 2, URI
 // Body compression types
 enum CompressId { CMP_NONE=2, CMP_GZIP, CMP_DEFLATE };
 
+// GZIP magic verification state
+enum GzipVerificationState { GZIP_TBD, GZIP_MAGIC_BAD, GZIP_MAGIC_GOOD, GZIP_FLAGS_PROCESSED };
+
 // Message section in which an IPS option provides the buffer
 enum InspectSection { IS_NONE, IS_HEADER, IS_FLEX_HEADER, IS_FIRST_BODY, IS_BODY, IS_TRAILER };
 
@@ -136,6 +135,7 @@ enum TransferEncoding { TE__OTHER=1, TE_CHUNKED, TE_IDENTITY };
 enum Upgrade { UP__OTHER=1, UP_H2C, UP_H2, UP_HTTP20 };
 
 // Every header we have ever heard of
+// Note: when making changes here also update NormalizedHeader::header_norms
 enum HeaderId { HEAD__NOT_COMPUTE=-14, HEAD__PROBLEMATIC=-12, HEAD__NOT_PRESENT=-11, HEAD__OTHER=1,
     HEAD_CACHE_CONTROL, HEAD_CONNECTION, HEAD_DATE, HEAD_PRAGMA, HEAD_TRAILER, HEAD_COOKIE,
     HEAD_SET_COOKIE, HEAD_TRANSFER_ENCODING, HEAD_UPGRADE, HEAD_VIA, HEAD_WARNING, HEAD_ACCEPT,
@@ -148,7 +148,8 @@ enum HeaderId { HEAD__NOT_COMPUTE=-14, HEAD__PROBLEMATIC=-12, HEAD__NOT_PRESENT=
     HEAD_CONTENT_LENGTH, HEAD_CONTENT_LOCATION, HEAD_CONTENT_MD5, HEAD_CONTENT_RANGE,
     HEAD_CONTENT_TYPE, HEAD_EXPIRES, HEAD_LAST_MODIFIED, HEAD_X_FORWARDED_FOR, HEAD_TRUE_CLIENT_IP,
     HEAD_X_WORKING_WITH, HEAD_CONTENT_TRANSFER_ENCODING, HEAD_MIME_VERSION, HEAD_PROXY_AGENT,
-    HEAD_CONTENT_DISPOSITION, HEAD_HTTP2_SETTINGS, HEAD__MAX_VALUE };
+    HEAD_CONTENT_DISPOSITION, HEAD_HTTP2_SETTINGS, HEAD_RESTRICT_ACCESS_TO_TENANTS,
+    HEAD_RESTRICT_ACCESS_CONTEXT, HEAD__MAX_VALUE };
 
 // All the infractions we might find while parsing and analyzing a message
 enum Infraction
@@ -289,6 +290,7 @@ enum Infraction
     INF_JS_SCOPE_NEST_OVERFLOW = 132,
     INF_INVALID_SUBVERSION = 133,
     INF_VERSION_0 = 134,
+    INF_GZIP_FEXTRA = 135,
     INF__MAX_VALUE
 };
 
@@ -426,6 +428,7 @@ enum EventSid
     EVENT_INVALID_SUBVERSION = 275,
     EVENT_VERSION_0 = 276,
     EVENT_VERSION_HIGHER_THAN_1 = 277,
+    EVENT_GZIP_FEXTRA = 278,
     EVENT__MAX_VALUE
 };
 
@@ -440,9 +443,6 @@ extern const bool is_sp_tab_cr_lf_vt_ff[256];
 extern const bool is_sp_tab_quote_dquote[256];
 extern const bool is_print_char[256]; // printable includes SP, tab, CR, LF
 extern const bool is_sp_comma[256];
-
-enum H2BodyState { H2_BODY_NOT_COMPLETE, H2_BODY_LAST_SEG, H2_BODY_COMPLETE,
-    H2_BODY_COMPLETE_EXPECT_TRAILERS, H2_BODY_NO_BODY };
 
 } // end namespace HttpEnums
 

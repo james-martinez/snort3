@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -60,8 +60,8 @@ public:
     { return get_offload_mpse() != normal_mpse; }
 
 public:  // FIXIT-L privatize
-        Mpse* normal_mpse;
-        Mpse* offload_mpse;
+    Mpse* normal_mpse;
+    Mpse* offload_mpse;
 };
 
 template<typename BUF = const uint8_t*, typename LEN = unsigned>
@@ -130,8 +130,7 @@ struct MpseBatch
 
 inline void MpseBatch::search()
 {
-    items.begin()->second.so[0]->get_normal_mpse()->
-        search(*this, Mpse::MPSE_TYPE_NORMAL);
+    items.begin()->second.so[0]->get_normal_mpse()->search(*this, Mpse::MPSE_TYPE_NORMAL);
 }
 
 inline Mpse::MpseRespType MpseBatch::receive_responses()

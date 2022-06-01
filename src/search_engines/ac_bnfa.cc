@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -56,12 +56,6 @@ public:
     {
         if (obj)
             bnfaFree(obj);
-    }
-
-    void set_opt(int flag) override
-    {
-        if (obj)
-            bnfaSetOpt(obj, flag);
     }
 
     int add_pattern(

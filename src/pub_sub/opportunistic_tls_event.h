@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -19,6 +19,9 @@
 
 #ifndef OPPORTUNISTIC_TLS_EVENT_H
 #define OPPORTUNISTIC_TLS_EVENT_H
+
+#include <memory>
+#include <string>
 
 #include "framework/data_bus.h"
 
@@ -42,7 +45,7 @@ public:
 
 private:
     const snort::Packet* pkt;
-    const char* next_service = nullptr;
+    const char* next_service;
 };
 
 }

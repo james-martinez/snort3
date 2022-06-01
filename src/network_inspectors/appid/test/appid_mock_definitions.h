@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -57,7 +57,7 @@ void LogText(const char*, FILE*) {}
 void ParseWarning(WarningGroup, const char*, ...) { }
 
 void LogLabel(const char*, FILE*) {}
-SearchTool::SearchTool(char const*, bool) { }
+SearchTool::SearchTool(bool) { }
 SearchTool::~SearchTool() = default;
 }
 DiscoveryFilter::~DiscoveryFilter(){}
@@ -80,10 +80,11 @@ void AppIdDiscovery::register_tcp_pattern(AppIdDetector*, unsigned char const*, 
 void AppIdDiscovery::register_udp_pattern(AppIdDetector*, unsigned char const*, unsigned int, int, unsigned int) { }
 int AppIdDiscovery::add_service_port(AppIdDetector*, ServiceDetectorPort const&) { return 0; }
 DnsPatternMatchers::~DnsPatternMatchers() = default;
-EfpCaPatternMatchers::~EfpCaPatternMatchers() = default;
+EveCaPatternMatchers::~EveCaPatternMatchers() = default;
 HttpPatternMatchers::~HttpPatternMatchers() = default;
 SipPatternMatchers::~SipPatternMatchers() = default;
 SslPatternMatchers::~SslPatternMatchers() = default;
+AlpnPatternMatchers::~AlpnPatternMatchers() = default;
 
 void Field::set(int32_t length, const uint8_t* start, bool own_the_buffer_)
 {
@@ -117,13 +118,13 @@ bool AppInfoManager::configured()
 
 // Stubs for service_state.h
 ServiceDiscoveryState* AppIdServiceState::get(SfIp const*, IpProtocol,
-    unsigned short, int16_t, uint16_t, bool, bool)
+    unsigned short, int16_t, uint32_t, bool, bool)
 {
   return nullptr;
 }
 
 ServiceDiscoveryState* AppIdServiceState::add(SfIp const*, IpProtocol,
-    unsigned short, int16_t, uint16_t, bool, bool)
+    unsigned short, int16_t, uint32_t, bool, bool)
 {
   return nullptr;
 }

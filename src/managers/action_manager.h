@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -40,23 +40,6 @@ struct IpsPolicy;
 
 //-------------------------------------------------------------------------
 
-#ifdef PIGLET
-struct IpsActionWrapper
-{
-    IpsActionWrapper(const snort::ActionApi* a, snort::IpsAction* p) :
-        api { a }, instance { p } { }
-
-    ~IpsActionWrapper()
-    {
-        if ( api && instance && api->dtor )
-            api->dtor(instance);
-    }
-
-    const snort::ActionApi* api;
-    snort::IpsAction* instance;
-};
-#endif
-
 class ActionManager
 {
 public:
@@ -79,10 +62,6 @@ public:
     static void thread_init(const snort::SnortConfig*);
     static void thread_reinit(const snort::SnortConfig*);
     static void thread_term();
-
-#ifdef PIGLET
-    static IpsActionWrapper* instantiate(const char*, snort::Module*);
-#endif
 };
 
 #endif

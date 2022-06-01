@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -37,6 +37,9 @@ using namespace snort;
 // Stubs whose sole purpose is to make the test code link
 static SnortConfig my_config;
 THREAD_LOCAL SnortConfig* snort_conf = &my_config;
+
+DataBus::DataBus() = default;
+DataBus::~DataBus() = default;
 
 // run_flags is used indirectly from HashFnc class by calling SnortConfig::static_hash()
 SnortConfig::SnortConfig(const SnortConfig* const, const char*)

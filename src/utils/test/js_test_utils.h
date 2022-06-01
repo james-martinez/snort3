@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -34,7 +34,14 @@ constexpr int norm_depth = 65535;
 constexpr int max_template_nesting = 4;
 constexpr int max_bracket_depth = 256;
 constexpr int max_scope_depth = 256;
-static const std::unordered_set<std::string> s_ignored_ids { "console", "eval", "document" };
+static const std::unordered_set<std::string> s_ignored_ids {
+    "console", "eval", "document", "unescape", "decodeURI", "decodeURIComponent", "String",
+    "name", "u"
+};
+
+static const std::unordered_set<std::string> s_ignored_props {
+    "watch", "unwatch", "split", "reverse", "join", "name", "w"
+};
 
 namespace snort
 {
@@ -47,7 +54,7 @@ class JSIdentifierCtxStub : public JSIdentifierCtxBase
 public:
     JSIdentifierCtxStub() = default;
 
-    const char* substitute(const char* identifier) override
+    const char* substitute(const char* identifier, bool) override
     { return identifier; }
     virtual void add_alias(const char*, const std::string&&) override {}
     virtual const char* alias_lookup(const char* alias) const override
@@ -60,14 +67,37 @@ public:
     size_t size() const override { return 0; }
 };
 
-void test_scope(const char* context, std::list<JSProgramScopeType> stack);
+class JSTokenizerTester
+{
+public:
+    JSTokenizerTester(int32_t depth, uint32_t max_scope_depth,
+        const std::unordered_set<std::string>& ignored_ids,
+        const std::unordered_set<std::string>& ignored_props,
+        uint8_t max_template_nesting, uint32_t max_bracket_depth)
+        :
+        ident_ctx(depth, max_scope_depth, ignored_ids, ignored_props),
+        normalizer(ident_ctx, depth, max_template_nesting, max_bracket_depth)
+    { }
+
+    typedef JSTokenizer::FuncType FuncType;
+    typedef std::tuple<const char*, const char*, std::list<FuncType>> ScopeCase;
+    void test_function_scopes(const std::list<ScopeCase>& pdus);
+    bool is_unescape_nesting_seen() const;
+
+private:
+    JSIdentifierCtx ident_ctx;
+    snort::JSNormalizer normalizer;
+};
+
+void test_scope(const char* context, const std::list<JSProgramScopeType>& stack);
 void test_normalization(const char* source, const char* expected);
 void test_normalization_bad(const char* source, const char* expected, JSTokenizer::JSRet eret);
+void test_normalization_mixed_encoding(const char* source, const char* expected);
 typedef std::pair<const char*, const char*> PduCase;
 // source, expected for a single PDU
 void test_normalization(const std::vector<PduCase>& pdus);
 typedef std::tuple<const char*,const char*, std::list<JSProgramScopeType>> ScopedPduCase;
 // source, expected, and current scope type stack for a single PDU
-void test_normalization(std::list<ScopedPduCase> pdus);
+void test_normalization(const std::list<ScopedPduCase>& pdus);
 
 #endif // JS_TEST_UTILS_H

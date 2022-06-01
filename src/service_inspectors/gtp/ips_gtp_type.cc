@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -47,9 +47,6 @@ class GtpTypeOption : public IpsOption
 {
 public:
     GtpTypeOption(ByteBitSet*);
-
-    CursorActionType get_cursor_type() const override
-    { return CAT_SET_OTHER; }
 
     uint32_t hash() const override;
     bool operator==(const IpsOption&) const override;

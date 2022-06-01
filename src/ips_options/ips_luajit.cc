@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -96,16 +96,9 @@ bool LuaJitModule::begin(const char*, int, SnortConfig*)
 
 bool LuaJitModule::set(const char*, Value& v, SnortConfig*)
 {
-    args = v.get_string();
-
     // if args not empty, it has to be a quoted string
     // so remove enclosing quotes
-    if ( args.size() > 1 )
-    {
-        args.erase(0, 1);
-        args.erase(args.size()-1);
-    }
-
+    args = v.get_unquoted_string();
     return true;
 }
 
@@ -134,7 +127,7 @@ private:
 
 LuaJitOption::LuaJitOption(
     const char* name, std::string& chunk, LuaJitModule* mod)
-    : IpsOption((my_name = snort_strdup(name)), RULE_OPTION_TYPE_BUFFER_USE)
+    : IpsOption((my_name = snort_strdup(name)))
 {
     // create an args table with any rule options
     config = "args = { ";

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -44,7 +44,7 @@ void set_smb_fp_processor(SmbFpProcessor*) { }
 
 namespace snort
 {
-    void SnortConfig::register_reload_resource_tuner(ReloadResourceTuner* rrt) { delete rrt; }
+    void SnortConfig::register_reload_handler(ReloadResourceTuner* rrt) { delete rrt; }
 }
 
 TEST_GROUP(rna_module_test)

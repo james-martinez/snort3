@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -74,7 +74,7 @@ StreamSplitter::Status Http2DataCutter::skip_over_frame(Http2Stream* const strea
 bool Http2DataCutter::check_http_state(Http2Stream* const stream)
 {
     HttpFlowData* const http_flow = stream->get_hi_flow_data();
-    if ((http_flow->get_type_expected(source_id) != HttpEnums::SEC_BODY_H2))
+    if ((http_flow->get_type_expected(source_id) != SEC_BODY_H2))
     {
         stream->set_state(source_id, STREAM_ERROR);
         if (data_len > 0)
@@ -91,7 +91,7 @@ StreamSplitter::Status Http2DataCutter::scan(const uint8_t* data, uint32_t lengt
     uint32_t* flush_offset, uint32_t& data_offset, uint8_t frame_flags)
 {
     Http2Stream* const stream = session_data->find_stream(session_data->current_stream[source_id]);
-        
+
     if (!stream or !stream->is_open(source_id) or stream->is_discard_set(source_id))
         return skip_over_frame(stream, length, flush_offset, data_offset, frame_flags);
 
@@ -138,7 +138,7 @@ StreamSplitter::Status Http2DataCutter::scan(const uint8_t* data, uint32_t lengt
         if ((data_bytes_read == data_len) && (frame_flags & FLAG_END_STREAM))
         {
             HttpFlowData* const hi_flow = stream->get_hi_flow_data();
-            hi_flow->set_h2_body_state(source_id, HttpEnums::H2_BODY_LAST_SEG);
+            hi_flow->set_h2_body_state(source_id, H2_BODY_LAST_SEG);
         }
         scan_result = session_data->hi_ss[source_id]->scan(&dummy_pkt, data + cur_data_offset,
             cur_data, unused, &http_flush_offset);
@@ -164,7 +164,7 @@ StreamSplitter::Status Http2DataCutter::scan(const uint8_t* data, uint32_t lengt
             // here
             assert(false);
             stream->set_state(source_id, STREAM_ERROR);
-            return skip_over_frame(stream, length, flush_offset, data_offset, frame_flags);        
+            return skip_over_frame(stream, length, flush_offset, data_offset, frame_flags);
         }
     }
 
@@ -193,7 +193,6 @@ StreamSplitter::Status Http2DataCutter::scan(const uint8_t* data, uint32_t lengt
             {
                 session_data->stream_in_hi = session_data->current_stream[source_id];
                 session_data->hi_ss[source_id]->prep_partial_flush(session_data->flow, 0);
-                session_data->stream_in_hi = NO_STREAM_ID;
             }
             else
             {
@@ -317,7 +316,7 @@ void Http2DataCutter::discarded_frame_cleanup(Http2Stream* const stream)
     frame_bytes_seen = 0;
     reassemble_data_bytes_read = 0;
     reassemble_state = GET_FRAME_HDR;
-    
+
     if (!stream->is_end_stream_on_data_flush(source_id))
         return;
 

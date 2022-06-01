@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -40,10 +40,10 @@ void HttpMsgBodyChunk::update_flow()
             session_data->mime_state[source_id] = nullptr;
         }
 
-        if ((source_id == SRC_SERVER) && (session_data->utf_state != nullptr))
+        if ((source_id == SRC_SERVER) && (session_data->utf_state[source_id] != nullptr))
         {
-            delete session_data->utf_state;
-            session_data->utf_state = nullptr;
+            delete session_data->utf_state[source_id];
+            session_data->utf_state[source_id] = nullptr;
         }
     }
     else

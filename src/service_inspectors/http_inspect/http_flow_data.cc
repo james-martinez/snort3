@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -123,15 +123,12 @@ HttpFlowData::~HttpFlowData()
             inflateEnd(compress_stream[k]);
             delete compress_stream[k];
         }
-        if (mime_state[k] != nullptr)
-        {
-            delete mime_state[k];
-        }
+        delete mime_state[k];
+        delete utf_state[k];
+        if (fd_state[k] != nullptr)
+            File_Decomp_StopFree(fd_state[k]);
     }
 
-    delete utf_state;
-    if (fd_state != nullptr)
-        File_Decomp_StopFree(fd_state);
     delete_pipeline();
 
     while (discard_list != nullptr)
@@ -158,19 +155,24 @@ void HttpFlowData::half_reset(SourceId source_id)
     file_depth_remaining[source_id] = STAT_NOT_PRESENT;
     detect_depth_remaining[source_id] = STAT_NOT_PRESENT;
     publish_depth_remaining[source_id] = STAT_NOT_PRESENT;
-    detection_status[source_id] = DET_REACTIVATING;
 
     compression[source_id] = CMP_NONE;
+    gzip_state[source_id] = GZIP_TBD;
+    gzip_header_bytes_processed[source_id] = 0;
     if (compress_stream[source_id] != nullptr)
     {
         inflateEnd(compress_stream[source_id]);
         delete compress_stream[source_id];
         compress_stream[source_id] = nullptr;
     }
-    if (mime_state[source_id] != nullptr)
+    delete mime_state[source_id];
+    mime_state[source_id] = nullptr;
+    delete utf_state[source_id];
+    utf_state[source_id] = nullptr;
+    if (fd_state[source_id] != nullptr)
     {
-        delete mime_state[source_id];
-        mime_state[source_id] = nullptr;
+        File_Decomp_StopFree(fd_state[source_id]);
+        fd_state[source_id] = nullptr;
     }
     delete infractions[source_id];
     infractions[source_id] = new HttpInfractions;
@@ -190,13 +192,6 @@ void HttpFlowData::half_reset(SourceId source_id)
         if (transaction[SRC_SERVER]->final_response())
             expected_trans_num[SRC_SERVER]++;
         status_code_num = STAT_NOT_PRESENT;
-        delete utf_state;
-        utf_state = nullptr;
-        if (fd_state != nullptr)
-        {
-            File_Decomp_StopFree(fd_state);
-            fd_state = nullptr;
-        }
     }
 }
 
@@ -210,7 +205,6 @@ void HttpFlowData::trailer_prep(SourceId source_id)
         delete compress_stream[source_id];
         compress_stream[source_id] = nullptr;
     }
-    detection_status[source_id] = DET_REACTIVATING;
 }
 
 void HttpFlowData::garbage_collect()
@@ -246,27 +240,26 @@ void HttpFlowData::reset_js_ident_ctx()
     }
 }
 
-snort::JSNormalizer& HttpFlowData::acquire_js_ctx(int32_t ident_depth, size_t norm_depth,
-    uint8_t max_template_nesting, uint32_t max_bracket_depth, uint32_t max_scope_depth,
-    const std::unordered_set<std::string>& ignored_ids)
+snort::JSNormalizer& HttpFlowData::acquire_js_ctx(const HttpParaList::JsNormParam& js_norm_param)
 {
     if (js_normalizer)
         return *js_normalizer;
 
     if (!js_ident_ctx)
     {
-        js_ident_ctx = new JSIdentifierCtx(ident_depth, max_scope_depth, ignored_ids);
+        js_ident_ctx = new JSIdentifierCtx(js_norm_param.js_identifier_depth, 
+            js_norm_param.max_scope_depth, js_norm_param.ignored_ids, js_norm_param.ignored_props);
 
         debug_logf(4, http_trace, TRACE_JS_PROC, nullptr,
-            "js_ident_ctx created (ident_depth %d)\n", ident_depth);
+            "js_ident_ctx created (ident_depth %d)\n", js_norm_param.js_identifier_depth);
     }
 
-    js_normalizer = new JSNormalizer(*js_ident_ctx, norm_depth,
-        max_template_nesting, max_bracket_depth);
+    js_normalizer = new JSNormalizer(*js_ident_ctx, js_norm_param.js_norm_bytes_depth,
+        js_norm_param.max_template_nesting, js_norm_param.max_bracket_depth);
 
     debug_logf(4, http_trace, TRACE_JS_PROC, nullptr,
         "js_normalizer created (norm_depth %zd, max_template_nesting %d)\n",
-        norm_depth, max_template_nesting);
+        js_norm_param.js_norm_bytes_depth, js_norm_param.max_template_nesting);
 
     return *js_normalizer;
 }
@@ -293,8 +286,7 @@ void HttpFlowData::release_js_ctx()
 }
 #else
 void HttpFlowData::reset_js_ident_ctx() {}
-snort::JSNormalizer& HttpFlowData::acquire_js_ctx(int32_t, size_t, uint8_t, uint32_t, uint32_t,
-    const std::unordered_set<std::string>&)
+snort::JSNormalizer& HttpFlowData::acquire_js_ctx(const HttpParaList::JsNormParam&)
 { return *js_normalizer; }
 void HttpFlowData::release_js_ctx() {}
 #endif
@@ -349,7 +341,7 @@ HttpInfractions* HttpFlowData::get_infractions(SourceId source_id)
     return transaction[source_id]->get_infractions(source_id);
 }
 
-void HttpFlowData::finish_h2_body(HttpCommon::SourceId source_id, HttpEnums::H2BodyState state,
+void HttpFlowData::finish_h2_body(HttpCommon::SourceId source_id, HttpCommon::H2BodyState state,
     bool clear_partial_buffer)
 {
     assert((h2_body_state[source_id] == H2_BODY_NOT_COMPLETE) ||
@@ -398,8 +390,10 @@ void HttpFlowData::show(FILE* out_file) const
         pipeline_back, pipeline_overflow, pipeline_underflow);
     fprintf(out_file, "Cutter: %s/%s\n", (cutter[0] != nullptr) ? "Present" : "nullptr",
         (cutter[1] != nullptr) ? "Present" : "nullptr");
-    fprintf(out_file, "utf_state: %s\n", (utf_state != nullptr) ? "Present" : "nullptr");
-    fprintf(out_file, "fd_state: %s\n", (fd_state != nullptr) ? "Present" : "nullptr");
+    fprintf(out_file, "utf_state: %s/%s\n", (utf_state[0] != nullptr) ? "Present" : "nullptr",
+        (utf_state[1] != nullptr) ? "Present" : "nullptr");
+    fprintf(out_file, "fd_state: %s/%s\n", (fd_state[0] != nullptr) ? "Present" : "nullptr",
+        (fd_state[1] != nullptr) ? "Present" : "nullptr");
     fprintf(out_file, "mime_state: %s/%s\n", (mime_state[0] != nullptr) ? "Present" : "nullptr",
         (mime_state[1] != nullptr) ? "Present" : "nullptr");
 }

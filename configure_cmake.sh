@@ -73,7 +73,6 @@ Optional Features:
     --enable-appid-third-party
                             enable third party appid
     --enable-unit-tests     build unit tests
-    --enable-piglet         build piglet test harness
     --enable-ccache         enable ccache support
     --disable-static-daq    link static DAQ modules
     --disable-html-docs     don't create the HTML documentation
@@ -108,10 +107,8 @@ Optional Packages:
                             libhs include directory
     --with-hyperscan-libraries=DIR
                             libhs library directory
-    --with-flatbuffers-includes=DIR
-                            flatbuffers include directory
-    --with-flatbuffers-libraries=DIR
-                            flatbuffers library directory
+    --with-atomic-libraries=DIR
+                            atomic library directory
     --with-flex-prefix=DIR
                             flex prefix directory
     --with-flex-includes=DIR
@@ -359,12 +356,6 @@ while [ $# -ne 0 ]; do
         --disable-benchmark-tests)
             append_cache_entry ENABLE_BENCHMARK_TESTS   BOOL false
             ;;
-        --enable-piglet)
-            append_cache_entry ENABLE_PIGLET            BOOL true
-            ;;
-        --disable-piglet)
-            append_cache_entry ENABLE_PIGLET            BOOL false
-            ;;
         --enable-ccache)
             append_cache_entry CMAKE_CXX_COMPILER_LAUNCHER STRING ccache
             append_cache_entry CMAKE_C_COMPILER_LAUNCHER STRING ccache
@@ -447,11 +438,8 @@ while [ $# -ne 0 ]; do
         --with-hyperscan-libraries=*)
             append_cache_entry HS_LIBRARIES_DIR PATH $optarg
             ;;
-        --with-flatbuffers-includes=*)
-            append_cache_entry FLATBUFFERS_INCLUDE_DIR_HINT PATH $optarg
-            ;;
-        --with-flatbuffers-libraries=*)
-            append_cache_entry FLATBUFFERS_LIBRARIES_DIR_HINT PATH $optarg
+        --with-atomic-libraries=*)
+            append_cache_entry ATOMIC_LIBRARIES_DIR_HINT PATH $optarg
             ;;
         --with-flex-prefix=*)
             append_cache_entry CMAKE_PREFIX_PATH PATH $optarg

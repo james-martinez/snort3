@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -49,6 +49,8 @@
 
 using namespace snort;
 
+#define IDLE_PRUNE_MAX 400
+
 // this should not be publicly accessible
 extern THREAD_LOCAL class FlowControl* flow_con;
 
@@ -90,7 +92,7 @@ Flow* Stream::get_flow(
     PktType type, IpProtocol proto,
     const SfIp* srcIP, uint16_t srcPort,
     const SfIp* dstIP, uint16_t dstPort,
-    uint16_t vlan, uint32_t mplsId, uint16_t addressSpaceId,
+    uint16_t vlan, uint32_t mplsId, uint32_t addressSpaceId,
     int16_t ingress_group, int16_t egress_group)
 {
     FlowKey key;
@@ -156,7 +158,7 @@ FlowData* Stream::get_flow_data(
     const SfIp* srcIP, uint16_t srcPort,
     const SfIp* dstIP, uint16_t dstPort,
     uint16_t vlan, uint32_t mplsId,
-    uint16_t addressSpaceID, unsigned flowdata_id,
+    uint32_t addressSpaceID, unsigned flowdata_id,
     int16_t ingress_group, int16_t egress_group)
 {
     Flow* flow = get_flow(
@@ -366,8 +368,13 @@ void Stream::handle_timeouts(bool idle)
     packet_gettimeofday(&cur_time);
 
     // FIXIT-M batch here or loop vs looping over idle?
-    if ( flow_con )
-        flow_con->timeout_flows(cur_time.tv_sec);
+    if (flow_con)
+    {
+        if (idle)
+            flow_con->timeout_flows(IDLE_PRUNE_MAX, cur_time.tv_sec);
+        else
+            flow_con->timeout_flows(1, cur_time.tv_sec);
+    }
 
     int max_remove = idle ? -1 : 1;       // -1 = all eligible
     TcpStreamTracker::release_held_packets(cur_time, max_remove);
@@ -806,12 +813,20 @@ bool Stream::set_packet_action_to_hold(Packet* p)
     return p->flow->session->set_packet_action_to_hold(p);
 }
 
-void Stream::set_no_ack_mode(Flow* flow, bool on_off)
+bool Stream::can_set_no_ack_mode(Flow* flow)
 {
     assert(flow and flow->session and flow->pkt_type == PktType::TCP);
 
     TcpStreamSession* tcp_session = (TcpStreamSession*)flow->session;
-    tcp_session->set_no_ack(on_off);
+    return tcp_session->can_set_no_ack();
+}
+
+bool Stream::set_no_ack_mode(Flow* flow, bool on_off)
+{
+    assert(flow and flow->session and flow->pkt_type == PktType::TCP);
+
+    TcpStreamSession* tcp_session = (TcpStreamSession*)flow->session;
+    return tcp_session->set_no_ack(on_off);
 }
 
 void Stream::partial_flush(Flow* flow, bool to_server)
@@ -832,7 +847,7 @@ bool Stream::get_held_pkt_seq(Flow* flow, uint32_t& seq)
 
     TcpStreamSession* tcp_session = (TcpStreamSession*)flow->session;
 
-    if (tcp_session->held_packet_dir == SSN_DIR_NONE) 
+    if (tcp_session->held_packet_dir == SSN_DIR_NONE)
         return false;
 
     if (tcp_session->held_packet_dir == SSN_DIR_FROM_CLIENT)

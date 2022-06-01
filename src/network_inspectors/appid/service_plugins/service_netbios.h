@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,18 +26,6 @@
 
 class AppIdSession;
 class ServiceDiscovery;
-
-class NbssServiceDetector : public ServiceDetector
-{
-public:
-    NbssServiceDetector(ServiceDiscovery*);
-
-    int validate(AppIdDiscoveryArgs&) override;
-
-private:
-    void parse_type_message(AppIdDiscoveryArgs& args, const uint8_t* data,
-        uint32_t tmp);
-};
 
 class NbnsServiceDetector : public ServiceDetector
 {

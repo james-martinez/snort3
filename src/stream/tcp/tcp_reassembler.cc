@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -105,6 +105,18 @@ bool TcpReassembler::next_acked_no_gap_c(const TcpSegmentNode& tsn, const TcpRea
 {
     return tsn.next and (tsn.next->c_seq == tsn.c_seq + tsn.c_len)
         and SEQ_LT(tsn.next->c_seq, trs.tracker->r_win_base);
+}
+
+bool TcpReassembler::fin_no_gap(const TcpSegmentNode& tsn, const TcpReassemblerState& trs)
+{
+    return trs.tracker->fin_seq_status >= TcpStreamTracker::FIN_WITH_SEQ_SEEN
+        and SEQ_GEQ(tsn.i_seq + tsn.i_len, trs.tracker->get_fin_i_seq());
+}
+
+bool TcpReassembler::fin_acked_no_gap(const TcpSegmentNode& tsn, const TcpReassemblerState& trs)
+{
+    return trs.tracker->fin_seq_status >= TcpStreamTracker::FIN_WITH_SEQ_ACKED
+        and SEQ_GEQ(tsn.i_seq + tsn.i_len, trs.tracker->get_fin_i_seq());
 }
 
 void TcpReassembler::update_next(TcpReassemblerState& trs, const TcpSegmentNode& tsn)
@@ -526,7 +538,7 @@ Packet* TcpReassembler::initialize_pdu(
 
     EncodeFlags enc_flags = 0;
     DAQ_PktHdr_t pkth;
-    trs.sos.session->get_packet_header_foo(&pkth, pkt_flags);
+    trs.sos.session->get_packet_header_foo(&pkth, p->pkth, pkt_flags);
     PacketManager::format_tcp(enc_flags, p, pdu, PSEUDO_PKT_TCP, &pkth, pkth.opaque);
     prep_pdu(trs, trs.sos.session->flow, p, pkt_flags, pdu);
     assert(pdu->pkth == pdu->context->pkth);
@@ -628,12 +640,7 @@ uint32_t TcpReassembler::get_q_footprint(TcpReassemblerState& trs)
         footprint = trs.tracker->r_win_base - trs.sos.seglist_base_seq;
 
     if ( footprint )
-    {
         sequenced = get_q_sequenced(trs);
-
-        if ( trs.tracker->fin_seq_status == TcpStreamTracker::FIN_WITH_SEQ_ACKED )
-            --footprint;
-    }
 
     return ( footprint > sequenced ) ? sequenced : footprint;
 }
@@ -759,7 +766,7 @@ static Packet* get_packet(Flow* flow, uint32_t flags, bool c2s)
     p->ptrs.set_pkt_type(PktType::PDU);
     p->proto_bits |= PROTO_BIT__TCP;
     p->flow = flow;
-    p->packet_flags = flags;
+    p->packet_flags |= flags;
 
     if ( c2s )
     {
@@ -776,36 +783,45 @@ static Packet* get_packet(Flow* flow, uint32_t flags, bool c2s)
 
     p->ip_proto_next = (IpProtocol)flow->ip_proto;
 
+    set_inspection_policy(flow->inspection_policy_id);
     const SnortConfig* sc = SnortConfig::get_conf();
-    set_inspection_policy(sc, flow->inspection_policy_id);
     set_ips_policy(sc, flow->ips_policy_id);
 
     return p;
 }
 
-void TcpReassembler::flush_queued_segments(
+void TcpReassembler::finish_and_final_flush(
     TcpReassemblerState& trs, Flow* flow, bool clear, Packet* p)
 {
     bool pending = clear and paf_initialized(&trs.paf_state)
-        and (!trs.tracker->get_splitter() || trs.tracker->get_splitter()->finish(flow) );
+        and trs.tracker->splitter_finish(flow);
 
     if ( pending and !(flow->ssn_state.ignore_direction & trs.ignore_dir) )
         final_flush(trs, p, trs.packet_dir);
 }
 
+// Call this only from outside reassembly.
 void TcpReassembler::flush_queued_segments(
     TcpReassemblerState& trs, Flow* flow, bool clear, const Packet* p)
 {
-    Packet* pdu = get_packet(flow, trs.packet_dir, trs.server_side);
-
     if ( p )
-        flush_queued_segments(trs, flow, clear, pdu);
-
+    {
+        finish_and_final_flush(trs, flow, clear, const_cast<Packet*>(p));
+    }
     else
     {
-        // if we weren't given a packet, we must establish a context
-        DetectionEngine de;
-        flush_queued_segments(trs, flow, clear, pdu);
+        Packet* pdu = get_packet(flow, trs.packet_dir, trs.server_side);
+
+        bool pending = clear and paf_initialized(&trs.paf_state);
+
+        if ( pending )
+        {
+            DetectionEngine de;
+            pending = trs.tracker->splitter_finish(flow);
+        }
+
+        if ( pending and !(flow->ssn_state.ignore_direction & trs.ignore_dir) )
+            final_flush(trs, pdu, trs.packet_dir);
     }
 }
 
@@ -848,17 +864,21 @@ int32_t TcpReassembler::scan_data_pre_ack(TcpReassemblerState& trs, uint32_t* fl
 {
     assert(trs.sos.session->flow == p->flow);
 
+    int32_t ret_val = FINAL_FLUSH_HOLD;
+
     if ( SEQ_GT(trs.sos.seglist.head->c_seq, trs.sos.seglist_base_seq) )
-        return -1;
+        return ret_val;
 
     if ( !trs.sos.seglist.cur_rseg )
         trs.sos.seglist.cur_rseg = trs.sos.seglist.cur_sseg;
 
     if ( !is_q_sequenced(trs) )
-        return -1;
+        return ret_val;
 
     TcpSegmentNode* tsn = trs.sos.seglist.cur_sseg;
     uint32_t total = tsn->c_seq - trs.sos.seglist_base_seq;
+
+    ret_val = FINAL_FLUSH_OK;
     while ( tsn && *flags )
     {
         total += tsn->c_len;
@@ -869,7 +889,10 @@ int32_t TcpReassembler::scan_data_pre_ack(TcpReassemblerState& trs, uint32_t* fl
         if ( paf_initialized(&trs.paf_state) && SEQ_LEQ(end, pos) )
         {
             if ( !next_no_gap(*tsn) )
+            {
+                ret_val = FINAL_FLUSH_HOLD;
                 break;
+            }
 
             tsn = tsn->next;
             continue;
@@ -890,13 +913,17 @@ int32_t TcpReassembler::scan_data_pre_ack(TcpReassemblerState& trs, uint32_t* fl
         }
 
         if (!next_no_gap(*tsn) || (trs.paf_state.paf == StreamSplitter::STOP))
+        {
+            if ( !(next_no_gap(*tsn) || fin_no_gap(*tsn, trs)) )
+                ret_val = FINAL_FLUSH_HOLD;
             break;
+        }
 
         tsn = tsn->next;
     }
 
     trs.sos.seglist.cur_sseg = tsn;
-    return -1;
+    return ret_val;
 }
 
 static inline bool both_splitters_aborted(Flow* flow)
@@ -965,8 +992,10 @@ int32_t TcpReassembler::scan_data_post_ack(TcpReassemblerState& trs, uint32_t* f
 {
     assert(trs.sos.session->flow == p->flow);
 
+    int32_t ret_val = FINAL_FLUSH_HOLD;
+
     if ( !trs.sos.seglist.cur_sseg || SEQ_GEQ(trs.sos.seglist_base_seq, trs.tracker->r_win_base) )
-        return -1;
+        return ret_val ;
 
     if ( !trs.sos.seglist.cur_rseg )
         trs.sos.seglist.cur_rseg = trs.sos.seglist.cur_sseg;
@@ -987,6 +1016,7 @@ int32_t TcpReassembler::scan_data_post_ack(TcpReassemblerState& trs, uint32_t* f
             total = tsn->c_seq - trs.sos.seglist.cur_rseg->c_seq;
     }
 
+    ret_val = FINAL_FLUSH_OK;
     while (tsn && *flags && SEQ_LT(tsn->c_seq, trs.tracker->r_win_base))
     {
         // only flush acked data that fits in pdu reassembly buffer...
@@ -1025,12 +1055,16 @@ int32_t TcpReassembler::scan_data_post_ack(TcpReassemblerState& trs, uint32_t* f
 
         if (flush_len < tsn->c_len || (splitter->is_paf() and !next_no_gap(*tsn)) ||
             (trs.paf_state.paf == StreamSplitter::STOP))
+        {
+            if ( !(next_no_gap(*tsn) || fin_acked_no_gap(*tsn, trs)) )
+                ret_val = FINAL_FLUSH_HOLD;
             break;
+        }
 
         tsn = tsn->next;
     }
 
-    return -1;
+    return ret_val;
 }
 
 int TcpReassembler::flush_on_data_policy(TcpReassemblerState& trs, Packet* p)
@@ -1050,10 +1084,11 @@ int TcpReassembler::flush_on_data_policy(TcpReassemblerState& trs, Packet* p)
         if ( trs.sos.seglist.head )
         {
             uint32_t flags;
+            int32_t flush_amt;
             do
             {
                 flags = get_forward_packet_dir(trs, p);
-                int32_t flush_amt = scan_data_pre_ack(trs, &flags, p);
+                flush_amt = scan_data_pre_ack(trs, &flags, p);
                 if ( flush_amt <= 0 )
                     break;
 
@@ -1065,6 +1100,15 @@ int TcpReassembler::flush_on_data_policy(TcpReassemblerState& trs, Packet* p)
             {
                 fallback(*trs.tracker, trs.server_side);
                 return flush_on_data_policy(trs, p);
+            }
+            else if ( trs.tracker->fin_seq_status >= TcpStreamTracker::FIN_WITH_SEQ_SEEN and
+                -1 <= flush_amt and flush_amt <= 0 and
+                trs.paf_state.paf == StreamSplitter::SEARCH and
+                !p->flow->searching_for_service() )
+            {
+                // we are on a FIN, the data has been scanned, it has no gaps,
+                // but somehow we are waiting for more data - do final flush here
+                finish_and_final_flush(trs, p->flow, true, p);
             }
         }
         break;
@@ -1145,7 +1189,7 @@ int TcpReassembler::flush_on_ack_policy(TcpReassemblerState& trs, Packet* p)
                 break;
 
             if ( trs.paf_state.paf == StreamSplitter::ABORT )
-                trs.tracker->get_splitter()->finish(p->flow);
+                trs.tracker->splitter_finish(p->flow);
 
             // for consistency with other cases, should return total
             // but that breaks flushing pipelined pdus
@@ -1167,6 +1211,15 @@ int TcpReassembler::flush_on_ack_policy(TcpReassemblerState& trs, Packet* p)
         {
             skip_seglist_hole(trs, p, flags, flush_amt);
             return flush_on_ack_policy(trs, p);
+        }
+        else if ( -1 <= flush_amt and flush_amt <= 0 and
+            trs.paf_state.paf == StreamSplitter::SEARCH and
+            trs.tracker->fin_seq_status == TcpStreamTracker::FIN_WITH_SEQ_ACKED and
+            !p->flow->searching_for_service() )
+        {
+            // we are acknowledging a FIN, the data has been scanned, it has no gaps,
+            // but somehow we are waiting for more data - do final flush here
+            finish_and_final_flush(trs, p->flow, true, p);
         }
     }
     break;
@@ -1322,21 +1375,10 @@ void TcpReassembler::queue_packet_for_reassembly(
         insert_segment_in_seglist(trs, tsd);
 }
 
-uint32_t TcpReassembler::perform_partial_flush(TcpReassemblerState& trs, Flow* flow)
+uint32_t TcpReassembler::perform_partial_flush(TcpReassemblerState& trs, Flow* flow, Packet*& p)
 {
-    Packet* p = get_packet(flow, (trs.packet_dir|PKT_WAS_SET), trs.server_side);
-
-    uint32_t result = perform_partial_flush(trs, p);
-
-    // If the held_packet hasn't been released by perform_partial_flush(),
-    // call finalize directly.
-    if ( trs.tracker->is_holding_packet() )
-    {
-        trs.tracker->finalize_held_packet(p);
-        tcpStats.held_packet_purges++;
-    }
-
-    return result;
+    p = get_packet(flow, trs.packet_dir, trs.server_side);
+    return perform_partial_flush(trs, p);
 }
 
 // No error checking here, so the caller must ensure that p, p->flow and context

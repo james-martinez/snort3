@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -39,7 +39,7 @@ extern const snort::LiteralSearch* searcher ;
 class VbaDataOption : public snort::IpsOption
 {
 public:
-    VbaDataOption() : IpsOption(s_name, RULE_OPTION_TYPE_BUFFER_SET) { }
+    VbaDataOption() : IpsOption(s_name) { }
 
     snort::CursorActionType get_cursor_type() const override;
 

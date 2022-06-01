@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,9 +22,14 @@
 #define PS_MODULE_H
 
 #include "framework/module.h"
-#include "main/snort_config.h"
+#include "main/reload_tuner.h"
 #include "ps_detect.h"
 #include "ps_pegs.h"
+
+namespace snort
+{
+struct SnortConfig;
+}
 
 #define PS_NAME "port_scan"
 #define PS_HELP "detect various ip, icmp, tcp, and udp port or protocol scans"

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -163,6 +163,8 @@ const NormalizedHeader::HeaderNormalizer* const NormalizedHeader::header_norms[H
     &NORMALIZER_BASIC,      // HEAD_PROXY_AGENT
     &NORMALIZER_BASIC,      // HEAD_CONTENT_DISPOSITION
     &NORMALIZER_TOKEN_LIST, // HEAD_HTTP2_SETTINGS
+    &NORMALIZER_BASIC,      // HEAD_RESTRICT_ACCESS_TO_TENANTS
+    &NORMALIZER_BASIC,      // HEAD_RESTRICT_ACCESS_CONTEXT
     &NORMALIZER_BASIC,      // HEAD__MAX_VALUE
     &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
     &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER

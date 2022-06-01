@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -63,6 +63,8 @@ Flow::Flow()
 Flow::~Flow() = default;
 IpsContext::IpsContext(unsigned int) { }
 IpsContext::~IpsContext() = default;
+DataBus::DataBus() = default;
+DataBus::~DataBus() = default;
 SnortConfig::SnortConfig(snort::SnortConfig const*, const char*) { }
 SnortConfig::~SnortConfig() = default;
 
@@ -94,7 +96,7 @@ Inspector::Inspector()
 
 Inspector::~Inspector() = default;
 bool Inspector::likes(Packet*) { return true; }
-bool Inspector::get_buf(const char*, Packet*, InspectionBuffer&) { return true; }
+bool Inspector::get_buf(const char*, Packet*, InspectionBuffer&) { return false; }
 class StreamSplitter* Inspector::get_splitter(bool) { return nullptr; }
 }
 

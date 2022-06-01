@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -305,34 +305,4 @@ void ActionManager::thread_term()
         s_tl_actors = nullptr;
     }
 }
-
-#ifdef PIGLET
-
-//-------------------------------------------------------------------------
-// piglet breach
-//-------------------------------------------------------------------------
-
-static const ActionApi* find_api(const char* name)
-{
-    for ( auto actor : s_actors )
-        if ( !strcmp(actor.api->base.name, name) )
-            return actor.api;
-
-    return nullptr;
-}
-
-IpsActionWrapper* ActionManager::instantiate(const char* name, Module* m)
-{
-    auto api = find_api(name);
-    if ( !api || !api->ctor )
-        return nullptr;
-
-    auto p = api->ctor(m);
-    if ( !p )
-        return nullptr;
-
-    return new IpsActionWrapper(api, p);
-}
-
-#endif
 

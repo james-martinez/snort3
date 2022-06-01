@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2006-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,8 +26,10 @@
 #include "snort_protocols.h"
 
 #include <algorithm>
+#include <cassert>
 
 #include "log/messages.h"
+#include "main/snort_config.h"
 #include "protocols/packet.h"
 #include "utils/util.h"
 #include "utils/util_cstring.h"
@@ -43,15 +45,15 @@ const char* ProtocolReference::get_name(SnortProtocolId id) const
     if ( id >= id_map.size() )
         id = 0;
 
-    return id_map[id].c_str();
+    return id_map[id];
 }
 
 struct Compare
 {
     bool operator()(SnortProtocolId a, SnortProtocolId b)
-    { return map[a] < map[b]; }
+    { return 0 > strcmp(map[a], map[b]); }
 
-    vector<string>& map;
+    vector<const char*>& map;
 };
 
 const char* ProtocolReference::get_name_sorted(SnortProtocolId id)
@@ -67,7 +69,7 @@ const char* ProtocolReference::get_name_sorted(SnortProtocolId id)
     if ( id >= ind_map.size() )
         return nullptr;
 
-    return id_map[ind_map[id]].c_str();
+    return id_map[ind_map[id]];
 }
 
 SnortProtocolId ProtocolReference::add(const char* protocol)
@@ -80,6 +82,7 @@ SnortProtocolId ProtocolReference::add(const char* protocol)
         return protocol_ref->second;
 
     SnortProtocolId snort_protocol_id = protocol_number++;
+    protocol = SnortConfig::get_static_name(protocol);
     id_map.emplace_back(protocol);
     ref_table[protocol] = snort_protocol_id;
 
@@ -121,5 +124,9 @@ ProtocolReference::ProtocolReference(ProtocolReference* old_proto_ref)
 { init(old_proto_ref); }
 
 ProtocolReference::~ProtocolReference()
-{ ref_table.clear(); }
+{
+    ref_table.clear();
+    id_map.clear();
+    ind_map.clear();
+}
 

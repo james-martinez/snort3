@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2011-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -45,12 +45,15 @@ static THREAD_LOCAL ProfileStats modbus_data_prof;
 class ModbusDataOption : public IpsOption
 {
 public:
-    ModbusDataOption() : IpsOption(s_name, RULE_OPTION_TYPE_BUFFER_SET) { }
+    ModbusDataOption() : IpsOption(s_name) { }
 
     uint32_t hash() const override;
     bool operator==(const IpsOption&) const override;
 
     EvalStatus eval(Cursor&, Packet*) override;
+
+    CursorActionType get_cursor_type() const override
+    { return CAT_SET_FAST_PATTERN; }
 };
 
 uint32_t ModbusDataOption::hash() const

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,13 @@
 class TcpReassembler : public SegmentOverlapEditor
 {
 public:
+
+    // OK means FIN seen, data scanned, flush point not found, no gaps
+    enum ScanStatus {
+        FINAL_FLUSH_HOLD = -2,
+        FINAL_FLUSH_OK = -1
+    };
+
     virtual void queue_packet_for_reassembly(TcpReassemblerState&, TcpSegmentDescriptor&);
     virtual void purge_segment_list(TcpReassemblerState&);
     virtual void purge_flushed_ackd(TcpReassemblerState&);
@@ -35,6 +42,8 @@ public:
         TcpReassemblerState&, snort::Packet* p, uint32_t dir, bool final_flush = false);
     virtual void flush_queued_segments(
         TcpReassemblerState&, snort::Flow* flow, bool clear, const snort::Packet* = nullptr);
+    void finish_and_final_flush(
+        TcpReassemblerState&, snort::Flow* flow, bool clear, snort::Packet*);
     virtual bool is_segment_pending_flush(TcpReassemblerState&);
     virtual int flush_on_data_policy(TcpReassemblerState&, snort::Packet*);
     virtual int flush_on_ack_policy(TcpReassemblerState&, snort::Packet*);
@@ -44,7 +53,7 @@ public:
         uint32_t event_id, uint32_t event_second);
     virtual void purge_alerts(TcpReassemblerState&);
 
-    uint32_t perform_partial_flush(TcpReassemblerState&, snort::Flow*);
+    uint32_t perform_partial_flush(TcpReassemblerState&, snort::Flow*, snort::Packet*&);
 
 protected:
     TcpReassembler() = default;
@@ -65,8 +74,6 @@ protected:
     bool is_segment_fasttrack
         (TcpReassemblerState&, TcpSegmentNode* tail, const TcpSegmentDescriptor&);
     void show_rebuilt_packet(const TcpReassemblerState&, snort::Packet*);
-    void flush_queued_segments(
-        TcpReassemblerState&, snort::Flow* flow, bool clear, snort::Packet*);
     int flush_data_segments(TcpReassemblerState&, uint32_t flush_len, snort::Packet* pdu);
     void prep_pdu(
         TcpReassemblerState&, snort::Flow*, snort::Packet*, uint32_t pkt_flags, snort::Packet*);
@@ -88,6 +95,8 @@ protected:
     bool next_no_gap(const TcpSegmentNode&);
     bool next_no_gap_c(const TcpSegmentNode&);
     bool next_acked_no_gap_c(const TcpSegmentNode&, const TcpReassemblerState&);
+    bool fin_no_gap(const TcpSegmentNode&, const TcpReassemblerState&);
+    bool fin_acked_no_gap(const TcpSegmentNode&, const TcpReassemblerState&);
     void update_next(TcpReassemblerState&, const TcpSegmentNode&);
     void update_skipped_bytes(uint32_t, TcpReassemblerState&);
     bool has_seglist_hole(TcpReassemblerState&, TcpSegmentNode&, PAF_State&, uint32_t& total,

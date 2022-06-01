@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -91,6 +91,7 @@ public:
 
     FileVerdict verdict = FILE_VERDICT_UNKNOWN;
     bool processing_complete = false;
+    std::mutex user_file_data_mutex;
     struct timeval pending_expire_time = {0, 0};
 
 protected:
@@ -109,7 +110,6 @@ protected:
     bool file_capture_enabled = false;
     FileState file_state = { FILE_CAPTURE_SUCCESS, FILE_SIG_PROCESSING };
     uint32_t policy_id = 0;
-    std::mutex user_file_data_mutex;
     UserFileDataBase* user_file_data = nullptr;
 
 private:

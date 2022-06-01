@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -81,7 +81,7 @@ static AppIdContext stub_ctxt(stub_config);
 static OdpContext stub_odp_ctxt(stub_config, nullptr);
 OdpContext* AppIdContext::odp_ctxt = &stub_odp_ctxt;
 AppIdSession::AppIdSession(IpProtocol proto, const SfIp* ip, uint16_t, AppIdInspector& inspector,
-    OdpContext&, uint16_t) : FlowData(inspector_id, &inspector), config(stub_config),
+    OdpContext&, uint32_t) : FlowData(inspector_id, &inspector), config(stub_config),
     protocol(proto), api(*(new AppIdSessionApi(this, *ip))), odp_ctxt(stub_odp_ctxt)
 {
     this->set_session_flags(APPID_SESSION_DISCOVER_APP | APPID_SESSION_SPECIAL_MONITORED);
@@ -141,14 +141,14 @@ AppId AppIdSession::pick_ss_misc_app_id() const
 
 AppId AppIdSession::pick_ss_client_app_id() const
 {
-    if (get_efp_client_app_id() > APP_ID_NONE and get_client_id() <= APP_ID_NONE)
+    if (get_eve_client_app_id() > APP_ID_NONE and get_client_id() <= APP_ID_NONE)
     {
-        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_TLS_FP);
-        return get_efp_client_app_id();
+        api.client.set_eve_client_app_detect_type(CLIENT_APP_DETECT_TLS_FP);
+        return get_eve_client_app_id();
     }
     else
     {
-        api.client.set_efp_client_app_detect_type(CLIENT_APP_DETECT_APPID);
+        api.client.set_eve_client_app_detect_type(CLIENT_APP_DETECT_APPID);
         return get_client_id();
     }
 }

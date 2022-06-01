@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -264,7 +264,7 @@ bool Http2StreamSplitter::finish(Flow* flow)
             (stream->get_state(source_id) >= STREAM_COMPLETE)         ||
             (stream->get_hi_flow_data() == nullptr)                   ||
             (stream->get_hi_flow_data()->get_type_expected(source_id)
-                != HttpEnums::SEC_BODY_H2)                            ||
+                != SEC_BODY_H2)                                       ||
             (session_data->processing_partial_header &&
                 (stream->get_stream_id() == session_data->current_stream[source_id])))
         {

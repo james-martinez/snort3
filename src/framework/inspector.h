@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,9 @@
 // in different ways.  These correspond to Snort 2X preprocessors.
 
 #include <atomic>
+#include <cstring>
+#include <memory>
+#include <vector>
 
 #include "framework/base_api.h"
 #include "main/thread.h"
@@ -44,10 +47,16 @@ struct InspectionBuffer
 {
     enum Type
     {
-        // FIXIT-L file data is tbd
-        IBT_KEY, IBT_HEADER, IBT_BODY, IBT_FILE, IBT_ALT,
-        IBT_RAW_KEY, IBT_RAW_HEADER, IBT_METHOD, IBT_STAT_CODE,
-        IBT_STAT_MSG, IBT_COOKIE, IBT_JS_DATA, IBT_VBA, IBT_MAX
+        // this is the only generic rule option
+        IBT_VBA,
+
+        // FIXIT-M all of these should be eliminated after NHI is updated
+        IBT_KEY, IBT_HEADER, IBT_BODY,
+        IBT_RAW_KEY, IBT_RAW_HEADER, IBT_METHOD,
+        IBT_STAT_CODE, IBT_STAT_MSG, IBT_COOKIE,
+        IBT_JS_DATA,
+
+        IBT_MAX
     };
     const uint8_t* data;
     unsigned len;
@@ -58,6 +67,8 @@ struct InspectApi;
 //-------------------------------------------------------------------------
 // api for class
 //-------------------------------------------------------------------------
+
+class ThreadSpecificData;
 
 class SO_PUBLIC Inspector
 {
@@ -164,8 +175,15 @@ public:
     virtual bool can_start_tls() const
     { return false; }
 
+    void allocate_thread_storage();
+    void set_thread_specific_data(void*);
+    void* get_thread_specific_data() const;
+    void copy_thread_storage(Inspector*);
+
+    virtual void install_reload_handler(SnortConfig*)
+    { }
+
 public:
-    static unsigned max_slots;
     static THREAD_LOCAL unsigned slot;
 
 protected:
@@ -174,6 +192,7 @@ protected:
 
 private:
     const InspectApi* api = nullptr;
+    std::shared_ptr<ThreadSpecificData> thread_specific_data;
     std::atomic_uint* ref_count;
     SnortProtocolId snort_protocol_id = 0;
     // FIXIT-E Use std::string to avoid storing a pointer to external std::string buffers
@@ -194,6 +213,7 @@ enum InspectorType
     IT_SERVICE,  // extract and analyze service PDUs (eg dce, http, ssl)
     IT_CONTROL,  // process all packets before detection (eg appid)
     IT_PROBE,    // process all packets after detection (eg perf_monitor, port_scan)
+    IT_FILE,     // file identification inspector
     IT_MAX
 };
 

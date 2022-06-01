@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,7 +23,6 @@
 
 #include "http2_headers_frame_header.h"
 
-#include "service_inspectors/http_inspect/http_enum.h"
 #include "service_inspectors/http_inspect/http_flow_data.h"
 
 #include "http2_enum.h"
@@ -73,7 +72,7 @@ void Http2HeadersFrameHeader::analyze_http1()
 
     // if END_STREAM flag set on headers, tell http_inspect not to expect a message body
     if (get_flags() & FLAG_END_STREAM)
-        stream->get_hi_flow_data()->finish_h2_body(source_id, HttpEnums::H2_BODY_NO_BODY, false);
+        stream->get_hi_flow_data()->finish_h2_body(source_id, H2_BODY_NO_BODY, false);
 
     process_decoded_headers(http_flow, source_id);
 }

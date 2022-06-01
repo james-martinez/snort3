@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -90,6 +90,8 @@ static void snort_ssh(SSH_PROTO_CONF* config, Packet* p)
 
     // Attempt to get a previously allocated SSH block.
     SSHData* sessp = get_session_data(p->flow);
+    if (!sessp)
+        return;
 
     // Don't process if we've missed packets
     if (sessp->state_flags & SSH_FLG_MISSED_PACKETS)

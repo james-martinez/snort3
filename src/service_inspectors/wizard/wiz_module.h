@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -58,7 +58,7 @@ public:
     MagicBook* get_book(bool c2s, bool hex);
     CurseBook* get_curse_book();
 
-    uint16_t get_max_search_depth()
+    uint16_t get_max_search_depth() const
     { return max_search_depth; }
 
     Usage get_usage() const override

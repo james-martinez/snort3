@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -88,7 +88,7 @@ AppIdConfig stub_config;
 AppIdContext stub_ctxt(stub_config);
 OdpContext stub_odp_ctxt(stub_config, nullptr);
 AppIdSession::AppIdSession(IpProtocol, const SfIp* ip, uint16_t, AppIdInspector&,
-    OdpContext&, uint16_t) : FlowData(0), config(stub_config),
+    OdpContext&, uint32_t) : FlowData(0), config(stub_config),
     api(*(new AppIdSessionApi(this, *ip))), odp_ctxt(stub_odp_ctxt) { }
 AppIdSession::~AppIdSession() = default;
 AppIdDiscovery::~AppIdDiscovery() = default;
@@ -121,11 +121,12 @@ int ServiceDiscovery::fail_service(AppIdSession&, const Packet*, AppidSessionDir
 int ServiceDiscovery::add_service_port(AppIdDetector*,
     const ServiceDetectorPort&) { return APPID_EINVALID; }
 DnsPatternMatchers::~DnsPatternMatchers() = default;
-EfpCaPatternMatchers::~EfpCaPatternMatchers() = default;
+EveCaPatternMatchers::~EveCaPatternMatchers() = default;
 HttpPatternMatchers::~HttpPatternMatchers() = default;
 SipPatternMatchers::~SipPatternMatchers() = default;
 SslPatternMatchers::~SslPatternMatchers() = default;
-snort::SearchTool::SearchTool(char const*, bool) { }
+AlpnPatternMatchers::~AlpnPatternMatchers() = default;
+snort::SearchTool::SearchTool(bool) { }
 snort::SearchTool::~SearchTool() = default;
 
 TEST_GROUP(service_state_tests)

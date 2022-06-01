@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -180,7 +180,7 @@ public:
     static FlowData* get_flow_data(
         PktType type, IpProtocol proto,
         const snort::SfIp* a1, uint16_t p1, const snort::SfIp* a2, uint16_t p2,
-        uint16_t vlanId, uint32_t mplsId, uint16_t addrSpaceId, unsigned flowdata_id,
+        uint16_t vlanId, uint32_t mplsId, uint32_t addrSpaceId, unsigned flowdata_id,
         int16_t ingress_group = DAQ_PKTHDR_UNKNOWN, int16_t egress_group = DAQ_PKTHDR_UNKNOWN);
 
     static FlowData* get_flow_data(
@@ -196,7 +196,7 @@ public:
     static Flow* get_flow(
         PktType type, IpProtocol proto,
         const snort::SfIp* a1, uint16_t p1, const snort::SfIp* a2, uint16_t p2,
-        uint16_t vlanId, uint32_t mplsId, uint16_t addrSpaceId,
+        uint16_t vlanId, uint32_t mplsId, uint32_t addrSpaceId,
         int16_t ingress_group = DAQ_PKTHDR_UNKNOWN, int16_t egress_group = DAQ_PKTHDR_UNKNOWN);
 
     static Flow* get_flow(
@@ -240,7 +240,8 @@ public:
     static uint8_t get_tcp_options_len(Flow*, bool to_server);
 
     static bool set_packet_action_to_hold(Packet*);
-    static void set_no_ack_mode(Flow*, bool);
+    static bool can_set_no_ack_mode(Flow*);
+    static bool set_no_ack_mode(Flow*, bool);
     static void partial_flush(Flow*, bool to_server);
 
     static bool get_held_pkt_seq(Flow*, uint32_t&);

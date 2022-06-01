@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -80,8 +80,10 @@ public:
         unsigned& copied       // actual data copied (1 <= copied <= len)
         );
 
+    virtual bool sync_on_start() const { return false; }
     virtual bool is_paf() { return false; }
     virtual unsigned max(Flow* = nullptr);
+    virtual void go_away() { delete this; }
 
     bool to_server() { return c2s; }
     bool to_client() { return !c2s; }

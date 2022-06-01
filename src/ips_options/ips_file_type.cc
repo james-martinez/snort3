@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -44,9 +44,6 @@ public:
 
     uint32_t hash() const override;
     bool operator==(const IpsOption& ips) const override;
-
-    CursorActionType get_cursor_type() const override
-    { return CAT_NONE; }
 
     EvalStatus eval(Cursor&, Packet*) override;
 
@@ -158,7 +155,7 @@ bool FileTypeModule::set(const char*, Value& v, SnortConfig* sc)
             tok.erase(0, 1);
 
         if (tok.length() == 0)
-            continue;	
+            continue;
 
         if ( tok[tok.length()-1] == '"' )
             tok.erase(tok.length()-1, 1);

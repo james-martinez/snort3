@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,7 +27,7 @@
 
 #include "control/control.h"
 
-ACShellCmd::ACShellCmd(ControlConn* ctrlcon, AnalyzerCommand* ac) : ctrlcon(ctrlcon), ac(ac)
+ACShellCmd::ACShellCmd(ControlConn* conn, AnalyzerCommand* ac) : AnalyzerCommand(conn), ac(ac)
 {
     assert(ac);
 
@@ -37,6 +37,7 @@ ACShellCmd::ACShellCmd(ControlConn* ctrlcon, AnalyzerCommand* ac) : ctrlcon(ctrl
 
 bool ACShellCmd::execute(Analyzer& analyzer, void** state)
 {
+    ctrlcon->set_user_network_policy();
     return ac->execute(analyzer, state);
 }
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,11 +21,11 @@
 #ifndef STREAM_MODULE_H
 #define STREAM_MODULE_H
 
-#include "main/analyzer.h"
-#include "main/snort_config.h"
 #include "flow/flow_config.h"
 #include "flow/flow_control.h"
 #include "framework/module.h"
+#include "main/analyzer.h"
+#include "main/reload_tuner.h"
 
 namespace snort
 {
@@ -59,7 +59,6 @@ struct BaseStats
      PegCount timeout_prunes;
      PegCount excess_prunes;
      PegCount uni_prunes;
-     PegCount preemptive_prunes;
      PegCount memcap_prunes;
      PegCount ha_prunes;
      PegCount stale_prunes;
@@ -75,6 +74,10 @@ struct BaseStats
      PegCount reload_allowed_flow_deletes;
      PegCount reload_blocked_flow_deletes;
      PegCount reload_offloaded_flow_deletes;
+     PegCount current_flows;
+     PegCount uni_flows;
+     PegCount uni_ip_flows;
+
 };
 
 extern const PegInfo base_pegs[];

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -60,12 +60,14 @@ public:
     int execute_commands();
     void shutdown();
 
+    void set_user_network_policy();
+
     SO_PUBLIC bool is_local() const { return local; }
+    SO_PUBLIC bool respond(const char* format, va_list& ap);
     SO_PUBLIC bool respond(const char* format, ...) __attribute__((format (printf, 2, 3)));
     SO_PUBLIC static ControlConn* query_from_lua(const lua_State*);
 
 private:
-    bool respond(const char* format, va_list& ap);
     bool show_prompt();
     void touch();
 
@@ -80,7 +82,7 @@ private:
     time_t touched;
 };
 
-#define LogRespond(cn, ...)       if (cn) cn->respond(__VA_ARGS__); else LogMessage(__VA_ARGS__)
-#define LogfRespond(cn, fh, ...)  if (cn) cn->respond(__VA_ARGS__); else LogMessage(fh, __VA_ARGS__)
+#define LogRespond(cn, ...)       do { if (cn) cn->respond(__VA_ARGS__); else LogMessage(__VA_ARGS__); } while(0)
+#define LogfRespond(cn, fh, ...)  do { if (cn) cn->respond(__VA_ARGS__); else LogMessage(fh, __VA_ARGS__); } while(0)
 
 #endif

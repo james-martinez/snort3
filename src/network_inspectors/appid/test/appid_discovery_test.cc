@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -47,7 +47,7 @@ namespace snort
 {
 // Stubs for appid api
 AppIdApi appid_api;
-const char* AppIdApi::get_application_name(AppId, OdpContext&) { return NULL; } 
+const char* AppIdApi::get_application_name(AppId, OdpContext&) { return NULL; }
 
 // Stubs for packet tracer
 THREAD_LOCAL PacketTracer* s_pkt_trace = nullptr;
@@ -66,7 +66,7 @@ Inspector::Inspector()
 }
 Inspector::~Inspector() = default;
 bool Inspector::likes(Packet*) { return true; }
-bool Inspector::get_buf(const char*, Packet*, InspectionBuffer&) { return true; }
+bool Inspector::get_buf(const char*, Packet*, InspectionBuffer&) { return false; }
 class StreamSplitter* Inspector::get_splitter(bool) { return nullptr; }
 
 // Stubs for module
@@ -100,7 +100,7 @@ char* snort_strndup(const char* src, size_t)
 time_t packet_time() { return std::time(nullptr); }
 
 // Stubs for search_tool
-SearchTool::SearchTool(const char*, bool) {}
+SearchTool::SearchTool(bool) {}
 SearchTool::~SearchTool() = default;
 void SearchTool::add(const char*, unsigned, int, bool) {}
 void SearchTool::add(const char*, unsigned, void*, bool) {}
@@ -139,10 +139,11 @@ void DataBus::publish(const char*, DataEvent& event, Flow*)
 // Stubs for matchers
 static HttpPatternMatchers* http_matchers;
 DnsPatternMatchers::~DnsPatternMatchers() = default;
-EfpCaPatternMatchers::~EfpCaPatternMatchers() = default;
+EveCaPatternMatchers::~EveCaPatternMatchers() = default;
 HttpPatternMatchers::~HttpPatternMatchers() = default;
 SipPatternMatchers::~SipPatternMatchers() = default;
 SslPatternMatchers::~SslPatternMatchers() = default;
+AlpnPatternMatchers::~AlpnPatternMatchers() = default;
 
 void ApplicationDescriptor::set_id(const Packet&, AppIdSession&, AppidSessionDirection, AppId, AppidChangeBits&) { }
 void ApplicationDescriptor::set_id(AppId app_id){my_id = app_id;}
@@ -279,7 +280,7 @@ HostPortVal* HostPortCache::find(const SfIp*, uint16_t, IpProtocol, const OdpCon
     return nullptr;
 }
 void AppIdServiceState::check_reset(AppIdSession&, const SfIp*, uint16_t,
-    int16_t, uint16_t) {}
+    int16_t, uint32_t) {}
 bool do_tp_discovery(ThirdPartyAppIdContext& , AppIdSession&, IpProtocol,
     Packet*, AppidSessionDirection&, AppidChangeBits&)
 {

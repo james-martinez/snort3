@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,6 +27,7 @@
 #include "flow/flow_control.h"
 
 #include "detection/detection_engine.h"
+#include "main/policy.h"
 #include "main/snort_config.h"
 #include "managers/inspector_manager.h"
 #include "packet_io/active.h"
@@ -80,16 +81,19 @@ void FlowCache::push(Flow*) { }
 bool FlowCache::prune_one(PruneReason, bool) { return true; }
 unsigned FlowCache::delete_flows(unsigned) { return 0; }
 unsigned FlowCache::timeout(unsigned, time_t) { return 1; }
+size_t FlowCache::uni_flows_size() const { return 0; }
+size_t FlowCache::uni_ip_flows_size() const { return 0; }
+size_t FlowCache::flows_size() const { return 0; }
 void Flow::init(PktType) { }
-void set_network_policy(const SnortConfig*, unsigned) { }
 void DataBus::publish(const char*, const uint8_t*, unsigned, Flow*) { }
 void DataBus::publish(const char*, Packet*, Flow*) { }
 const SnortConfig* SnortConfig::get_conf() { return nullptr; }
 void FlowCache::unlink_uni(Flow*) { }
 void Flow::set_client_initiate(Packet*) { }
 void Flow::set_direction(Packet*) { }
-void set_inspection_policy(const SnortConfig*, unsigned) { }
-void set_ips_policy(const SnortConfig*, unsigned) { }
+void set_network_policy(unsigned) { }
+void set_inspection_policy(unsigned) { }
+void set_ips_policy(const snort::SnortConfig*, unsigned) { }
 void Flow::set_mpls_layer_per_dir(Packet*) { }
 void DetectionEngine::disable_all(Packet*) { }
 void Stream::drop_traffic(const Packet*, char) { }
@@ -101,6 +105,11 @@ Flow* HighAvailabilityManager::import(Packet&, FlowKey&) { return nullptr; }
 
 namespace snort
 {
+NetworkPolicy* get_network_policy() { return nullptr; }
+InspectionPolicy* get_inspection_policy() { return nullptr; }
+IpsPolicy* get_ips_policy() { return nullptr; }
+unsigned SnortConfig::get_thread_reload_id() { return 0; }
+
 namespace layer
 {
 const vlan::VlanTagHdr* get_vlan_layer(const Packet* const) { return nullptr; }
@@ -121,7 +130,7 @@ bool FlowKey::init(
     const SfIp*, uint16_t,
     const SfIp*, uint16_t,
     uint16_t, uint32_t,
-    uint16_t, int16_t, int16_t)
+    uint32_t, int16_t, int16_t)
 {
    return true;
 }
@@ -141,7 +150,7 @@ bool FlowKey::init(
     PktType, IpProtocol,
     const SfIp*, const SfIp*,
     uint32_t, uint16_t,
-    uint32_t, uint16_t, int16_t,
+    uint32_t, uint32_t, int16_t,
     int16_t)
 {
     return true;

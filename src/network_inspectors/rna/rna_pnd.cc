@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -172,6 +172,26 @@ bool RnaPnd::analyze_cpe_os_info(snort::DataEvent& event)
     fp.fp_type = FpFingerprint::FpType::FP_TYPE_CPE;
     logger.log(RNA_EVENT_NEW, NEW_OS, p, &rt, src_ip_ptr, src_mac, &fp,
         cpeos_event.get_os_names(), packet_time());
+
+    return true;
+}
+
+bool RnaPnd::analyze_netflow(snort::DataEvent& event)
+{
+    const Packet* p = event.get_packet();
+    if ( !p )
+        return false;
+
+    const auto& src_ip = p->ptrs.ip_api.get_src();
+    const auto& src_ip_ptr = (const struct in6_addr*) src_ip->get_ip6_ptr();
+    const auto& src_mac = layer::get_eth_layer(p)->ether_src;
+    NetflowEvent* nfe = static_cast<NetflowEvent*>(&event);
+    const NetflowSessionRecord* nf_record = nfe->get_record();
+
+    // process host and service log events
+    UNUSED(src_ip_ptr);
+    UNUSED(src_mac);
+    UNUSED(nf_record);
 
     return true;
 }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -114,8 +114,6 @@ void OtnLookupAdd(snort::GHash*, OptTreeNode*);
 OptTreeNode* OtnLookup(snort::GHash*, uint32_t gid, uint32_t sid);
 void OtnLookupFree(snort::GHash*);
 void OtnRemove(snort::GHash*, OptTreeNode*);
-
-OptTreeNode* GetOTN(uint32_t gid, uint32_t sid);
 
 void dump_msg_map(const snort::SnortConfig*);
 void dump_rule_deps(const snort::SnortConfig*);

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,6 +28,11 @@
 #include "protocols/protocol_ids.h"
 #include "sfip/sf_ip.h"
 #include "utils/cpp_macros.h"
+
+namespace snort
+{
+    struct SnortConfig;
+}
 
 class OdpContext;
 
@@ -64,7 +69,8 @@ class HostPortCache
 {
 public:
     HostPortVal* find(const snort::SfIp*, uint16_t port, IpProtocol, const OdpContext&);
-    bool add(const snort::SfIp*, uint16_t port, IpProtocol, unsigned type, AppId);
+    bool add(const snort::SnortConfig*, const snort::SfIp*, uint16_t port, IpProtocol,
+        unsigned type, AppId);
     void dump();
 
     ~HostPortCache()

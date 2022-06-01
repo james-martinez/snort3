@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -138,7 +138,7 @@ void UserTracker::term()
 {
     if ( splitter )
     {
-        delete splitter;
+        splitter->go_away();
         splitter = nullptr;
     }
 
@@ -367,8 +367,10 @@ void UserSession::start(Packet* p, Flow* f)
 
 void UserSession::end(Packet*, Flow*)
 {
-    delete client.splitter;
-    delete server.splitter;
+    if (client.splitter != nullptr)
+        client.splitter->go_away();
+    if (server.splitter != nullptr)
+        server.splitter->go_away();
 
     client.splitter = nullptr;
     server.splitter = nullptr;
@@ -451,7 +453,7 @@ void UserSession::set_splitter(bool c2s, StreamSplitter* ss)
     UserTracker& ut = c2s ? server : client;
 
     if ( ut.splitter )
-        delete ut.splitter;
+        ut.splitter->go_away();
 
     ut.splitter = ss;
 
