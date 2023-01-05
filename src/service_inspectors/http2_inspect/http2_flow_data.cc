@@ -53,6 +53,7 @@ Http2FlowData::Http2FlowData(Flow* flow_) :
                         infractions[SRC_SERVER]) },
     data_cutter { Http2DataCutter(this, SRC_CLIENT), Http2DataCutter(this, SRC_SERVER) }
 {
+    static Http2FlowStreamIntf h2_stream;
     if (hi != nullptr)
     {
         hi_ss[SRC_CLIENT] = hi->get_splitter(true);
@@ -72,6 +73,8 @@ Http2FlowData::Http2FlowData(Flow* flow_) :
     if (Http2Module::get_peg_counts(PEG_MAX_CONCURRENT_SESSIONS) <
         Http2Module::get_peg_counts(PEG_CONCURRENT_SESSIONS))
         Http2Module::increment_peg_counts(PEG_MAX_CONCURRENT_SESSIONS);
+
+    flow->stream_intf = &h2_stream;
 }
 
 Http2FlowData::~Http2FlowData()
@@ -94,12 +97,9 @@ Http2FlowData::~Http2FlowData()
         hi_ss[k]->go_away();
         delete[] frame_data[k];
     }
-
-    for (Http2Stream* stream : streams)
-        delete stream;
 }
 
-HttpFlowData* Http2FlowData::get_hi_flow_data() const
+HttpFlowData* Http2FlowData::get_hi_flow_data()
 {
     assert(stream_in_hi != Http2Enums::NO_STREAM_ID);
     Http2Stream* stream = get_hi_stream();
@@ -113,12 +113,12 @@ void Http2FlowData::set_hi_flow_data(HttpFlowData* flow)
     stream->set_hi_flow_data(flow);
 }
 
-Http2Stream* Http2FlowData::find_stream(const uint32_t key) const
+Http2Stream* Http2FlowData::find_stream(const uint32_t key)
 {
-    for (Http2Stream* stream : streams)
+    for (Http2Stream& stream : streams)
     {
-        if (stream->get_stream_id() == key)
-            return stream;
+        if (stream.get_stream_id() == key)
+            return &stream;
     }
 
     return nullptr;
@@ -134,6 +134,7 @@ Http2Stream* Http2FlowData::get_processing_stream(const SourceId source_id, uint
         {
             *infractions[source_id] += INF_TOO_MANY_STREAMS;
             events[source_id]->create_event(EVENT_TOO_MANY_STREAMS);
+            events[source_id]->create_event(EVENT_LOSS_OF_SYNC);
             Http2Module::increment_peg_counts(PEG_FLOWS_OVER_STREAM_LIMIT);
             abort_flow[SRC_CLIENT] = true;
             abort_flow[SRC_SERVER] = true;
@@ -174,8 +175,8 @@ Http2Stream* Http2FlowData::get_processing_stream(const SourceId source_id, uint
         }
 
         // Allocate new stream
-        stream = new Http2Stream(key, this);
-        streams.emplace_front(stream);
+        streams.emplace_front(key, this);
+        stream = &streams.front();
 
         // stream 0 does not count against stream limit
         if (key > 0)
@@ -190,12 +191,12 @@ Http2Stream* Http2FlowData::get_processing_stream(const SourceId source_id, uint
 
 void Http2FlowData::delete_processing_stream()
 {
-    std::list<Http2Stream*>::iterator it;
+    std::list<Http2Stream>::iterator it;
+
     for (it = streams.begin(); it != streams.end(); ++it)
     {
-        if ((*it)->get_stream_id() == processing_stream_id)
+        if (it->get_stream_id() == processing_stream_id)
         {
-            delete *it;
             streams.erase(it);
             delete_stream = false;
             assert(concurrent_streams > 0);
@@ -206,17 +207,17 @@ void Http2FlowData::delete_processing_stream()
     assert(false);
 }
 
-Http2Stream* Http2FlowData::get_hi_stream() const
+Http2Stream* Http2FlowData::get_hi_stream()
 {
     return find_stream(stream_in_hi);
 }
 
-Http2Stream* Http2FlowData::find_current_stream(const SourceId source_id) const
+Http2Stream* Http2FlowData::find_current_stream(const SourceId source_id)
 {
     return find_stream(current_stream[source_id]);
 }
 
-Http2Stream* Http2FlowData::find_processing_stream() const
+Http2Stream* Http2FlowData::find_processing_stream()
 {
     return find_stream(get_processing_stream_id());
 }
@@ -250,3 +251,39 @@ bool Http2FlowData::is_mid_frame() const
         continuation_expected[SRC_SERVER];
 }
 
+FlowData* Http2FlowStreamIntf::get_stream_flow_data(const Flow* flow)
+{
+    Http2FlowData* h2i_flow_data = nullptr;
+
+    h2i_flow_data = (Http2FlowData*)flow->get_flow_data(Http2FlowData::inspector_id);
+    assert(h2i_flow_data);
+
+    return h2i_flow_data->get_hi_flow_data();
+}
+
+void Http2FlowStreamIntf::set_stream_flow_data(Flow* flow, FlowData* flow_data)
+{
+    Http2FlowData* h2i_flow_data =
+        (Http2FlowData*)flow->get_flow_data(Http2FlowData::inspector_id);
+    assert(h2i_flow_data);
+    h2i_flow_data->set_hi_flow_data((HttpFlowData*)flow_data);
+}
+
+void Http2FlowStreamIntf::get_stream_id(const Flow* flow, int64_t& stream_id)
+{
+    Http2FlowData* h2i_flow_data = nullptr;
+
+    h2i_flow_data = (Http2FlowData*)flow->get_flow_data(Http2FlowData::inspector_id);
+    assert(h2i_flow_data);
+    stream_id = h2i_flow_data->get_processing_stream_id();
+}
+
+AppId Http2FlowStreamIntf::get_appid_from_stream(const Flow* flow)
+{
+    Http2FlowData* h2i_flow_data = nullptr;
+
+    h2i_flow_data = (Http2FlowData*)flow->get_flow_data(Http2FlowData::inspector_id);
+    assert(h2i_flow_data);
+
+    return APP_ID_HTTP2;
+}

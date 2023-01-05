@@ -39,6 +39,7 @@
 #include "framework/data_bus.h"
 #include "framework/decode_data.h"
 #include "framework/inspector.h"
+#include "network_inspectors/appid/application_ids.h"
 #include "protocols/layer.h"
 #include "sfip/sf_ip.h"
 #include "target_based/snort_protocols.h"
@@ -64,6 +65,8 @@
 #define SSNFLAG_TIMEDOUT            0x00001000
 #define SSNFLAG_PRUNED              0x00002000
 #define SSNFLAG_RESET               0x00004000
+
+#define SSNFLAG_TCP_ONE_SIDED       0x00008000
 
 #define SSNFLAG_DROP_CLIENT         0x00010000
 #define SSNFLAG_DROP_SERVER         0x00020000
@@ -101,6 +104,7 @@
 #define STREAM_STATE_BLOCK_PENDING     0x0400
 #define STREAM_STATE_RELEASING         0x0800
 
+class Continuation;
 class BitOp;
 class Session;
 
@@ -155,6 +159,15 @@ struct LwState
 
     char direction;
     char ignore_direction;
+};
+
+class SO_PUBLIC StreamFlowIntf
+{
+public:
+    virtual FlowData* get_stream_flow_data(const Flow* flow) = 0;
+    virtual void set_stream_flow_data(Flow* flow, FlowData* flow_data) = 0;
+    virtual void get_stream_id(const Flow* flow, int64_t& stream_id) = 0;
+    virtual AppId get_appid_from_stream(const Flow*) { return APP_ID_NONE; }
 };
 
 // this struct is organized by member size for compactness
@@ -417,6 +430,7 @@ public:  // FIXIT-M privatize if possible
     Session* session;
     Inspector* ssn_client;
     Inspector* ssn_server;
+    Continuation* ips_cont;
 
     long last_data_seen;
     Layer mpls_client, mpls_server;
@@ -425,6 +439,7 @@ public:  // FIXIT-M privatize if possible
     IpsContextChain context_chain;
     FlowData* flow_data;
     FlowStats flowstats;
+    StreamFlowIntf* stream_intf;
 
     SfIp client_ip;
     SfIp server_ip;
@@ -444,8 +459,6 @@ public:  // FIXIT-M privatize if possible
     unsigned inspection_policy_id;
     unsigned ips_policy_id;
     unsigned reload_id;
-
-    uint32_t iplist_monitor_id;
 
     uint32_t tenant;
 
@@ -476,10 +489,6 @@ public:  // FIXIT-M privatize if possible
                                     // currently considered to be the client
         bool app_direction_swapped : 1; // Packet direction swapped from application perspective
         bool disable_inspect : 1;
-        bool reputation_src_dest : 1;
-        bool reputation_blocklist : 1;
-        bool reputation_monitor : 1;
-        bool reputation_allowlist : 1;
         bool trigger_detained_packet_event : 1;
         bool trigger_finalize_event : 1;
         bool use_direct_inject : 1;
@@ -487,6 +496,7 @@ public:  // FIXIT-M privatize if possible
         bool snort_proto_id_set_by_ha : 1;
         bool efd_flow : 1;  // Indicate that current flow is an elephant flow
         bool svc_event_generated : 1; // Set if FLOW_NO_SERVICE_EVENT was generated for this flow
+        bool retry_queued : 1; // Set if a packet was queued for retry for this flow
     } flags;
 
     FlowState flow_state;

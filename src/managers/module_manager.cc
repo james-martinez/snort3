@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -80,6 +81,8 @@ mutex ModuleManager::stats_mutex;
 static string s_current;
 static string s_aliased_name;
 static string s_aliased_type;
+static string s_ips_includer;
+static string s_file_id_includer;
 
 // for callbacks from Lua
 static SnortConfig* s_config = nullptr;
@@ -97,10 +100,14 @@ extern "C"
     bool set_alias(const char* from, const char* to);
     void clear_alias();
 
-    const char* push_include_path(const char* file);
+    bool set_includer(const char* fqn, const char* val);
+    const char* push_include_path(const char*);
     void pop_include_path();
+
     void snort_whitelist_append(const char*);
     void snort_whitelist_add_prefix(const char*);
+
+    int get_module_version(const char* name, const char* type);
 }
 
 //-------------------------------------------------------------------------
@@ -219,12 +226,38 @@ static void dump_field_std(const string& key, const Parameter* p)
     cout << " " << Markup::emphasis(Markup::escape(key));
 
     if ( p->deflt )
-        cout << " = " << p->deflt;
+    {
+        if ( p->is_quoted() )
+            cout << " = '" << p->deflt << "'";
+        else
+            cout << " = " << p->deflt;
+    }
 
     cout << ": " << p->help;
 
-    if ( const char* r = p->get_range() )
-        cout << " { " << r << " }";
+    const char* range = p->get_range();
+    if ( !range )
+    {
+        cout << endl;
+        return;
+    }
+
+    if ( strcmp(p->get_type(), "enum" ) != 0 )
+        cout << " { " << range << " }";
+    else
+    {
+        std::stringstream ss(range);
+        std::string word;
+        cout << " { ";
+        while ( ss >> word )
+        {
+            if ( word != "|" )
+                std::cout << "'" << word << "'";
+            else
+                std::cout << " " << word << " ";
+        }
+        cout << " }";
+    }
 
     cout << endl;
 }
@@ -697,6 +730,38 @@ SO_PUBLIC void pop_include_path()
     pop_parse_location();
 }
 
+// cppcheck-suppress unusedFunction
+SO_PUBLIC bool set_includer(const char* fqn, const char* s)
+{
+    if ( !strcmp(fqn, "ips.includer") )
+        s_ips_includer = s;
+    else
+    {
+        assert(!strcmp(fqn, "file_id.includer"));
+        s_file_id_includer = s;
+    }
+    return true;
+}
+
+// cppcheck-suppress unusedFunction
+SO_PUBLIC int get_module_version(const char* name, const char* type)
+{
+    // not all modules are plugins
+    // not all plugins have modules
+    ModHook* h = get_hook(name);
+
+    if ( !h )
+    {
+        if ( !type )
+            return -1;
+
+        PlugType pt = PluginManager::get_type(type);
+        return PluginManager::get_api(pt, name) ? 0 : -1;
+    }
+
+    return h->api ? (int)h->api->version : 0;
+}
+
 //-------------------------------------------------------------------------
 // ffi methods - also called internally so no cppcheck suppressions
 //-------------------------------------------------------------------------
@@ -938,6 +1003,16 @@ void ModuleManager::reset_errors()
 unsigned ModuleManager::get_errors()
 { return s_errors; }
 
+const char* ModuleManager::get_includer(const char* mod)
+{
+    assert(!strcmp(mod, "ips") or !strcmp(mod, "file_id"));
+
+    if ( !strcmp(mod, "ips") )
+        return s_ips_includer.c_str();
+
+    return s_file_id_includer.c_str();
+}
+
 void ModuleManager::list_modules(const char* s)
 {
     PlugType pt = s ? PluginManager::get_type(s) : PT_MAX;
@@ -1089,39 +1164,6 @@ void ModuleManager::show_module(const char* name)
     }
     if ( !c )
         cout << "no match" << endl;
-}
-
-void ModuleManager::reload_module(const char* name, SnortConfig* sc)
-{
-    ModHook* h = get_hook(name);
-
-    // Most of the modules don't support yet reload_module.
-    // This list contains the ones that do, and should be updated as
-    // more modules support reload_module.
-    const vector<string> supported_modules =
-    {
-        "dns_si", "firewall", "identity", "qos", "reputation", "url_si", "rt_network"
-    };
-    auto it = find(supported_modules.begin(), supported_modules.end(), name);
-
-    // FIXIT-L: we can check that h->api is not null here or inside instantiate.
-    // Both alternatives prevent crashing in instantiate(). However,
-    // checking it here might be too aggressive, because we are also saying it
-    // is an error. That makes the caller of this function
-    // (get_updated_module()) discard other legitimate reload operations, e.g.
-    // the newly read configuration. We should decide on this when proper
-    // reload functionality gets implemented.
-    if ( it != supported_modules.end() and h and h->api and h->mod and sc )
-    {
-        PluginManager::instantiate(h->api, h->mod, sc);
-        s_errors += get_parse_errors();
-    }
-    else
-    {
-        cout << "Module " << name <<" doesn't exist or reload not implemented.";
-        cout << endl;
-        ++s_errors;
-    }
 }
 
 static bool selected(const Module* m, const char* pfx, bool exact)

@@ -23,6 +23,7 @@
 
 #include "reputation_module.h"
 
+struct table_flat_t;
 class ReputationData
 {
 public:
@@ -46,7 +47,8 @@ public:
     void tterm() override;
 
     void show(const snort::SnortConfig*) const override;
-    void eval(snort::Packet*) override;
+    void eval(snort::Packet*) override
+    { }
     bool configure(snort::SnortConfig*) override;
     void install_reload_handler(snort::SnortConfig*) override;
 

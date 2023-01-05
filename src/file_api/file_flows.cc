@@ -35,7 +35,7 @@
 #include "managers/inspector_manager.h"
 #include "packet_tracer/packet_tracer.h"
 #include "protocols/packet.h"
-#include "main/snort_debug.h"
+#include "trace/trace_api.h"
 
 #include "file_cache.h"
 #include "file_config.h"
@@ -43,6 +43,7 @@
 #include "file_module.h"
 #include "file_service.h"
 #include "file_stats.h"
+#include <thread>
 
 using namespace snort;
 
@@ -199,6 +200,7 @@ uint64_t FileFlows::get_new_file_instance()
 
 FileFlows::~FileFlows()
 {
+    std::lock_guard<std::mutex> guard(file_flow_context_mutex);
     FileCache* file_cache = FileService::get_file_cache();
     assert(file_cache);
     uint64_t file_id = 0;

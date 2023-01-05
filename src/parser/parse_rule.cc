@@ -88,9 +88,13 @@ static rule_count_t svcCnt;  // dummy for now
 
 static bool s_ignore = false;  // for skipping drop rules when not inline, etc.
 static bool s_capture = false;
+static bool buf_is_set = false;
 
 static std::string s_type;
 static std::string s_body;
+
+static bool action_file_id = false;
+static bool strict_rtn_reduction = false;
 
 struct SoRule
 {
@@ -104,6 +108,9 @@ struct SoRule
 };
 
 static SoRule* s_so_rule = nullptr;
+
+static bool rule_is_stateless()
+{ return action_file_id; }
 
 static int ValidateIPList(sfip_var_t* addrset, const char* token)
 {
@@ -396,6 +403,9 @@ static int ParsePortList(
     return 0;
 }
 
+void set_strict_rtn_reduction(bool new_strict_rtn_reduction)
+{ strict_rtn_reduction = new_strict_rtn_reduction; }
+
 bool same_headers(RuleTreeNode* rule, RuleTreeNode* rtn)
 {
     if ( !rule or !rtn )
@@ -420,16 +430,23 @@ bool same_headers(RuleTreeNode* rule, RuleTreeNode* rtn)
     if ( rule->dip and rtn->dip and sfvar_compare(rule->dip, rtn->dip) != SFIP_EQUAL )
         return false;
 
-    /* compare the port group pointers - this prevents confusing src/dst port objects
-     * with the same port set, and it's quicker. It does assume that we only have
-     * one port object and pointer for each unique port set...this is handled by the
-     * parsing and initial port object storage and lookup.  This must be consistent during
-     * the rule parsing phase. - man */
-    if ( (rule->src_portobject != rtn->src_portobject)
-        or (rule->dst_portobject != rtn->dst_portobject))
+    if ( strict_rtn_reduction )
     {
-        return false;
+        if ( rule->src_portobject and rtn->src_portobject
+            and !PortObjectEqual(rule->src_portobject, rtn->src_portobject) )
+            return false;
+
+        if ( rule->dst_portobject and rtn->dst_portobject
+            and !PortObjectEqual(rule->dst_portobject, rtn->dst_portobject) )
+            return false;
     }
+    else
+    {
+        if ( (rule->src_portobject != rtn->src_portobject)
+            or (rule->dst_portobject != rtn->dst_portobject) )
+            return false;
+    }
+
     return true;
 }
 
@@ -775,6 +792,10 @@ void parse_rule_type(SnortConfig* sc, const char* s, RuleTreeNode& rtn)
         ParseError("unknown rule action '%s'", s);
         return;
     }
+    if (!strcmp(s,"file_id"))
+        action_file_id = true;
+    else
+        action_file_id = false;
 
     if ( sc->dump_rule_meta() )
         rtn.header = new RuleHeader(s);
@@ -787,7 +808,7 @@ void parse_rule_type(SnortConfig* sc, const char* s, RuleTreeNode& rtn)
         rtn.listhead = get_rule_list(sc, s);
     }
 
-    if ( sc->get_default_rule_state() )
+    if ( sc->get_default_rule_state() or rule_is_stateless() )
         rtn.set_enabled();
 }
 
@@ -963,6 +984,21 @@ void parse_rule_opt_set(
     IpsManager::option_set(sc, key, opt, val);
 }
 
+static void select_section(section_flags& otn_sects, section_flags sections)
+{
+    // The logic for choosing the right section is limited to rule options working on a single section or
+    // on both header and body. Should be updated if other combinations are required.
+    if ((otn_sects == section_to_flag(PS_TRAILER) and sections == section_to_flag(PS_BODY)) or
+        (sections == section_to_flag(PS_TRAILER) and otn_sects == section_to_flag(PS_BODY)))
+    {
+        otn_sects = section_to_flag(PS_ERROR);
+        return;
+    }
+
+    if (otn_sects < sections)
+        otn_sects = sections;
+}
+
 void parse_rule_opt_end(SnortConfig* sc, const char* key, OptTreeNode* otn)
 {
     if ( s_ignore )
@@ -981,10 +1017,21 @@ void parse_rule_opt_end(SnortConfig* sc, const char* key, OptTreeNode* otn)
     {
         if ( cat != CAT_SET_RAW )
             otn->set_service_only();
+        buf_is_set = true;
     }
 
     if ( type != OPT_TYPE_META )
         otn->num_detection_opts++;
+
+    for (int i=0; i<OptTreeNode::SECT_DIR__MAX; i++)
+    {
+        section_flags sections = ips ? ips->get_pdu_section(i==OptTreeNode::SECT_TO_SRV) : section_to_flag(PS_NONE);
+        // Rule option is using the cursor. The default buffer is pkt_data, belongs to BODY section
+        if (!buf_is_set and ((cat == CAT_ADJUST) or (cat == CAT_READ)))
+            sections = section_to_flag(PS_BODY);
+
+        select_section(otn->sections[i], sections);
+    }
 }
 
 OptTreeNode* parse_rule_open(SnortConfig* sc, RuleTreeNode& rtn, bool stub)
@@ -1004,27 +1051,22 @@ OptTreeNode* parse_rule_open(SnortConfig* sc, RuleTreeNode& rtn, bool stub)
     OptTreeNode* otn = new OptTreeNode;
     otn->state = new OtnState[ThreadConfig::get_instance_max()];
 
-    if ( !stub )
-        otn->sigInfo.gid = GID_DEFAULT;
-
     otn->snort_protocol_id = rtn.snort_protocol_id;
 
-    if ( sc->get_default_rule_state() )
+    if ( sc->get_default_rule_state() or rule_is_stateless() )
         rtn.set_enabled();
 
     IpsManager::reset_options();
 
     s_capture = sc->dump_rule_meta();
     s_body = "(";
+    buf_is_set = false;
 
     return otn;
 }
 
 static void parse_rule_state(SnortConfig* sc, const RuleTreeNode& rtn, OptTreeNode* otn)
 {
-    if ( !otn->sigInfo.gid )
-        otn->sigInfo.gid = GID_DEFAULT;
-
     if ( otn->num_detection_opts )
     {
         ParseError("%u:%u rule state stubs do not support detection options",
@@ -1054,16 +1096,8 @@ static void parse_rule_state(SnortConfig* sc, const RuleTreeNode& rtn, OptTreeNo
 
 static bool is_builtin(uint32_t gid)
 {
-    if ( ModuleManager::gid_in_use(gid) )
-        return true;
-
-    // the builtin range prevents unloaded sids from firing on every packet
-    if ( gid < GID_BUILTIN_MIN or gid > GID_BUILTIN_MAX )
-        return false;
-
-    // not builtin but may get used and abused by snort2lua
-    // should be deleted at some point
-    return gid != GID_EXCEPTION_SDF;
+    return ModuleManager::gid_in_use(gid) or
+        ( gid >= GID_BUILTIN_MIN and gid <= GID_BUILTIN_MAX );
 }
 
 void parse_rule_close(SnortConfig* sc, RuleTreeNode& rtn, OptTreeNode* otn)
@@ -1195,6 +1229,11 @@ void parse_rule_close(SnortConfig* sc, RuleTreeNode& rtn, OptTreeNode* otn)
         std::string service = sc->proto_ref->get_name(otn->snort_protocol_id);
         add_service_to_otn(sc, otn, service.c_str());
     }
+    if (!otn->sigInfo.services.size() and action_file_id)
+    {
+        add_service_to_otn(sc, otn, "file_id");
+        action_file_id = false;
+    }
 
     validate_services(sc, otn);
     OtnLookupAdd(sc->otn_map, otn);
@@ -1206,6 +1245,19 @@ void parse_rule_close(SnortConfig* sc, RuleTreeNode& rtn, OptTreeNode* otn)
     }
 
     ClearIpsOptionsVars();
+
+    for (int i=0; i<OptTreeNode::SECT_DIR__MAX; i++)
+    {
+        if (otn->sections[i] == section_to_flag(PS_HEADER_BODY))
+            otn->sections[i] = section_to_flag(PS_HEADER) | section_to_flag(PS_BODY);
+    }
+
+    if ((otn->to_server_err() && otn->to_server()) ||
+        (otn->to_client_err() && otn->to_client()) ||
+        (otn->to_server_err() && otn->to_client_err()))
+        ParseError("Rule cannot examine both HTTP message body and HTTP trailers, unless it is request"
+            " trailer with response body");
+
 }
 
 void parse_rule_process_rtn(RuleTreeNode* rtn)

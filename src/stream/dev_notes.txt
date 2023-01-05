@@ -24,7 +24,7 @@ subdirectory located here.  These include the following:
 * tcp - implements module for handling Stream tcp sessions.  This includes
   normalization protocol tracking, normalization, and reassembly.
 
-* upd - implements module for handling Stream udp sessions.  Tracking only.
+* udp - implements module for handling Stream udp sessions.  Tracking only.
 
 * icmp - implements module for handling Stream icmp sessions.  Tracking
   only.
@@ -43,3 +43,5 @@ destroys the <protocol>HA class.  <protocol>HA is a subclass of ProtocolHA and i
 with the high level Stream HA functionality. <protocol>HA is instantiated in each packet
 processing thread.
 
+Note that the lifetime of any stream splitter instance should be less than the lifetime
+of the corresponding inspector instance.

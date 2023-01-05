@@ -86,6 +86,15 @@ void ExpectFlow::reset_expect_flows()
         packet_expect_flows->clear();
 }
 
+void ExpectFlow::handle_expected_flows(const Packet* p)
+{
+    if (p->flow && packet_expect_flows && !packet_expect_flows->empty())
+    {
+        ExpectedFlowsEvent event(*packet_expect_flows, *p);
+        DataBus::publish(EXPECT_EVENT_TYPE_HANDLE_FLOWS, event);
+    }
+}
+
 FlowData* ExpectFlow::get_flow_data(unsigned id)
 {
     for (FlowData* p = data; p; p = p->next)
@@ -318,7 +327,7 @@ ExpectCache::~ExpectCache()
 int ExpectCache::add_flow(const Packet *ctrlPkt, PktType type, IpProtocol ip_proto,
     const SfIp* cliIP, uint16_t cliPort, const SfIp* srvIP, uint16_t srvPort, char direction,
     FlowData* fd, SnortProtocolId snort_protocol_id, bool swap_app_direction, bool expect_multi,
-    bool bidirectional)
+    bool bidirectional, bool expect_persist)
 {
     /* Just pull the VLAN ID, MPLS ID, and Address Space ID from the
         control packet until we have a use case for not doing so. */
@@ -399,6 +408,9 @@ int ExpectCache::add_flow(const Packet *ctrlPkt, PktType type, IpProtocol ip_pro
 
             if (bidirectional)
                 flag |= DAQ_EFLOW_BIDIRECTIONAL;
+
+            if (expect_persist)
+                flag |= DAQ_EFLOW_PERSIST;
 
             ctrlPkt->daq_instance->add_expected(ctrlPkt, cliIP, cliPort, srvIP, srvPort,
                     ip_proto, 1000, flag);

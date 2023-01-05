@@ -40,9 +40,6 @@ HttpMsgRequest::HttpMsgRequest(const uint8_t* buffer, const uint16_t buf_size,
 {
     transaction->set_request(this);
     get_related_sections();
-    session_data->release_js_ctx();
-    session_data->reset_js_ident_ctx();
-    session_data->reset_js_pdu_idx();
 }
 
 HttpMsgRequest::~HttpMsgRequest()
@@ -74,8 +71,8 @@ void HttpMsgRequest::parse_start_line()
         else
         {
             add_infraction(INF_BAD_REQ_LINE);
-            session_data->events[source_id]->generate_misformatted_http(start_line.start(),
-                start_line.length());
+            session_data->events[source_id]->create_event(HttpEnums::EVENT_BAD_REQ_LINE);
+            session_data->events[source_id]->create_event(HttpEnums::EVENT_LOSS_OF_SYNC);
             return;
         }
     }
@@ -257,7 +254,36 @@ void HttpMsgRequest::gen_events()
         }
     }
 
-    if (method_id == METH__OTHER)
+    bool known_method = false;
+    assert(method.length() > 0);
+    if (!params->allowed_methods.empty() or !params->disallowed_methods.empty())
+    {
+        string method_str((const char*)method.start(), method.length());
+
+        if (!params->allowed_methods.empty())
+        {
+            const set<string>::iterator it = params->allowed_methods.find(method_str);
+            if (it == params->allowed_methods.end())
+            {
+                add_infraction(INF_METHOD_NOT_ON_ALLOWED_LIST);
+                create_event(EVENT_DISALLOWED_METHOD);
+            }
+            else
+                known_method = true;
+        }
+        else
+        {
+            const set<string>::iterator it = params->disallowed_methods.find(method_str);
+            if (it != params->disallowed_methods.end())
+            {
+                add_infraction(INF_METHOD_ON_DISALLOWED_LIST);
+                create_event(EVENT_DISALLOWED_METHOD);
+                known_method = true;
+            }
+        }
+    }
+
+    if (method_id == METH__OTHER && !known_method)
         create_event(EVENT_UNKNOWN_METHOD);
 
     if (uri && uri->get_scheme().length() > LONG_SCHEME_LENGTH)

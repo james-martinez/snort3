@@ -233,6 +233,22 @@ ACDAQSwap::~ACDAQSwap()
     LogMessage("== daq module reload complete\n");
 }
 
+bool ACScratchUpdate::execute(Analyzer&, void**)
+{
+    for ( auto* s : handlers )
+    {
+        if ( s )
+            s->update(sc);
+    }
+    return true;
+}
+
+ACScratchUpdate::~ACScratchUpdate()
+{
+    log_message("== scratch update complete\n");
+    ReloadTracker::end(ctrlcon, true);
+}
+
 SFDAQInstance* AnalyzerCommand::get_daq_instance(Analyzer& analyzer)
 {
     return analyzer.get_daq_instance();

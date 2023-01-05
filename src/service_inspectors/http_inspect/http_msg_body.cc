@@ -27,6 +27,7 @@
 #include "file_api/file_flows.h"
 #include "file_api/file_service.h"
 #include "helpers/buffer_data.h"
+#include "js_norm/js_enum.h"
 #include "pub_sub/http_request_body_event.h"
 
 #include "http_api.h"
@@ -41,6 +42,23 @@
 using namespace snort;
 using namespace HttpCommon;
 using namespace HttpEnums;
+using namespace jsn;
+
+extern THREAD_LOCAL const snort::Trace* js_trace;
+
+static HttpInfractions decode_infs;
+
+static void init_decode_infs()
+{
+    decode_infs += INF_UNKNOWN_ENCODING;
+    decode_infs += INF_UNSUPPORTED_ENCODING;
+    decode_infs += INF_STACKED_ENCODINGS;
+    decode_infs += INF_CONTENT_ENCODING_CHUNKED;
+    decode_infs += INF_GZIP_FAILURE;
+    decode_infs += INF_GZIP_OVERRUN;
+}
+
+static int _init_decode_infs __attribute__((unused)) = (static_cast<void>(init_decode_infs()), 0);
 
 HttpMsgBody::HttpMsgBody(const uint8_t* buffer, const uint16_t buf_size,
     HttpFlowData* session_data_, SourceId source_id_, bool buf_owner, Flow* flow_,
@@ -65,7 +83,7 @@ void HttpMsgBody::publish()
 
     HttpRequestBodyEvent http_request_body_event(this, publish_octets, last_piece, session_data);
 
-    DataBus::publish(HTTP2_REQUEST_BODY_EVENT_KEY, http_request_body_event, flow);
+    DataBus::publish(HTTPX_REQUEST_BODY_EVENT_KEY, http_request_body_event, flow);
     publish_octets += publish_length;
 #ifdef REG_TEST
     if (HttpTestManager::use_test_output(HttpTestManager::IN_HTTP))
@@ -81,8 +99,6 @@ void HttpMsgBody::publish()
 void HttpMsgBody::bookkeeping_regular_flush(uint32_t& partial_detect_length,
     uint8_t*& partial_detect_buffer, uint32_t& partial_js_detect_length, int32_t detect_length)
 {
-    params->js_norm_param.js_norm->set_detection_depth(session_data->detect_depth_remaining[source_id]);
-
     session_data->detect_depth_remaining[source_id] -= detect_length;
     partial_detect_buffer = nullptr;
     partial_detect_length = 0;
@@ -111,6 +127,15 @@ void HttpMsgBody::clean_partial(uint32_t& partial_inspected_octets, uint32_t& pa
 
 void HttpMsgBody::analyze()
 {
+    const int32_t raw_body_length =
+        (msg_text.length() <= session_data->detect_depth_remaining[source_id]) ?
+        msg_text.length() : session_data->detect_depth_remaining[source_id];
+
+    if (raw_body_length > 0)
+        raw_body.set(raw_body_length, msg_text.start());
+    else
+        raw_body.set(STAT_NO_SOURCE);
+
     uint32_t& partial_inspected_octets = session_data->partial_inspected_octets[source_id];
 
     // When there have been partial inspections we focus on the part of the message we have not
@@ -142,7 +167,7 @@ void HttpMsgBody::analyze()
             msg_text_new.length() : pub_depth_remaining;
         pub_depth_remaining -= publish_length;
     }
-    
+
     if (session_data->mime_state[source_id])
     {
         // FIXIT-M this interface does not convey any indication of end of message body. If the
@@ -151,18 +176,66 @@ void HttpMsgBody::analyze()
         Packet* p = DetectionEngine::get_current_packet();
         const uint8_t* const section_end = msg_text_new.start() + msg_text_new.length();
         const uint8_t* ptr = msg_text_new.start();
+        MimeSession::AttachmentBuffer latest_attachment;
+
+        if (session_data->partial_mime_bufs[source_id] != nullptr)
+        {
+            // Retrieve the attachment list stored during the partial inspection
+            mime_bufs = session_data->partial_mime_bufs[source_id];
+            session_data->partial_mime_bufs[source_id] = nullptr;
+            last_attachment_complete = session_data->partial_mime_last_complete[source_id];
+            session_data->partial_mime_last_complete[source_id] = true;
+
+            if (!mime_bufs->empty())
+                mime_bufs->front().file.set_accumulation(true);
+        }
+        else
+            mime_bufs = new std::list<MimeBufs>;
+
         while (ptr < section_end)
         {
-            // After process_mime_data(), ptr will point to the last byte processed in the current
-            // MIME part
+            // After process_mime_data(), ptr will point to the last byte processed in the current MIME part
             ptr = session_data->mime_state[source_id]->process_mime_data(p, ptr,
                 (section_end - ptr), true, SNORT_FILE_POSITION_UNKNOWN);
             ptr++;
+
+            latest_attachment = session_data->mime_state[source_id]->get_attachment();
+            if (latest_attachment.data != nullptr)
+            {
+                uint32_t attach_length;
+                uint8_t* attach_buf;
+                if (!last_attachment_complete)
+                {
+                    assert(!mime_bufs->empty());
+                    // Remove the partial attachment from the list and replace it with an extended version
+                    const uint8_t* const old_buf = mime_bufs->back().file.start();
+                    const uint32_t old_length = mime_bufs->back().file.length();
+                    attach_length = old_length + latest_attachment.length;
+                    attach_buf = new uint8_t[attach_length];
+                    memcpy(attach_buf, old_buf, old_length);
+                    memcpy(attach_buf + old_length, latest_attachment.data, latest_attachment.length);
+                    mime_bufs->pop_back();
+                }
+                else
+                {
+                    attach_length = latest_attachment.length;
+                    attach_buf = new uint8_t[attach_length];
+                    memcpy(attach_buf, latest_attachment.data, latest_attachment.length);
+                }
+                const BufferData& vba_buf = session_data->mime_state[source_id]->get_ole_buf();
+                if (vba_buf.data_ptr() != nullptr)
+                {
+                    uint8_t* my_vba_buf = new uint8_t[vba_buf.length()];
+                    memcpy(my_vba_buf, vba_buf.data_ptr(), vba_buf.length());
+                    mime_bufs->emplace_back(attach_length, attach_buf, true, vba_buf.length(), my_vba_buf, true);
+                }
+                else
+                    mime_bufs->emplace_back(attach_length, attach_buf, true, STAT_NOT_PRESENT, nullptr, false);
+
+                mime_bufs->back().file.set_accumulation(!last_attachment_complete);
+            }
+            last_attachment_complete = latest_attachment.finished;
         }
-        
-        const BufferData& vba_buf = session_data->mime_state[source_id]->get_ole_buf();
-        if (vba_buf.data_ptr())
-            ole_data.set(vba_buf.length(), vba_buf.data_ptr());
 
         detect_data.set(msg_text.length(), msg_text.start());
     }
@@ -181,12 +254,17 @@ void HttpMsgBody::analyze()
         {
             do_file_decompression(decoded_body, decompressed_file_body);
 
+            if (decompressed_file_body.length() > 0 and session_data->js_ctx[source_id])
+                session_data->js_ctx[source_id]->ctx().tick();
+
             uint32_t& partial_detect_length = session_data->partial_detect_length[source_id];
             uint8_t*& partial_detect_buffer = session_data->partial_detect_buffer[source_id];
             uint32_t& partial_js_detect_length = session_data->partial_js_detect_length[source_id];
 
             if (partial_detect_length > 0)
             {
+                detect_data.set_accumulation(true);
+                norm_js_data.set_accumulation(true);
                 const int32_t total_length = partial_detect_length +
                     decompressed_file_body.length();
                 assert(total_length <=
@@ -210,8 +288,6 @@ void HttpMsgBody::analyze()
             }
             else
                 do_legacy_js_normalization(decompressed_file_body, js_norm_body);
-
-            ++session_data->pdu_idx;
 
             const int32_t detect_length =
                 (js_norm_body.length() <= session_data->detect_depth_remaining[source_id]) ?
@@ -237,12 +313,9 @@ void HttpMsgBody::analyze()
                 partial_js_detect_length = js_norm_body.length();
             }
 
-            // If this is a MIME upload, the MIME library sets the file_data buffer to the
-            // file attachment body data.
-            // FIXIT-E currently the file_data buffer is set to the body of the last attachment per
-            // message section.
+            const uint64_t file_index = get_header(source_id)->get_multi_file_processing_id();
             set_file_data(const_cast<uint8_t*>(detect_data.start()),
-                (unsigned)detect_data.length());
+                (unsigned)detect_data.length(), file_index, detect_data.is_accumulated());
         }
     }
     body_octets += msg_text.length();
@@ -298,11 +371,11 @@ void HttpMsgBody::get_ole_data()
     {
         ole_data.set(ole_len, ole_data_ptr, false);
 
-        //Reset the ole data ptr once it is stored in msg body
+        // Reset the ole data ptr once it is stored in msg body
         session_data->fd_state[source_id]->ole_data_reset();
     }
 }
-    
+
 void HttpMsgBody::do_file_decompression(const Field& input, Field& output)
 {
     if (session_data->fd_state[source_id] == nullptr)
@@ -386,33 +459,6 @@ void HttpMsgBody::fd_event_callback(void* context, int event)
     }
 }
 
-void HttpMsgBody::do_enhanced_js_normalization(const Field& input, Field& output)
-{
-    if (session_data->js_data_lost_once)
-        return;
-
-    auto infractions = transaction->get_infractions(source_id);
-    auto back = !session_data->partial_flush[source_id];
-    auto http_header = get_header(source_id);
-    auto normalizer = params->js_norm_param.js_norm;
-
-    if ((*infractions & INF_UNKNOWN_ENCODING) or (*infractions & INF_UNSUPPORTED_ENCODING))
-        return;
-
-    if (session_data->is_pdu_missed())
-    {
-        *infractions += INF_JS_PDU_MISS;
-        session_data->events[HttpCommon::SRC_SERVER]->create_event(EVENT_JS_PDU_MISS);
-        session_data->js_data_lost_once = true;
-        return;
-    }
-
-    if (http_header and http_header->is_external_js())
-        normalizer->do_external(input, output, infractions, session_data, back);
-    else
-        normalizer->do_inline(input, output, infractions, session_data, back);
-}
-
 void HttpMsgBody::do_legacy_js_normalization(const Field& input, Field& output)
 {
     if (!params->js_norm_param.normalize_javascript || source_id == SRC_CLIENT)
@@ -421,9 +467,97 @@ void HttpMsgBody::do_legacy_js_normalization(const Field& input, Field& output)
         return;
     }
 
-    params->js_norm_param.js_norm->do_legacy(input, output,
-        transaction->get_infractions(source_id), session_data->events[source_id],
-        params->js_norm_param.max_javascript_whitespaces);
+    js_normalize(input, output, params,
+        transaction->get_infractions(source_id), session_data->events[source_id]);
+}
+
+HttpJSNorm* HttpMsgBody::acquire_js_ctx()
+{
+    HttpJSNorm* js_ctx = session_data->js_ctx[source_id];
+
+    if (js_ctx)
+    {
+        if (js_ctx->get_trans_num() == trans_num)
+            return js_ctx;
+
+        delete js_ctx;
+        js_ctx = nullptr;
+    }
+
+    auto http_header = get_header(source_id);
+
+    if (!http_header)
+        return nullptr;
+
+    JSNormConfig* jsn_config = get_inspection_policy()->jsn_config;
+
+    switch(http_header->get_content_type())
+    {
+    case CT_APPLICATION_JAVASCRIPT:
+    case CT_APPLICATION_ECMASCRIPT:
+    case CT_APPLICATION_X_JAVASCRIPT:
+    case CT_APPLICATION_X_ECMASCRIPT:
+    case CT_TEXT_JAVASCRIPT:
+    case CT_TEXT_JAVASCRIPT_1_0:
+    case CT_TEXT_JAVASCRIPT_1_1:
+    case CT_TEXT_JAVASCRIPT_1_2:
+    case CT_TEXT_JAVASCRIPT_1_3:
+    case CT_TEXT_JAVASCRIPT_1_4:
+    case CT_TEXT_JAVASCRIPT_1_5:
+    case CT_TEXT_ECMASCRIPT:
+    case CT_TEXT_X_JAVASCRIPT:
+    case CT_TEXT_X_ECMASCRIPT:
+    case CT_TEXT_JSCRIPT:
+    case CT_TEXT_LIVESCRIPT:
+        // an external script should be processed from the beginning
+        js_ctx = first_body ? new HttpExternalJSNorm(jsn_config, trans_num) : nullptr;
+        break;
+
+    case CT_APPLICATION_XHTML_XML:
+    case CT_TEXT_HTML:
+        js_ctx = new HttpInlineJSNorm(jsn_config, trans_num, params->js_norm_param.mpse_otag,
+            params->js_norm_param.mpse_attr);
+        break;
+
+    case CT_APPLICATION_PDF:
+        js_ctx = new HttpPDFJSNorm(jsn_config, trans_num);
+        break;
+
+    case CT_APPLICATION_OCTET_STREAM:
+        js_ctx = first_body and HttpPDFJSNorm::is_pdf(decompressed_file_body.start(), decompressed_file_body.length()) ?
+            new HttpPDFJSNorm(jsn_config, trans_num) : nullptr;
+        break;
+    }
+
+    session_data->js_ctx[source_id] = js_ctx;
+    return js_ctx;
+}
+
+HttpJSNorm* HttpMsgBody::acquire_js_ctx_mime()
+{
+    HttpJSNorm* js_ctx = session_data->js_ctx_mime[source_id];
+
+    if (js_ctx)
+    {
+        if (js_ctx->get_trans_num() == trans_num)
+            return js_ctx;
+
+        delete js_ctx;
+        js_ctx = nullptr;
+    }
+
+    JSNormConfig* jsn_config = get_inspection_policy()->jsn_config;
+    js_ctx = HttpPDFJSNorm::is_pdf(decompressed_file_body.start(), decompressed_file_body.length()) ?
+        new HttpPDFJSNorm(jsn_config, trans_num) : nullptr;
+
+    session_data->js_ctx_mime[source_id] = js_ctx;
+    return js_ctx;
+}
+
+void HttpMsgBody::clear_js_ctx_mime()
+{
+    delete session_data->js_ctx_mime[source_id];
+    session_data->js_ctx_mime[source_id] = nullptr;
 }
 
 void HttpMsgBody::do_file_processing(const Field& file_data)
@@ -491,6 +625,68 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
     session_data->file_octets[source_id] += fp_length;
 }
 
+bool HttpMsgBody::run_detection(snort::Packet* p)
+{
+    if ((p == nullptr) || !detection_required())
+        return false;
+    if ((mime_bufs != nullptr) && !mime_bufs->empty())
+    {
+        HttpJSNorm* js_ctx_tmp = nullptr;
+        auto mb = mime_bufs->cbegin();
+        uint32_t mime_bufs_size = mime_bufs->size();
+
+        for (uint32_t count = 0; (count < params->max_mime_attach) && (mb != mime_bufs->cend());
+            ++count, ++mb)
+        {
+            bool is_last_attachment = ((count + 1 == mime_bufs_size) ||
+                (count + 1 == params->max_mime_attach));
+            const uint64_t idx = get_header(source_id)->get_multi_file_processing_id();
+            set_file_data(mb->file.start(), mb->file.length(), idx,
+                count or mb->file.is_accumulated(),
+                std::next(mb) != mime_bufs->end() or last_attachment_complete);
+            if (mb->vba.length() > 0)
+                ole_data.set(mb->vba.length(), mb->vba.start());
+            decompressed_file_body.reset();
+            decompressed_file_body.set(mb->file.length(), mb->file.start());
+
+            js_ctx_tmp = session_data->js_ctx[source_id];
+            session_data->js_ctx[source_id] = acquire_js_ctx_mime();
+
+            DetectionEngine::detect(p);
+
+            if (!is_last_attachment || last_attachment_complete)
+                clear_js_ctx_mime();
+
+            session_data->js_ctx[source_id] = js_ctx_tmp;
+
+            ole_data.reset();
+            decompressed_vba_data.reset();
+            decompressed_file_body.reset();
+        }
+        if (mb != mime_bufs->cend())
+        {
+            // More MIME attachments than we have resources to inspect
+            HttpModule::increment_peg_counts(PEG_SKIP_MIME_ATTACH);
+        }
+    }
+    else
+        DetectionEngine::detect(p);
+    return true;
+}
+
+void HttpMsgBody::clear()
+{
+    if (session_data->partial_flush[source_id])
+    {
+        // Stash the MIME file attachments for use in full inspection
+        session_data->partial_mime_bufs[source_id] = mime_bufs;
+        mime_bufs = nullptr;
+        session_data->partial_mime_last_complete[source_id] = last_attachment_complete;
+    }
+
+    HttpMsgSection::clear();
+}
+
 // Parses out the filename and URI associated with this file.
 // For the filename, if the message has a Content-Disposition header with a filename attribute,
 // use that. Otherwise use the segment of the URI path after the last '/' but not including the
@@ -527,7 +723,7 @@ void HttpMsgBody::get_file_info(FileDirection dir, const uint8_t*& filename_buff
         if (filename_length > 0)
             return;
 
-        const Field& path = http_uri->get_norm_path(); 
+        const Field& path = http_uri->get_norm_path();
         if (path.length() > 0)
         {
             int last_slash_index = path.length() - 1;
@@ -585,16 +781,49 @@ const Field& HttpMsgBody::get_norm_js_data()
     if (norm_js_data.length() != STAT_NOT_COMPUTE)
         return norm_js_data;
 
-    if (decompressed_file_body.length() <= 0)
+    auto infractions = this->transaction->get_infractions(source_id);
+
+    if (*infractions & decode_infs)
     {
         norm_js_data.set(STAT_NO_SOURCE);
         return norm_js_data;
     }
 
-    do_enhanced_js_normalization(decompressed_file_body, norm_js_data);
+    int src_len = decompressed_file_body.length();
 
-    if (norm_js_data.length() == STAT_NOT_COMPUTE)
+    if (src_len <= 0)
+    {
+        norm_js_data.set(STAT_NO_SOURCE);
+        return norm_js_data;
+    }
+
+    auto jsn = acquire_js_ctx();
+
+    if (!jsn)
+    {
+        norm_js_data.set(STAT_NO_SOURCE);
+        return norm_js_data;
+    }
+
+    const void* src = decompressed_file_body.start();
+    const void* dst = nullptr;
+    size_t dst_len = HttpCommon::STAT_NOT_PRESENT;
+    bool back = !session_data->partial_flush[source_id];
+
+    jsn->link(src, session_data->events[source_id], infractions);
+    jsn->ctx().normalize(src, src_len, dst, dst_len);
+
+    debug_logf(4, js_trace, TRACE_PROC, DetectionEngine::get_current_packet(),
+        "input data was %s\n", back ? "last one in PDU" : "a part of PDU");
+
+    if (!dst or !dst_len)
         norm_js_data.set(STAT_NOT_PRESENT);
+    else
+    {
+        if (back)
+            jsn->ctx().flush_data(dst, dst_len);
+        norm_js_data.set(dst_len, (const uint8_t*)dst, back);
+    }
 
     return norm_js_data;
 }
@@ -611,6 +840,22 @@ void HttpMsgBody::print_body_section(FILE* output, const char* body_type_str)
     HttpMsgSection::print_section_title(output, body_type_str);
     fprintf(output, "octets seen %" PRIi64 "\n", body_octets);
     detect_data.print(output, "Detect data");
+    if ((mime_bufs != nullptr) && !mime_bufs->empty())
+        for (MimeBufs& mb : *mime_bufs)
+        {
+            mb.file.print(output, "MIME data");
+            mb.vba.print(output, "MIME OLE data");
+            if (mb.vba.length() > 0)
+                ole_data.set(mb.vba.length(), mb.vba.start());
+            get_decomp_vba_data().print(output, "MIME Decompressed VBA data");
+            ole_data.reset();
+            decompressed_vba_data.reset();
+        }
+    else
+    {
+        ole_data.print(output, "OLE data");
+        get_decomp_vba_data().print(output, "Decompressed VBA data");
+    }
     get_classic_buffer(HTTP_BUFFER_CLIENT_BODY, 0, 0).print(output,
         HttpApi::classic_buffer_names[HTTP_BUFFER_CLIENT_BODY-1]);
     get_classic_buffer(HTTP_BUFFER_RAW_BODY, 0, 0).print(output,
@@ -619,4 +864,3 @@ void HttpMsgBody::print_body_section(FILE* output, const char* body_type_str)
     HttpMsgSection::print_section_wrapup(output);
 }
 #endif
-

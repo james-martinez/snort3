@@ -58,7 +58,7 @@ public:
     static void init() { inspector_id = snort::FlowData::create_flow_data_id(); }
 
     // Used by http_inspect to store its stuff
-    HttpFlowData* get_hi_flow_data() const;
+    HttpFlowData* get_hi_flow_data();
     void set_hi_flow_data(HttpFlowData* flow);
     HttpMsgSection* get_hi_msg_section() const { return hi_msg_section; }
     void set_hi_msg_section(HttpMsgSection* section)
@@ -67,12 +67,14 @@ public:
     friend class Http2Frame;
     friend class Http2DataFrame;
     friend class Http2DataCutter;
+    friend class Http2GoAwayFrame;
     friend class Http2HeadersFrame;
     friend class Http2HeadersFrameHeader;
     friend class Http2HeadersFrameTrailer;
     friend class Http2HeadersFrameWithStartline;
     friend class Http2Hpack;
     friend class Http2Inspect;
+    friend class Http2PriorityFrame;
     friend class Http2PushPromiseFrame;
     friend class Http2RequestLine;
     friend class Http2RstStreamFrame;
@@ -84,10 +86,10 @@ public:
     friend class Http2WindowUpdateFrame;
     friend void finish_msg_body(Http2FlowData* session_data, HttpCommon::SourceId source_id);
 
-    Http2Stream* find_current_stream(const HttpCommon::SourceId source_id) const;
+    Http2Stream* find_current_stream(const HttpCommon::SourceId source_id);
     uint32_t get_current_stream_id(const HttpCommon::SourceId source_id) const;
     Http2Stream* get_processing_stream(const HttpCommon::SourceId source_id, uint32_t concurrent_streams_limit);
-    Http2Stream* find_processing_stream() const;
+    Http2Stream* find_processing_stream();
     uint32_t get_processing_stream_id() const;
     void set_processing_stream_id(const HttpCommon::SourceId source_id);
     bool is_processing_partial_header() const { return processing_partial_header; }
@@ -103,7 +105,7 @@ public:
     // frame into the S2C direction of an HTTP/2 flow.
     bool is_mid_frame() const;
 
-    // Used by payload injection to determine whether we should inject S2C settings frame 
+    // Used by payload injection to determine whether we should inject S2C settings frame
     // before injecting payload
     bool was_server_settings_received() const
     { return server_settings_frame_received; }
@@ -148,7 +150,7 @@ protected:
     // Used in eval()
     Http2ConnectionSettings connection_settings[2];
     Http2HpackDecoder hpack_decoder[2];
-    std::list<Http2Stream*> streams;
+    std::list<Http2Stream> streams;
     uint32_t concurrent_files = 0;
     uint32_t concurrent_streams = 0;
     uint32_t stream_memory_allocations_tracked = Http2Enums::STREAM_MEMORY_TRACKING_INCREMENT;
@@ -180,6 +182,7 @@ protected:
     bool abort_flow[2] = { false, false };
     bool processing_partial_header = false;
     std::queue<uint32_t> frame_lengths[2];
+    uint32_t accumulated_frame_length[2] = { 0, 0 };
 
     // Internal to reassemble()
     uint32_t frame_header_offset[2] = { 0, 0 };
@@ -198,9 +201,18 @@ protected:
 #endif
 
 private:
-    Http2Stream* get_hi_stream() const;
-    Http2Stream* find_stream(const uint32_t key) const;
+    Http2Stream* get_hi_stream();
+    Http2Stream* find_stream(const uint32_t key);
     void delete_processing_stream();
+};
+
+class Http2FlowStreamIntf : public snort::StreamFlowIntf
+{
+public:
+    snort::FlowData* get_stream_flow_data(const snort::Flow* flow) override;
+    void set_stream_flow_data(snort::Flow* flow, snort::FlowData* flow_data) override;
+    void get_stream_id(const snort::Flow* flow, int64_t& stream_id) override;
+    AppId get_appid_from_stream(const snort::Flow* flow) override;
 };
 
 #endif

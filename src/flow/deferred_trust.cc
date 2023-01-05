@@ -59,11 +59,12 @@ void DeferredTrust::set_deferred_trust(unsigned module_id, bool on)
 
 void DeferredTrust::finalize(Active& active)
 {
-    if (active.packet_was_dropped())
+    if (active.session_was_blocked())
         clear();
     else if (TRUST_DEFER_DO_TRUST == deferred_trust && active.session_was_allowed())
         active.set_trust();
-    else if (TRUST_DEFER_ON == deferred_trust && active.session_was_trusted())
+    else if ((TRUST_DEFER_ON == deferred_trust || TRUST_DEFER_DEFERRING == deferred_trust)
+        && active.session_was_trusted())
     {
         // This is the case where defer was called after session trust while processing
         // the same packet

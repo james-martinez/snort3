@@ -53,6 +53,7 @@ public:
     SO_PUBLIC static std::list<Module*> get_all_modules();
 
     static const char* get_lua_coreinit();
+    static const char* get_includer(const char* module);
 
     static void list_modules(const char* = nullptr);
     static void dump_modules();
@@ -78,7 +79,6 @@ public:
     static void load_commands(Shell*);
     static void load_rules(SnortConfig*);
     static void set_config(SnortConfig*);
-    static void reload_module(const char*, SnortConfig*);
 
     static void reset_errors();
     static unsigned get_errors();

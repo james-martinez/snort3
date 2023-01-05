@@ -55,12 +55,15 @@ void VarTablesFree(snort::SnortConfig*);
 
 void parser_append_rules(const char*);
 void parser_append_includes(const char*);
+void parser_append_rules_special(const char* file, const char* includer);
+const char* parser_get_special_includer();
 
 int ParseBool(const char* arg);
 
 int addRtnToOtn(snort::SnortConfig*, struct OptTreeNode*, RuleTreeNode*);
 int addRtnToOtn(snort::SnortConfig*, struct OptTreeNode*, RuleTreeNode*, PolicyId);
 
+void set_strict_rtn_reduction(bool);
 bool same_headers(RuleTreeNode*, RuleTreeNode*);
 RuleTreeNode* deleteRtnFromOtn(OptTreeNode*, snort::SnortConfig* sc = nullptr);
 RuleTreeNode* deleteRtnFromOtn(struct OptTreeNode*, PolicyId, snort::SnortConfig* sc = nullptr, bool remove = true);

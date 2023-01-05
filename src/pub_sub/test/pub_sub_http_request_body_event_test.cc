@@ -55,9 +55,11 @@ void HttpMsgBody::publish() {}
 void HttpMsgBody::do_file_processing(const Field&) {}
 void HttpMsgBody::do_utf_decoding(const Field&, Field&) {}
 void HttpMsgBody::do_file_decompression(const Field&, Field&) {}
-void HttpMsgBody::do_enhanced_js_normalization(const Field&, Field&) {}
 void HttpMsgBody::clean_partial(uint32_t&, uint32_t&, uint8_t*&, uint32_t&) {}
 void HttpMsgBody::bookkeeping_regular_flush(uint32_t&, uint8_t*&, uint32_t&, int32_t) {}
+bool HttpMsgBody::run_detection(snort::Packet*) { return true; }
+void HttpMsgBody::clear() {}
+void HttpMsgSection::clear() {}
 #ifdef REG_TEST
 void HttpMsgBody::print_body_section(FILE*, const char*) {}
 #endif
@@ -78,6 +80,7 @@ HttpMsgSection::HttpMsgSection(const uint8_t* buffer, const uint16_t buf_size,
     tcp_close(false)
 {}
 void HttpMsgSection::update_depth() const{}
+bool HttpMsgSection::run_detection(snort::Packet*) { return true; }
 
 HttpTransaction*HttpTransaction::attach_my_transaction(HttpFlowData*, HttpCommon::SourceId)
     { return nullptr; }
@@ -103,9 +106,9 @@ int32_t HttpMsgBody::get_publish_length() const
     return mock().getData("pub_length").getIntValue();
 }
 
-uint32_t HttpFlowData::get_h2_stream_id() const
+int64_t HttpFlowData::get_hx_stream_id() const
 {
-    return  mock().getData("stream_id").getUnsignedIntValue();
+    return  mock().getData("stream_id").getLongLongIntValue();
 }
 
 
@@ -132,7 +135,7 @@ TEST(pub_sub_http_request_body_event_test, first_event)
     CHECK(memcmp(data, msg.data(), length) == 0);
     CHECK(length == msg_len);
     CHECK(offset == 0);
-    CHECK(event.get_http2_stream_id() == stream_id);
+    CHECK(event.get_httpx_stream_id() == stream_id);
     CHECK_FALSE(event.is_last_request_body_piece());
     delete body;
 }
@@ -153,7 +156,7 @@ TEST(pub_sub_http_request_body_event_test, last_event)
     CHECK(memcmp(data, msg.data(), length) == 0);
     CHECK(length == msg_len);
     CHECK(offset == 1500);
-    CHECK(event.get_http2_stream_id() == stream_id);
+    CHECK(event.get_httpx_stream_id() == stream_id);
     CHECK(event.is_last_request_body_piece());
     delete body;
 }
@@ -169,7 +172,7 @@ TEST(pub_sub_http_request_body_event_test, empty_data_last_event)
     CHECK(data == nullptr);
     CHECK(length == 0);
     CHECK(offset == 1500);
-    CHECK(event.get_http2_stream_id() == stream_id);
+    CHECK(event.get_httpx_stream_id() == stream_id);
     CHECK(event.is_last_request_body_piece());
 }
 

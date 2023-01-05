@@ -107,7 +107,7 @@ bool HttpStreamSplitter::finish(Flow* flow)
             (session_data->type_expected[source_id] == SEC_STATUS))
         {
             *session_data->get_infractions(source_id) += INF_PARTIAL_START;
-            // FIXIT-M why not use generate_misformatted_http()?
+            session_data->events[source_id]->create_event(EVENT_PARTIAL_START);
             session_data->events[source_id]->create_event(EVENT_LOSS_OF_SYNC);
             return false;
         }
@@ -198,7 +198,7 @@ bool HttpStreamSplitter::finish(Flow* flow)
         {
             HttpRequestBodyEvent http_request_body_event(nullptr,
                 session_data->publish_octets[source_id], true, session_data);
-            DataBus::publish(HTTP2_REQUEST_BODY_EVENT_KEY, http_request_body_event, flow);
+            DataBus::publish(HTTPX_REQUEST_BODY_EVENT_KEY, http_request_body_event, flow);
 #ifdef REG_TEST
             if (HttpTestManager::use_test_output(HttpTestManager::IN_HTTP))
             {

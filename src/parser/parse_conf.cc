@@ -61,6 +61,7 @@ struct Location
 
 static std::stack<Location> files;
 static int rules_file_depth = 0;
+static bool s_ips_policy = true;
 
 const char* get_parse_file()
 {
@@ -189,17 +190,26 @@ const char* get_config_file(const char* arg, std::string& file)
 void parse_include(SnortConfig* sc, const char* arg)
 {
     assert(arg);
-    arg = ExpandVars(arg);
-    std::string file = !rules_file_depth ? get_ips_policy()->includer : get_parse_file();
+    std::string conf = ExpandVars(arg);
+    std::string file;
 
-    const char* code = get_config_file(arg, file);
+    if ( rules_file_depth )
+        file = get_parse_file();
+
+    else if ( s_ips_policy )
+        file = get_ips_policy()->includer;
+
+    else
+        file = parser_get_special_includer();
+
+    const char* code = get_config_file(conf.c_str(), file);
 
     if ( !code )
     {
-        ParseError("can't open %s\n", arg);
+        ParseError("can't open %s\n", conf.c_str());
         return;
     }
-    push_parse_location(code, file.c_str(), arg);
+    push_parse_location(code, file.c_str(), conf.c_str());
     parse_rules_file(sc, file.c_str());
     pop_parse_location();
 }
@@ -207,8 +217,9 @@ void parse_include(SnortConfig* sc, const char* arg)
 void ParseIpVar(const char* var, const char* value)
 {
     int ret;
-    IpsPolicy* p = get_ips_policy();  // FIXIT-M double check, see below
+    IpsPolicy* p = get_ips_policy();
     DisallowCrossTableDuplicateVars(var, VAR_TYPE__IPVAR);
+    // FIXIT-M: ip checked for duplicates twice: in the function above and in sfvt_add_str
 
     if ((ret = sfvt_define(p->ip_vartable, var, value)) != SFIP_SUCCESS)
     {
@@ -252,7 +263,10 @@ void add_service_to_otn(SnortConfig* sc, OptTreeNode* otn, const char* svc_name)
     }
 
     if ( !strcmp(svc_name, "http") )
+    {
         add_service_to_otn(sc, otn, "http2");
+        add_service_to_otn(sc, otn, "http3");
+    }
 
     SnortProtocolId svc_id = sc->proto_ref->add(svc_name);
 
@@ -292,10 +306,12 @@ void parse_rules_file(SnortConfig* sc, const char* fname)
     --rules_file_depth;
 }
 
-void parse_rules_string(SnortConfig* sc, const char* s)
+void parse_rules_string(SnortConfig* sc, const char* s, bool ips_policy)
 {
+    s_ips_policy = ips_policy;
     std::string rules = s;
     std::stringstream ss(rules);
     parse_stream(ss, sc);
+    s_ips_policy = true;
 }
 

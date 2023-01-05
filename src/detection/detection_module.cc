@@ -49,6 +49,7 @@ static const TraceOption detection_trace_options[] =
     { "pkt_detect",    TRACE_PKT_DETECTION,     "enable packet detection trace logging" },
     { "opt_tree",      TRACE_OPTION_TREE,       "enable tree option trace logging" },
     { "tag",           TRACE_TAG,               "enable tag trace logging" },
+    { "cont",          TRACE_CONT,              "enable rule continuation trace logging" },
     { nullptr, 0, nullptr }
 };
 #endif
@@ -97,6 +98,13 @@ static const Parameter detection_params[] =
 
     { "enable_address_anomaly_checks", Parameter::PT_BOOL, nullptr, "false",
       "enable check and alerting of address anomalies" },
+
+    { "enable_strict_reduction", Parameter::PT_BOOL, nullptr, "false",
+      "enable strict deduplication of rule headers by ports (saves memory, but "
+      "loses some speed during config reading)" },
+
+    { "max_continuations_per_flow", Parameter::PT_INT, "0:65535", "1024",
+      "maximum number of continuations stored simultaneously on the flow" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -205,6 +213,12 @@ bool DetectionModule::set(const char*, Value& v, SnortConfig* sc)
 
     else if ( v.is("enable_address_anomaly_checks") )
         sc->address_anomaly_check_enabled = v.get_bool();
+
+    else if ( v.is("enable_strict_reduction") )
+        sc->enable_strict_reduction = v.get_bool();
+
+    else if ( v.is("max_continuations_per_flow") )
+        sc->max_continuations = v.get_uint16();
 
     return true;
 }

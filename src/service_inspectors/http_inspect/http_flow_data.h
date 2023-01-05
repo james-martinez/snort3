@@ -23,40 +23,40 @@
 #include <zlib.h>
 
 #include <cstdio>
+#include <list>
 
 #include "flow/flow.h"
-#include "mime/file_mime_process.h"
 #include "utils/util_utf.h"
 #include "decompress/file_decomp.h"
 
 #include "http_common.h"
 #include "http_enum.h"
 #include "http_event.h"
+#include "http_field.h"
 #include "http_module.h"
 
 class HttpTransaction;
-class HttpJsNorm;
+class HttpJSNorm;
 class HttpMsgSection;
 class HttpCutter;
 class HttpQueryParser;
-class JSIdentifierCtxBase;
 
 namespace snort
 {
-class JSNormalizer;
+class MimeSession;
 }
 
 class HttpFlowData : public snort::FlowData
 {
 public:
-    HttpFlowData(snort::Flow* flow);
+    HttpFlowData(snort::Flow* flow, const HttpParaList* params_);
     ~HttpFlowData() override;
     static unsigned inspector_id;
     static void init() { inspector_id = snort::FlowData::create_flow_data_id(); }
 
     friend class HttpBodyCutter;
     friend class HttpInspect;
-    friend class HttpJsNorm;
+    friend class HttpJSNorm;
     friend class HttpMsgSection;
     friend class HttpMsgStart;
     friend class HttpMsgRequest;
@@ -67,7 +67,7 @@ public:
     friend class HttpMsgBody;
     friend class HttpMsgBodyChunk;
     friend class HttpMsgBodyCl;
-    friend class HttpMsgBodyH2;
+    friend class HttpMsgBodyHX;
     friend class HttpMsgBodyOld;
     friend class HttpQueryParser;
     friend class HttpStreamSplitter;
@@ -79,15 +79,19 @@ public:
     HttpCommon::SectionType get_type_expected(HttpCommon::SourceId source_id) const
     { return type_expected[source_id]; }
 
-    void finish_h2_body(HttpCommon::SourceId source_id, HttpCommon::H2BodyState state,
+    void finish_hx_body(HttpCommon::SourceId source_id, HttpCommon::HXBodyState state,
         bool clear_partial_buffer);
 
-    void set_h2_body_state(HttpCommon::SourceId source_id, HttpCommon::H2BodyState state)
-    { h2_body_state[source_id] = state; }
+    void set_hx_body_state(HttpCommon::SourceId source_id, HttpCommon::HXBodyState state)
+    { hx_body_state[source_id] = state; }
 
-    uint32_t get_h2_stream_id() const;
+    bool valid_hx_stream_id() const;
+    int64_t get_hx_stream_id() const;
+    bool is_for_httpx() const { return for_httpx; }
 
 private:
+    const HttpParaList* const params;
+
     // Convenience routines
     void half_reset(HttpCommon::SourceId source_id);
     void trailer_prep(HttpCommon::SourceId source_id);
@@ -178,6 +182,8 @@ private:
     uint8_t* partial_detect_buffer[2] = { nullptr, nullptr };
     uint32_t partial_detect_length[2] = { 0, 0 };
     uint32_t partial_js_detect_length[2] = { 0, 0 };
+    std::list<MimeBufs>* partial_mime_bufs[2] = { nullptr, nullptr };
+    bool partial_mime_last_complete[2] = { true, true };
     int32_t status_code_num = HttpCommon::STAT_NOT_PRESENT;
     HttpEnums::VersionId version_id[2] = { HttpEnums::VERS__NOT_PRESENT,
                                             HttpEnums::VERS__NOT_PRESENT };
@@ -197,33 +203,20 @@ private:
     bool pipeline_overflow = false;
     bool pipeline_underflow = false;
     bool add_to_pipeline(HttpTransaction* latest);
+    int pipeline_length();
     HttpTransaction* take_from_pipeline();
     void delete_pipeline();
 
-    bool js_data_lost_once = false;
-    uint32_t pdu_idx = 0;
-    uint32_t js_pdu_idx = 0;
-
-    // *** HttpJsNorm
-    JSIdentifierCtxBase* js_ident_ctx = nullptr;
-    snort::JSNormalizer* js_normalizer = nullptr;
-    bool js_continue = false;
-    bool js_built_in_event = false;
-
-    void reset_js_pdu_idx();
-    void reset_js_ident_ctx();
-    snort::JSNormalizer& acquire_js_ctx(const HttpParaList::JsNormParam& js_norm_param);
-    void release_js_ctx();
-    bool is_pdu_missed();
-
+    HttpJSNorm* js_ctx[2] = { nullptr, nullptr };
+    HttpJSNorm* js_ctx_mime[2] = { nullptr, nullptr };
     bool cutover_on_clear = false;
     bool ssl_search_abandoned = false;
 
-    // *** HTTP/2 handling
-    bool for_http2 = false;
-    uint32_t h2_stream_id = 0;
-    HttpCommon::H2BodyState h2_body_state[2] = { HttpCommon::H2_BODY_NOT_COMPLETE,
-        HttpCommon::H2_BODY_NOT_COMPLETE };
+    // *** HTTP/X handling
+    bool for_httpx = false;
+    int64_t hx_stream_id = -1;
+    HttpCommon::HXBodyState hx_body_state[2] = { HttpCommon::HX_BODY_NOT_COMPLETE,
+        HttpCommon::HX_BODY_NOT_COMPLETE };
 
 #ifdef REG_TEST
     static uint64_t instance_count;
@@ -231,6 +224,14 @@ private:
 
     void show(FILE* out_file) const;
 #endif
+};
+
+class HttpFlowStreamIntf : public snort::StreamFlowIntf
+{
+public:
+    snort::FlowData* get_stream_flow_data(const snort::Flow* flow) override;
+    void set_stream_flow_data(snort::Flow* flow, snort::FlowData* flow_data) override;
+    void get_stream_id(const snort::Flow* flow, int64_t& stream_id) override;
 };
 
 #endif

@@ -538,7 +538,7 @@ void TcpStreamTracker::update_tracker_ack_sent(TcpSegmentDescriptor& tsd)
     }
 
     if ( ( fin_seq_status == TcpStreamTracker::FIN_WITH_SEQ_SEEN )
-        && SEQ_GEQ(tsd.get_ack(), fin_final_seq + 1) )
+        && SEQ_GEQ(tsd.get_ack(), fin_final_seq + 1) && !(tsd.is_meta_ack_packet()) )
     {
         fin_seq_status = TcpStreamTracker::FIN_WITH_SEQ_ACKED;
     }
@@ -552,13 +552,10 @@ bool TcpStreamTracker::update_on_3whs_ack(TcpSegmentDescriptor& tsd)
 
     if ( good_ack )
     {
-        Flow* flow = tsd.get_flow();
-
         irs = tsd.get_seq();
         finish_client_init(tsd);
         update_tracker_ack_recv(tsd);
-        flow->set_session_flags(SSNFLAG_ESTABLISHED);
-        flow->session_state |= ( STREAM_STATE_ACK | STREAM_STATE_ESTABLISHED );
+        session->set_established(tsd.get_pkt(), STREAM_STATE_ACK);
         tcp_state = TcpStreamTracker::TCP_ESTABLISHED;
     }
 
@@ -729,7 +726,7 @@ void TcpStreamTracker::finalize_held_packet(Packet* cp)
             if ( cp->active->packet_retry_requested() )
             {
                 tcpStats.held_packet_retries++;
-                Analyzer::get_local_analyzer()->add_to_retry_queue(msg);
+                Analyzer::get_local_analyzer()->add_to_retry_queue(msg, cp->flow);
             }
             else
             {

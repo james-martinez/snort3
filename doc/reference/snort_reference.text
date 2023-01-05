@@ -8,7 +8,7 @@ Snort 3 Reference Manual
 The Snort Team
 
 Revision History
-Revision 3.1.30.0 2022-05-19 00:40:10 EDT TST
+Revision 3.1.49.0 2022-12-15 16:32:12 EST TST
 
 ---------------------------------------------------------------------
 
@@ -33,22 +33,23 @@ Table of Contents
     2.14. hosts
     2.15. inspection
     2.16. ips
-    2.17. latency
-    2.18. memory
-    2.19. network
-    2.20. output
-    2.21. packet_tracer
-    2.22. packets
-    2.23. payload_injector
-    2.24. process
-    2.25. profiler
-    2.26. rate_filter
-    2.27. references
-    2.28. search_engine
-    2.29. side_channel
-    2.30. snort
-    2.31. suppress
-    2.32. trace
+    2.17. js_norm
+    2.18. latency
+    2.19. memory
+    2.20. network
+    2.21. output
+    2.22. packet_tracer
+    2.23. packets
+    2.24. payload_injector
+    2.25. process
+    2.26. profiler
+    2.27. rate_filter
+    2.28. references
+    2.29. search_engine
+    2.30. side_channel
+    2.31. snort
+    2.32. suppress
+    2.33. trace
 
 3. Codec Modules
 
@@ -186,97 +187,101 @@ Table of Contents
     7.34. enip_req
     7.35. enip_rsp
     7.36. file_data
-    7.37. file_type
-    7.38. flags
-    7.39. flow
-    7.40. flowbits
-    7.41. fragbits
-    7.42. fragoffset
-    7.43. gid
-    7.44. gtp_info
-    7.45. gtp_type
-    7.46. gtp_version
-    7.47. http_client_body
-    7.48. http_cookie
-    7.49. http_header
-    7.50. http_header_test
-    7.51. http_method
-    7.52. http_num_headers
-    7.53. http_num_trailers
-    7.54. http_param
-    7.55. http_raw_body
-    7.56. http_raw_cookie
-    7.57. http_raw_header
-    7.58. http_raw_request
-    7.59. http_raw_status
-    7.60. http_raw_trailer
-    7.61. http_raw_uri
-    7.62. http_stat_code
-    7.63. http_stat_msg
-    7.64. http_trailer
-    7.65. http_trailer_test
-    7.66. http_true_ip
-    7.67. http_uri
-    7.68. http_version
-    7.69. http_version_match
-    7.70. icmp_id
-    7.71. icmp_seq
-    7.72. icode
-    7.73. id
-    7.74. iec104_apci_type
-    7.75. iec104_asdu_func
-    7.76. ip_proto
-    7.77. ipopts
-    7.78. isdataat
-    7.79. itype
-    7.80. js_data
-    7.81. md5
-    7.82. metadata
-    7.83. mms_data
-    7.84. mms_func
-    7.85. modbus_data
-    7.86. modbus_func
-    7.87. modbus_unit
-    7.88. msg
-    7.89. mss
-    7.90. pcre
-    7.91. pkt_data
-    7.92. pkt_num
-    7.93. priority
-    7.94. raw_data
-    7.95. reference
-    7.96. regex
-    7.97. rem
-    7.98. replace
-    7.99. rev
-    7.100. rpc
-    7.101. s7commplus_content
-    7.102. s7commplus_func
-    7.103. s7commplus_opcode
-    7.104. sd_pattern
-    7.105. seq
-    7.106. service
-    7.107. sha256
-    7.108. sha512
-    7.109. sid
-    7.110. sip_body
-    7.111. sip_header
-    7.112. sip_method
-    7.113. sip_stat_code
-    7.114. so
-    7.115. soid
-    7.116. ssl_state
-    7.117. ssl_version
-    7.118. stream_reassemble
-    7.119. stream_size
-    7.120. tag
-    7.121. target
-    7.122. tos
-    7.123. ttl
-    7.124. urg
-    7.125. vba_data
-    7.126. window
-    7.127. wscale
+    7.37. file_meta
+    7.38. file_type
+    7.39. flags
+    7.40. flow
+    7.41. flowbits
+    7.42. fragbits
+    7.43. fragoffset
+    7.44. gid
+    7.45. gtp_info
+    7.46. gtp_type
+    7.47. gtp_version
+    7.48. http_client_body
+    7.49. http_cookie
+    7.50. http_header
+    7.51. http_header_test
+    7.52. http_max_header_line
+    7.53. http_max_trailer_line
+    7.54. http_method
+    7.55. http_num_cookies
+    7.56. http_num_headers
+    7.57. http_num_trailers
+    7.58. http_param
+    7.59. http_raw_body
+    7.60. http_raw_cookie
+    7.61. http_raw_header
+    7.62. http_raw_request
+    7.63. http_raw_status
+    7.64. http_raw_trailer
+    7.65. http_raw_uri
+    7.66. http_stat_code
+    7.67. http_stat_msg
+    7.68. http_trailer
+    7.69. http_trailer_test
+    7.70. http_true_ip
+    7.71. http_uri
+    7.72. http_version
+    7.73. http_version_match
+    7.74. icmp_id
+    7.75. icmp_seq
+    7.76. icode
+    7.77. id
+    7.78. iec104_apci_type
+    7.79. iec104_asdu_func
+    7.80. ip_proto
+    7.81. ipopts
+    7.82. isdataat
+    7.83. itype
+    7.84. js_data
+    7.85. md5
+    7.86. metadata
+    7.87. mms_data
+    7.88. mms_func
+    7.89. modbus_data
+    7.90. modbus_func
+    7.91. modbus_unit
+    7.92. msg
+    7.93. mss
+    7.94. pcre
+    7.95. pkt_data
+    7.96. pkt_num
+    7.97. priority
+    7.98. raw_data
+    7.99. reference
+    7.100. regex
+    7.101. rem
+    7.102. replace
+    7.103. rev
+    7.104. rpc
+    7.105. s7commplus_content
+    7.106. s7commplus_func
+    7.107. s7commplus_opcode
+    7.108. sd_pattern
+    7.109. seq
+    7.110. service
+    7.111. sha256
+    7.112. sha512
+    7.113. sid
+    7.114. sip_body
+    7.115. sip_header
+    7.116. sip_method
+    7.117. sip_stat_code
+    7.118. so
+    7.119. soid
+    7.120. ssl_state
+    7.121. ssl_version
+    7.122. stream_reassemble
+    7.123. stream_size
+    7.124. tag
+    7.125. target
+    7.126. tos
+    7.127. ttl
+    7.128. urg
+    7.129. vba_data
+    7.130. window
+    7.131. wscale
 
 8. Search Engine Modules
 9. SO Rule Modules
@@ -489,7 +494,7 @@ Configuration:
   * int daq.batch_size = 64: set receive batch size (same as
     --daq-batch-size) { 1: }
   * string daq.modules[].name: DAQ module name (required)
-  * enum daq.modules[].mode = passive: DAQ module mode { passive |
+  * enum daq.modules[].mode = passive: DAQ module mode { passive | 
     inline | read-file }
   * string daq.modules[].variables[].variable: DAQ module variable
     (foo[=bar])
@@ -591,6 +596,11 @@ Configuration:
     instead of pcre for compatible expressions
   * bool detection.enable_address_anomaly_checks = false: enable
     check and alerting of address anomalies
+  * bool detection.enable_strict_reduction = false: enable strict
+    deduplication of rule headers by ports (saves memory, but loses
+    some speed during config reading)
+  * int detection.max_continuations_per_flow = 1024: maximum number
+    of continuations stored simultaneously on the flow { 0:65535 }
 
 Peg counts:
 
@@ -637,6 +647,20 @@ Peg counts:
     the recursion limit (sum)
   * detection.pcre_error: total number of times pcre returns error
     (sum)
+  * detection.cont_creations: total number of continuations created
+    (sum)
+  * detection.cont_recalls: total number of continuations recalled
+    (sum)
+  * detection.cont_flows: total number of flows using continuation
+    (sum)
+  * detection.cont_evals: total number of condition-met continuations
+    (sum)
+  * detection.cont_matches: total number of continuations matched
+    (sum)
+  * detection.cont_mismatches: total number of continuations
+    mismatched (sum)
+  * detection.cont_max_num: peak number of simultaneous continuations
+    per flow (max)
 
 
 2.8. event_filter
@@ -651,7 +675,7 @@ Usage: context
 
 Configuration:
 
-  * int event_filter[].gid = 1: rule generator ID { 0:max32 }
+  * int event_filter[].gid = 1: rule generator ID { 0:8129 }
   * int event_filter[].sid = 1: rule signature ID { 0:max32 }
   * enum event_filter[].type: 1st count events | every count events |
     once after count events { limit | threshold | both }
@@ -836,7 +860,7 @@ Configuration:
 
   * addr host_tracker[].ip: hosts address / cidr
   * port host_tracker[].services[].port: port number
-  * enum host_tracker[].services[].proto: IP protocol { ip | tcp |
+  * enum host_tracker[].services[].proto: IP protocol { ip | tcp | 
     udp }
 
 Peg counts:
@@ -860,8 +884,8 @@ Configuration:
   * addr hosts[].ip = 0.0.0.0/32: hosts address / CIDR
   * enum hosts[].frag_policy: defragmentation policy { first | linux
     | bsd | bsd_right | last | windows | solaris }
-  * enum hosts[].tcp_policy: TCP reassembly policy { first | last |
-    linux | old_linux | bsd | macos | solaris | irix | hpux11 |
+  * enum hosts[].tcp_policy: TCP reassembly policy { first | last | 
+    linux | old_linux | bsd | macos | solaris | irix | hpux11 | 
     hpux10 | windows | win_2003 | vista | proxy }
   * string hosts[].services[].name: service identifier
   * enum hosts[].services[].proto = tcp: IP protocol { tcp | udp }
@@ -898,7 +922,7 @@ Configuration:
   * int inspection.id = 0: correlate policy and events with other
     items in configuration { 0:65535 }
   * string inspection.uuid: correlate events by uuid
-  * enum inspection.mode = inline-test: set policy mode { inline |
+  * enum inspection.mode = inline-test: set policy mode { inline | 
     inline-test }
   * int inspection.max_aux_ip = 16: maximum number of auxiliary IPs
     per flow to detect and save (-1 = disable, 0 = detect but don’t
@@ -928,11 +952,9 @@ Configuration:
   * int ips.id = 0: correlate unified2 events with configuration {
     0:65535 }
   * string ips.include: snort rules and includes
-  * string ips.includer: for internal use; where includes are
-    included from { (optional) }
   * enum ips.mode: set policy mode { tap | inline | inline-test }
-  * bool ips.obfuscate_pii = false: mask all but the last 4
-    characters of credit card and social security numbers
+  * bool ips.obfuscate_pii = true: mask all but the last 4 characters
+    of credit card, SSN, phone number, and email
   * string ips.rules: snort rules and includes (may contain states
     too)
   * string ips.states: snort rule states and includes (may contain
@@ -944,7 +966,57 @@ Configuration:
   * string ips.variables.ports.$var: IPS policy variable
 
 
-2.17. latency
+2.17. js_norm
+
+--------------
+
+Help: JavaScript normalizer
+
+Type: basic
+
+Usage: inspect
+
+Configuration:
+
+  * int js_norm.bytes_depth = -1: number of input JavaScript bytes to
+    normalize (-1 unlimited) { -1:max53 }
+  * int js_norm.identifier_depth = 65536: max number of unique
+    JavaScript identifiers to normalize { 0:65536 }
+  * int js_norm.max_tmpl_nest = 32: maximum depth of template literal
+    nesting that enhanced JavaScript normalizer will process { 0:255
+    }
+  * int js_norm.max_bracket_depth = 256: maximum depth of bracket
+    nesting that enhanced JavaScript normalizer will process {
+    1:65535 }
+  * int js_norm.max_scope_depth = 256: maximum depth of scope nesting
+    that enhanced JavaScript normalizer will process { 1:65535 }
+  * string js_norm.ident_ignore[].ident_name: name of the identifier
+    to ignore
+  * string js_norm.prop_ignore[].prop_name: name of the object
+    property to ignore
+
+Rules:
+
+  * 154:1 (js_norm) nested unescape functions
+  * 154:2 (js_norm) mixed unescape sequence
+  * 154:3 (js_norm) bad token
+  * 154:4 (js_norm) unexpected HTML script opening tag
+  * 154:5 (js_norm) unexpected HTML script closing tag
+  * 154:6 (js_norm) max number of unique identifiers reached
+  * 154:7 (js_norm) excessive bracket nesting
+  * 154:8 (js_norm) data gaps during normalization
+  * 154:9 (js_norm) excessive scope nesting
+
+Peg counts:
+
+  * js_norm.bytes: total number of bytes processed (sum)
+  * js_norm.identifiers: total number of unique identifiers processed
+    (sum)
+  * js_norm.identifier_overflows: total number of unique identifier
+    limit overflows (sum)
+
+
+2.18. latency
 
 --------------
 
@@ -987,7 +1059,7 @@ Peg counts:
   * latency.rule_tree_enables: rule tree re-enables (sum)
 
 
-2.18. memory
+2.19. memory
 
 --------------
 
@@ -1009,13 +1081,13 @@ Peg counts:
   * memory.allocations: total number of allocations (now)
   * memory.deallocations: total number of deallocations (now)
   * memory.allocated: total amount of memory allocated (now)
-  * memory.deallocated: total amount of memory allocated (now)
+  * memory.deallocated: total amount of memory deallocated (now)
   * memory.reap_attempts: attempts to reclaim memory (now)
   * memory.reap_failures: failures to reclaim memory (now)
-  * memory.max_in_use: highest allocated - deallocated (max)
+  * memory.max_in_use: maximum memory used (max)
 
 
-2.19. network
+2.20. network
 
 --------------
 
@@ -1053,7 +1125,7 @@ Commands:
     the user policy id
 
 
-2.20. output
+2.21. output
 
 --------------
 
@@ -1091,7 +1163,7 @@ Rules:
   * 2:1 (output) tagged packet
 
 
-2.21. packet_tracer
+2.22. packet_tracer
 
 --------------
 
@@ -1115,7 +1187,7 @@ Commands:
   * packet_tracer.disable(): disable packet tracer
 
 
-2.22. packets
+2.23. packets
 
 --------------
 
@@ -1141,7 +1213,7 @@ Configuration:
     are used to track fragments and connections
 
 
-2.23. payload_injector
+2.24. payload_injector
 
 --------------
 
@@ -1163,7 +1235,7 @@ Peg counts:
     inject mid-frame (sum)
 
 
-2.24. process
+2.25. process
 
 --------------
 
@@ -1193,9 +1265,11 @@ Configuration:
     timestamps
   * int process.watchdog_timer = 0: watchdog timer for packet threads
     (seconds, 0 to disable) { 0:60 }
+  * int process.watchdog_min_thread_count = 1: minimum unresponsive
+    threads for watchdog to trigger { 1:65535 }
 
 
-2.25. profiler
+2.26. profiler
 
 --------------
 
@@ -1210,7 +1284,7 @@ Configuration:
   * bool profiler.modules.show = true: show module time profile stats
   * int profiler.modules.count = 0: limit results to count items per
     level (0 = no limit) { 0:max32 }
-  * enum profiler.modules.sort = total_time: sort by given field {
+  * enum profiler.modules.sort = total_time: sort by given field { 
     none | checks | avg_check | total_time }
   * int profiler.modules.max_depth = -1: limit depth to max_depth (-1
     = no limit) { -1:255 }
@@ -1218,7 +1292,7 @@ Configuration:
     stats
   * int profiler.memory.count = 0: limit results to count items per
     level (0 = no limit) { 0:max32 }
-  * enum profiler.memory.sort = total_used: sort by given field {
+  * enum profiler.memory.sort = total_used: sort by given field { 
     none | allocations | total_used | avg_allocation }
   * int profiler.memory.max_depth = -1: limit depth to max_depth (-1
     = no limit) { -1:255 }
@@ -1226,11 +1300,11 @@ Configuration:
   * int profiler.rules.count = 0: print results to given level (0 =
     all) { 0:max32 }
   * enum profiler.rules.sort = total_time: sort by given field { none
-    | checks | avg_check | total_time | matches | no_matches |
+    | checks | avg_check | total_time | matches | no_matches | 
     avg_match | avg_no_match }
 
 
-2.26. rate_filter
+2.27. rate_filter
 
 --------------
 
@@ -1242,7 +1316,7 @@ Usage: inspect
 
 Configuration:
 
-  * int rate_filter[].gid = 1: rule generator ID { 0:max32 }
+  * int rate_filter[].gid = 1: rule generator ID { 0:8129 }
   * int rate_filter[].sid = 1: rule signature ID { 0:max32 }
   * enum rate_filter[].track = by_src: filter only matching source or
     destination addresses { by_src | by_dst | by_rule }
@@ -1250,8 +1324,8 @@ Configuration:
     tripping { 0:max32 }
   * int rate_filter[].seconds = 1: count interval { 0:max32 }
   * dynamic rate_filter[].new_action = alert: take this action on
-    future hits until timeout { alert | block | drop | log | pass |
-    react | reject | rewrite }
+    future hits until timeout { alert | block | drop | file_id | log
+    | pass | react | reject | rewrite }
   * int rate_filter[].timeout = 1: count interval { 0:max32 }
   * string rate_filter[].apply_to: restrict filter to these addresses
     according to track
@@ -1262,7 +1336,7 @@ Peg counts:
     memory (sum)
 
 
-2.27. references
+2.28. references
 
 --------------
 
@@ -1278,7 +1352,7 @@ Configuration:
   * string references[].url: where this reference is defined
 
 
-2.28. search_engine
+2.29. search_engine
 
 --------------
 
@@ -1342,7 +1416,7 @@ Peg counts:
   * search_engine.searched_bytes: total bytes searched (sum)
 
 
-2.29. side_channel
+2.30. side_channel
 
 --------------
 
@@ -1364,7 +1438,7 @@ Peg counts:
   * side_channel.packets: total packets (sum)
 
 
-2.30. snort
+2.31. snort
 
 --------------
 
@@ -1604,6 +1678,8 @@ Configuration:
 
 Commands:
 
+  * snort.set_watchdog_params(timer, min_thread_count): set watchdog
+    parameters
   * snort.show_plugins(): show available plugins
   * snort.delete_inspector(inspector): delete an inspector from the
     default policy
@@ -1613,7 +1689,6 @@ Commands:
   * snort.reload_config(filename): load new configuration
   * snort.reload_policy(filename): reload part or all of the default
     policy
-  * snort.reload_module(module): reload module
   * snort.reload_daq(): reload daq module
   * snort.reload_hosts(filename): load a new hosts table
   * snort.pause(): suspend packet processing
@@ -1644,7 +1719,7 @@ Peg counts:
     failed due to attribute table full (sum)
 
 
-2.31. suppress
+2.32. suppress
 
 --------------
 
@@ -1656,7 +1731,7 @@ Usage: context
 
 Configuration:
 
-  * int suppress[].gid = 0: rule generator ID { 0:max32 }
+  * int suppress[].gid = 0: rule generator ID { 0:8129 }
   * int suppress[].sid = 0: rule signature ID { 0:max32 }
   * enum suppress[].track: suppress only matching source or
     destination addresses { by_src | by_dst }
@@ -1664,7 +1739,7 @@ Configuration:
     according to track
 
 
-2.32. trace
+2.33. trace
 
 --------------
 
@@ -1680,12 +1755,10 @@ Configuration:
   * int trace.modules.dce_smb.all: enable all trace options { 0:255 }
   * int trace.modules.dpx.all: enable all trace options { 0:255 }
   * int trace.modules.file_id.all: enable all trace options { 0:255 }
-  * int trace.modules.http_inspect.all: enable all trace options {
-    0:255 }
-  * int trace.modules.http_inspect.js_proc: enable JavaScript
-    processing logging { 0:255 }
-  * int trace.modules.http_inspect.js_dump: enable JavaScript data
-    logging { 0:255 }
+  * int trace.modules.js_norm.all: enable all trace options { 0:255 }
+  * int trace.modules.js_norm.proc: enable processing logging { 0:255
+    }
+  * int trace.modules.js_norm.dump: enable data logging { 0:255 }
   * int trace.modules.snort.all: enable all trace options { 0:255 }
   * int trace.modules.snort.inspector_manager: enable inspector
     manager trace logging { 0:255 }
@@ -2165,7 +2238,7 @@ Configuration:
 
   * int mpls.max_stack_depth = -1: set maximum MPLS stack depth {
     -1:255 }
-  * enum mpls.payload_type = auto: force encapsulated payload type {
+  * enum mpls.payload_type = auto: force encapsulated payload type { 
     auto | eth | ip4 | ip6 }
 
 Rules:
@@ -2330,6 +2403,11 @@ Type: codec
 
 Usage: context
 
+Configuration:
+
+  * int_list vlan.extra_tpid_ether_types = 0x9100 0x9200: set
+    non-standard QinQ ether types { 65535 }
+
 Rules:
 
   * 116:130 (vlan) bad VLAN frame
@@ -2375,7 +2453,7 @@ Configuration:
   * string file_connector[].connector: connector name
   * string file_connector[].name: channel name
   * enum file_connector[].format: file format { binary | text }
-  * enum file_connector[].direction: usage { receive | transmit |
+  * enum file_connector[].direction: usage { receive | transmit | 
     duplex }
 
 Peg counts:
@@ -2695,7 +2773,7 @@ Instance Type: singleton
 
 Configuration:
 
-  * select data_log.key = http_request_header_event : name of the
+  * select data_log.key = 'http_request_header_event ': name of the
     event to log { http_request_header_event |
     http_response_header_event }
   * int data_log.limit = 0: set maximum size in MB before rollover (0
@@ -2771,7 +2849,7 @@ Configuration:
   * enum dce_smb.smb_fingerprint_policy = none: target based SMB
     policy to use { none | client | server | both }
   * enum dce_smb.policy = WinXP: target based policy to use { Win2000
-    | WinXP | WinVista | Win2003 | Win2008 | Win7 | Samba |
+    | WinXP | WinVista | Win2003 | Win2008 | Win7 | Samba | 
     Samba-3.0.37 | Samba-3.0.22 | Samba-3.0.20 }
   * int dce_smb.smb_max_chain = 3: SMB max chain size { 0:255 }
   * int dce_smb.smb_max_compound = 3: SMB max compound size { 0:255 }
@@ -2784,7 +2862,7 @@ Configuration:
   * string dce_smb.smb_invalid_shares: SMB shares to alert on
   * bool dce_smb.smb_legacy_mode = false: inspect only SMBv1
   * int dce_smb.smb_max_credit = 8192: Maximum number of outstanding
-    request { 1:65536 }
+    request { 1:65535 }
   * int dce_smb.memcap = 8388608: Memory utilization limit on smb {
     512:maxSZ }
 
@@ -2901,8 +2979,8 @@ Peg counts:
     reassembled (sum)
   * dce_smb.smb_server_segs_reassembled: total smb server segments
     reassembled (sum)
-  * dce_smb.max_outstanding_requests: total smb maximum outstanding
-    requests (sum)
+  * dce_smb.max_outstanding_requests: maximum outstanding requests
+    (max)
   * dce_smb.files_processed: total smb files processed (sum)
   * dce_smb.v2_setup: total number of SMBv2 setup packets seen (sum)
   * dce_smb.v2_setup_err_resp: total number of SMBv2 setup error
@@ -3022,6 +3100,8 @@ Peg counts:
   * dce_smb.total_smb2_sessions: total smb2 sessions (sum)
   * dce_smb.total_encrypted_sessions: total encrypted sessions (sum)
   * dce_smb.total_mc_sessions: total multichannel sessions (sum)
+  * dce_smb.ignore_dup_sessions: total smb req/resp dropped because
+    of dup msg id (sum)
 
 
 5.12. dce_tcp
@@ -3047,7 +3127,7 @@ Configuration:
   * int dce_tcp.reassemble_threshold = 0: minimum bytes received
     before performing reassembly { 0:65535 }
   * enum dce_tcp.policy = WinXP: target based policy to use { Win2000
-    | WinXP | WinVista | Win2003 | Win2008 | Win7 | Samba |
+    | WinXP | WinVista | Win2003 | Win2008 | Win7 | Samba | 
     Samba-3.0.37 | Samba-3.0.22 | Samba-3.0.20 }
 
 Rules:
@@ -3362,17 +3442,8 @@ Configuration:
     able to be concurrently processed per flow { 1:max53 }
   * int file_id.show_data_depth = 100: print this many octets {
     0:max53 }
-  * int file_id.file_rules[].rev = 0: rule revision { 0:max32 }
-  * string file_id.file_rules[].msg: information about the file type
-  * string file_id.file_rules[].type: file type name
-  * int file_id.file_rules[].id = 0: file type id { 0:max32 }
-  * string file_id.file_rules[].category: file type category
-  * string file_id.file_rules[].group: comma separated list of groups
-    associated with file type
-  * string file_id.file_rules[].version: file type version
-  * string file_id.file_rules[].magic[].content: file magic content
-  * int file_id.file_rules[].magic[].offset = 0: file magic offset {
-    0:max32 }
+  * string file_id.rules_file: name of file with IPS rules for file
+    identification
   * bool file_id.trace_type = false: enable runtime dump of type info
   * bool file_id.trace_signature = false: enable runtime dump of
     signature info
@@ -3668,6 +3739,12 @@ Rules:
     value set by decoder in SETTINGS frame
   * 121:37 (http2_inspect) Nonempty HTTP/2 Data frame where message
     body not expected
+  * 121:38 (http2_inspect) HTTP/2 non-Data frame longer than 63780
+    bytes
+  * 121:39 (http2_inspect) not HTTP/2 traffic or unrecoverable HTTP/2
+    protocol error
+  * 121:40 (http2_inspect) invalid HTTP/2 PRIORITY frame
+  * 121:41 (http2_inspect) invalid HTTP/2 GOAWAY frame
 
 Peg counts:
 
@@ -3712,6 +3789,12 @@ Configuration:
     for Host header value (-1 no limit) { -1:max53 }
   * int http_inspect.maximum_chunk_length = 4294967295: maximum
     allowed length for a message body chunk { 0:4294967295 }
+  * int http_inspect.maximum_header_length = 4096: alert when the
+    length of a header exceeds this value { 0:65535 }
+  * int http_inspect.maximum_headers = 200: alert when the number of
+    headers in a message exceeds this value { 0:65535 }
+  * int http_inspect.maximum_pipelined_requests = 99: alert when the
+    number of pipelined requests exceeds this value { 0:99 }
   * bool http_inspect.normalize_utf = true: normalize charset utf
     encodings in response bodies
   * bool http_inspect.decompress_pdf = false: decompress pdf files in
@@ -3722,27 +3805,13 @@ Configuration:
     response bodies
   * bool http_inspect.decompress_vba = false: decompress MS Office
     Visual Basic for Applications macro files in response bodies
+  * int http_inspect.max_mime_attach = 5: maximum number of mime
+    attachments that will be inspected in a section of a request
+    message { 1:65535 }
   * bool http_inspect.script_detection = false: inspect JavaScript
     immediately upon script end
   * bool http_inspect.normalize_javascript = false: use legacy
     normalizer to normalize JavaScript in response bodies
-  * int http_inspect.js_norm_bytes_depth = -1: number of input
-    JavaScript bytes to normalize (-1 unlimited) { -1:max53 }
-  * int http_inspect.js_norm_identifier_depth = 65536: max number of
-    unique JavaScript identifiers to normalize { 0:65536 }
-  * int http_inspect.js_norm_max_tmpl_nest = 32: maximum depth of
-    template literal nesting that enhanced javascript normalizer will
-    process { 0:255 }
-  * int http_inspect.js_norm_max_bracket_depth = 256: maximum depth
-    of bracket nesting that enhanced JavaScript normalizer will
-    process { 1:65535 }
-  * int http_inspect.js_norm_max_scope_depth = 256: maximum depth of
-    scope nesting that enhanced JavaScript normalizer will process {
-    1:65535 }
-  * string http_inspect.js_norm_ident_ignore[].ident_name: name of
-    the identifier to ignore
-  * string http_inspect.js_norm_prop_ignore[].prop_name: name of the
-    object property to ignore
   * int http_inspect.max_javascript_whitespaces = 200: maximum
     consecutive whitespaces allowed within the JavaScript obfuscated
     data { 1:65535 }
@@ -3781,6 +3850,9 @@ Configuration:
   * bool http_inspect.request_body_app_detection = true: make HTTP/2
     request message bodies available for application detection
     (detection requires AppId)
+  * string http_inspect.allowed_methods: list of allowed methods
+  * string http_inspect.disallowed_methods: list of disallowed
+    methods
 
 Rules:
 
@@ -3814,9 +3886,10 @@ Rules:
     maximum_chunk_length
   * 119:18 (http_inspect) URI path includes /../ that goes above the
     root directory
-  * 119:19 (http_inspect) HTTP header line exceeds 4096 bytes
-  * 119:20 (http_inspect) HTTP message has more than 200 header
-    fields
+  * 119:19 (http_inspect) HTTP header line exceeds
+    maximum_header_length option bytes
+  * 119:20 (http_inspect) HTTP message has more than maximum_headers
+    option header fields
   * 119:21 (http_inspect) HTTP message has more than one
     Content-Length header value
   * 119:24 (http_inspect) Host header field appears more than once or
@@ -3830,8 +3903,9 @@ Rules:
     known as HTTP/0.9
   * 119:33 (http_inspect) HTTP request URI has space character that
     is not percent-encoded
-  * 119:34 (http_inspect) HTTP connection has more than 100
-    simultaneous pipelined requests that have not been answered
+  * 119:34 (http_inspect) HTTP connection has more than
+    maximum_pipelined_requests simultaneous pipelined requests that
+    have not been answered
   * 119:102 (http_inspect) invalid status code in HTTP response
   * 119:104 (http_inspect) HTTP response has UTF character set that
     failed to normalize
@@ -3880,7 +3954,6 @@ Rules:
   * 119:222 (http_inspect) Transfer-Encoding not ending with chunked
   * 119:223 (http_inspect) Transfer-Encoding with encodings before
     chunked
-  * 119:224 (http_inspect) misformatted HTTP traffic
   * 119:225 (http_inspect) unsupported Content-Encoding used
   * 119:226 (http_inspect) unknown Content-Encoding used
   * 119:227 (http_inspect) multiple Content-Encodings applied
@@ -3942,27 +4015,31 @@ Rules:
   * 119:262 (http_inspect) HTTP URI scheme longer than 10 characters
   * 119:263 (http_inspect) HTTP/1 client requested HTTP/2 upgrade
   * 119:264 (http_inspect) HTTP/1 server granted HTTP/2 upgrade
-  * 119:265 (http_inspect) bad token in JavaScript
-  * 119:266 (http_inspect) unexpected script opening tag in
-    JavaScript
-  * 119:267 (http_inspect) unexpected script closing tag in
-    JavaScript
   * 119:268 (http_inspect) JavaScript code under the external script
     tags
   * 119:269 (http_inspect) script opening tag in a short form
-  * 119:270 (http_inspect) max number of unique JavaScript
-    identifiers reached
-  * 119:271 (http_inspect) excessive JavaScript bracket nesting
   * 119:272 (http_inspect) Consecutive commas in HTTP Accept-Encoding
     header
-  * 119:273 (http_inspect) missed PDUs during JavaScript
-    normalization
-  * 119:274 (http_inspect) excessive JavaScript scope nesting
   * 119:275 (http_inspect) HTTP/1 version other than 1.0 or 1.1
   * 119:276 (http_inspect) HTTP version in start line is 0
   * 119:277 (http_inspect) HTTP version in start line is higher than
     1
   * 119:278 (http_inspect) HTTP gzip body with the FEXTRA flag set
+  * 119:279 (http_inspect) invalid status line
+  * 119:280 (http_inspect) HTTP message headers longer than 63780
+    bytes
+  * 119:281 (http_inspect) invalid request line
+  * 119:282 (http_inspect) too many white space characters when start
+    line is expected
+  * 119:283 (http_inspect) HTTP message status line longer than 63780
+    bytes
+  * 119:284 (http_inspect) partial start line
+  * 119:285 (http_inspect) HTTP message request line longer than
+    63780 bytes
+  * 119:286 (http_inspect) HTTP/2 preface received instead of an HTTP
+    /1 method
+  * 119:287 (http_inspect) HTTP request method is not on allowed
+    methods list or is on disallowed methods list
 
 Peg counts:
 
@@ -4016,12 +4093,10 @@ Peg counts:
     JavaScripts processed (sum)
   * http_inspect.js_external_scripts: total number of external
     JavaScripts processed (sum)
-  * http_inspect.js_bytes: total number of JavaScript bytes processed
+  * http_inspect.js_pdf_scripts: total number of PDF files processed
     (sum)
-  * http_inspect.js_identifiers: total number of unique JavaScript
-    identifiers processed (sum)
-  * http_inspect.js_identifier_overflows: total number of unique
-    JavaScript identifier limit overflows (sum)
+  * http_inspect.skip_mime_attach: total number of HTTP requests with
+    too many MIME attachments to inspect (sum)
 
 
 5.26. iec104
@@ -4217,6 +4292,7 @@ Peg counts:
   * imap.non_encoded_attachments: total non-encoded attachments
     extracted (sum)
   * imap.non_encoded_bytes: total non-encoded extracted bytes (sum)
+  * imap.js_pdf_scripts: total number of PDF files processed (sum)
 
 
 5.28. mem_test
@@ -4321,9 +4397,23 @@ Configuration:
     event
   * bool netflow.rules[].create_service = false: generate a new or
     changed service event
+  * int netflow.flow_memcap = 0: maximum memory for flow record cache
+    in bytes, 0 = unlimited { 0:maxSZ }
+  * int netflow.template_memcap = 0: maximum memory for template
+    cache in bytes, 0 = unlimited { 0:maxSZ }
+  * string netflow.netflow_service_id_path: path to file containing
+    service IDs for NetFlow
 
 Peg counts:
 
+  * netflow.cache_adds: netflow cache added new entry (sum)
+  * netflow.cache_hits: netflow cache found existing entry (sum)
+  * netflow.cache_misses: netflow cache did not find entry (sum)
+  * netflow.cache_replaces: netflow cache found entry and replaced
+    its value (sum)
+  * netflow.cache_max: netflow cache’s maximum byte usage (sum)
+  * netflow.cache_prunes: netflow cache pruned entry to make space
+    for new entry (sum)
   * netflow.invalid_netflow_record: count of invalid netflow records
     (sum)
   * netflow.packets: total packets processed (sum)
@@ -4554,7 +4644,7 @@ Configuration:
   * string perf_monitor.modules[].name: name of the module
   * string perf_monitor.modules[].pegs: list of statistics to track
     or empty for all counters
-  * enum perf_monitor.format = csv: output format for stats { csv |
+  * enum perf_monitor.format = csv: output format for stats { csv | 
     text | json }
   * bool perf_monitor.summary = false: output summary at shutdown
 
@@ -4643,6 +4733,7 @@ Peg counts:
   * pop.non_encoded_attachments: total non-encoded attachments
     extracted (sum)
   * pop.non_encoded_bytes: total non-encoded extracted bytes (sum)
+  * pop.js_pdf_scripts: total number of PDF files processed (sum)
 
 
 5.37. port_scan
@@ -4823,7 +4914,7 @@ Peg counts:
 
 Help: reputation inspection
 
-Type: inspector (first)
+Type: inspector (passive)
 
 Usage: context
 
@@ -4899,7 +4990,7 @@ Configuration:
   * int rna.tcp_fingerprints[].fpid = 0: fingerprint id { 0:max32 }
   * int rna.tcp_fingerprints[].type = 0: fingerprint type { 0:max32 }
   * string rna.tcp_fingerprints[].uuid: fingerprint uuid
-  * int rna.tcp_fingerprints[].ttl = 0: fingerprint ttl { 0:256 }
+  * int rna.tcp_fingerprints[].ttl = 0: fingerprint ttl { 0:255 }
   * string rna.tcp_fingerprints[].tcp_window: fingerprint tcp window
   * string rna.tcp_fingerprints[].mss = X: fingerprint mss
   * string rna.tcp_fingerprints[].id = X: id
@@ -4921,7 +5012,7 @@ Configuration:
   * int rna.ua_fingerprints[].fpid = 0: fingerprint id { 0:max32 }
   * int rna.ua_fingerprints[].type = 0: fingerprint type { 0:max32 }
   * string rna.ua_fingerprints[].uuid: fingerprint uuid
-  * int rna.ua_fingerprints[].ttl = 0: fingerprint ttl { 0:256 }
+  * int rna.ua_fingerprints[].ttl = 0: fingerprint ttl { 0:255 }
   * string rna.ua_fingerprints[].tcp_window: fingerprint tcp window
   * string rna.ua_fingerprints[].mss = X: fingerprint mss
   * string rna.ua_fingerprints[].id = X: id
@@ -4943,7 +5034,7 @@ Configuration:
   * int rna.udp_fingerprints[].fpid = 0: fingerprint id { 0:max32 }
   * int rna.udp_fingerprints[].type = 0: fingerprint type { 0:max32 }
   * string rna.udp_fingerprints[].uuid: fingerprint uuid
-  * int rna.udp_fingerprints[].ttl = 0: fingerprint ttl { 0:256 }
+  * int rna.udp_fingerprints[].ttl = 0: fingerprint ttl { 0:255 }
   * string rna.udp_fingerprints[].tcp_window: fingerprint tcp window
   * string rna.udp_fingerprints[].mss = X: fingerprint mss
   * string rna.udp_fingerprints[].id = X: id
@@ -4965,7 +5056,7 @@ Configuration:
   * int rna.smb_fingerprints[].fpid = 0: fingerprint id { 0:max32 }
   * int rna.smb_fingerprints[].type = 0: fingerprint type { 0:max32 }
   * string rna.smb_fingerprints[].uuid: fingerprint uuid
-  * int rna.smb_fingerprints[].ttl = 0: fingerprint ttl { 0:256 }
+  * int rna.smb_fingerprints[].ttl = 0: fingerprint ttl { 0:255 }
   * string rna.smb_fingerprints[].tcp_window: fingerprint tcp window
   * string rna.smb_fingerprints[].mss = X: fingerprint mss
   * string rna.smb_fingerprints[].id = X: id
@@ -5238,7 +5329,7 @@ Configuration:
     0:65535 }
   * int smtp.max_response_line_len = 512: max SMTP response line {
     0:65535 }
-  * enum smtp.normalize = none: turns on/off normalization { none |
+  * enum smtp.normalize = none: turns on/off normalization { none | 
     cmds | all }
   * string smtp.normalize_cmds: list of commands to normalize
   * int smtp.qp_decode_depth = -1: quoted-Printable decoding depth
@@ -5289,6 +5380,7 @@ Peg counts:
   * smtp.non_encoded_attachments: total non-encoded attachments
     extracted (sum)
   * smtp.non_encoded_bytes: total non-encoded extracted bytes (sum)
+  * smtp.js_pdf_scripts: total number of PDF files processed (sum)
 
 
 5.44. so_proxy
@@ -5419,28 +5511,16 @@ Configuration:
     for held packets { 1:max32 }
   * int stream.ip_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
-  * int stream.ip_cache.cap_weight = 0: additional bytes to track per
-    flow for better estimation against cap { 0:65535 }
   * int stream.icmp_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
-  * int stream.icmp_cache.cap_weight = 0: additional bytes to track
-    per flow for better estimation against cap { 0:65535 }
   * int stream.tcp_cache.idle_timeout = 3600: maximum inactive time
     before retiring session tracker { 1:max32 }
-  * int stream.tcp_cache.cap_weight = 11000: additional bytes to
-    track per flow for better estimation against cap { 0:65535 }
   * int stream.udp_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
-  * int stream.udp_cache.cap_weight = 0: additional bytes to track
-    per flow for better estimation against cap { 0:65535 }
   * int stream.user_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
-  * int stream.user_cache.cap_weight = 0: additional bytes to track
-    per flow for better estimation against cap { 0:65535 }
   * int stream.file_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
-  * int stream.file_cache.cap_weight = 32: additional bytes to track
-    per flow for better estimation against cap { 0:65535 }
 
 Rules:
 
@@ -5629,8 +5709,8 @@ Configuration:
   * bool stream_tcp.no_ack = false: received data is implicitly acked
     immediately
   * enum stream_tcp.policy = bsd: determines operating system
-    characteristics like reassembly { first | last | linux |
-    old_linux | bsd | macos | solaris | irix | hpux11 | hpux10 |
+    characteristics like reassembly { first | last | linux | 
+    old_linux | bsd | macos | solaris | irix | hpux11 | hpux10 | 
     windows | win_2003 | vista | proxy }
   * bool stream_tcp.reassemble_async = true: queue data for
     reassembly before traffic is seen in both directions
@@ -5877,24 +5957,22 @@ Instance Type: multiton
 Configuration:
 
   * string wizard.hexes[].service: name of service
-  * select wizard.hexes[].proto = tcp: protocol to scan { tcp | udp }
-  * bool wizard.hexes[].client_first = true: which end initiates data
-    transfer
+  * select wizard.hexes[].proto = any: protocol to scan { tcp | udp |
+    any }
   * string wizard.hexes[].to_server[].hex: sequence of data with wild
     chars (?)
   * string wizard.hexes[].to_client[].hex: sequence of data with wild
     chars (?)
   * string wizard.spells[].service: name of service
-  * select wizard.spells[].proto = tcp: protocol to scan { tcp | udp
-    }
-  * bool wizard.spells[].client_first = true: which end initiates
-    data transfer
+  * select wizard.spells[].proto = any: protocol to scan { tcp | udp
+    | any }
   * string wizard.spells[].to_server[].spell: sequence of data with
     wild cards (*)
   * string wizard.spells[].to_client[].spell: sequence of data with
     wild cards (*)
   * multi wizard.curses: enable service identification based on
-    internal algorithm { dce_smb | dce_udp | dce_tcp | mms | sslv2 }
+    internal algorithm { dce_smb | dce_udp | dce_tcp | mms |
+    s7commplus | sslv2 }
   * int wizard.max_search_depth = 8192: maximum scan depth per flow {
     0:65535 }
 
@@ -5953,7 +6031,7 @@ Usage: detect
 
 Configuration:
 
-  * enum reject.reset = both: send TCP reset to one or both ends {
+  * enum reject.reset = both: send TCP reset to one or both ends { 
     none|source|dest|both }
   * enum reject.control = none: send ICMP unreachable(s) { none|
     network|host|port|forward|all }
@@ -6109,7 +6187,7 @@ Usage: detect
 Configuration:
 
   * int byte_extract.~count: number of bytes to pick up from the
-    buffer { 1:10 }
+    buffer (string can pick less) { 1:10 }
   * int byte_extract.~offset: number of bytes into the buffer to
     start processing { -65535:65535 }
   * string byte_extract.~name: name of the variable that will be used
@@ -6144,7 +6222,7 @@ Usage: detect
 Configuration:
 
   * int byte_jump.~count: number of bytes to pick up from the buffer
-    { 0:10 }
+    (string can pick less) { 0:10 }
   * string byte_jump.~offset: variable name or number of bytes into
     the buffer to start processing
   * implied byte_jump.relative: offset from cursor instead of start
@@ -6183,8 +6261,8 @@ Usage: detect
 
 Configuration:
 
-  * int byte_math.bytes: number of bytes to pick up from the buffer {
-    1:10 }
+  * int byte_math.bytes: number of bytes to pick up from the buffer
+    (string can pick less) { 1:10 }
   * string byte_math.offset: number of bytes into the buffer to start
     processing
   * enum byte_math.oper: mathematical operation to perform { +|-|*|/|
@@ -6196,7 +6274,7 @@ Configuration:
     of buffer
   * enum byte_math.endian: specify big/little endian { big|little }
   * implied byte_math.dce: dcerpc2 determines endianness
-  * enum byte_math.string: convert extracted string to dec/hex/oct {
+  * enum byte_math.string: convert extracted string to dec/hex/oct { 
     hex|dec|oct }
   * int byte_math.bitmask: applies as bitwise AND to the extracted
     value before storage in name { 0x1:0xFFFFFFFF }
@@ -6215,7 +6293,7 @@ Usage: detect
 Configuration:
 
   * int byte_test.~count: number of bytes to pick up from the buffer
-    { 1:10 }
+    (string can pick less) { 1:10 }
   * string byte_test.~operator: operation to perform to test the
     value
   * string byte_test.~compare: variable name or value to test the
@@ -6614,7 +6692,27 @@ Type: ips_option
 Usage: detect
 
 
-7.37. file_type
+7.37. file_meta
+
+--------------
+
+Help: rule option to set file metadata (file type and id)
+
+Type: ips_option
+
+Usage: detect
+
+Configuration:
+
+  * string file_meta.type: file type to set
+  * int file_meta.id: file type id { 1:1023 }
+  * string file_meta.category: file type category
+  * string file_meta.group: comma separated list of groups associated
+    with file type
+  * string file_meta.version: file type version
+
+
+7.38. file_type
 
 --------------
 
@@ -6629,7 +6727,7 @@ Configuration:
   * string file_type.~: list of file type IDs to match
 
 
-7.38. flags
+7.39. flags
 
 --------------
 
@@ -6645,7 +6743,7 @@ Configuration:
   * string flags.~mask_flags: these flags are don’t cares
 
 
-7.39. flow
+7.40. flow
 
 --------------
 
@@ -6671,7 +6769,7 @@ Configuration:
   * implied flow.only_frag: match on defragmented packets only
 
 
-7.40. flowbits
+7.41. flowbits
 
 --------------
 
@@ -6683,12 +6781,12 @@ Usage: detect
 
 Configuration:
 
-  * enum flowbits.~op: bit operation or noalert (no bits) { set |
+  * enum flowbits.~op: bit operation or noalert (no bits) { set | 
     unset | isset | isnotset | noalert }
   * string flowbits.~bits: bit [|bit]* or bit [&bit]*
 
 
-7.41. fragbits
+7.42. fragbits
 
 --------------
 
@@ -6703,7 +6801,7 @@ Configuration:
   * string fragbits.~flags: these flags are tested
 
 
-7.42. fragoffset
+7.43. fragoffset
 
 --------------
 
@@ -6719,7 +6817,7 @@ Configuration:
     given range { 0:8192 }
 
 
-7.43. gid
+7.44. gid
 
 --------------
 
@@ -6731,10 +6829,10 @@ Usage: detect
 
 Configuration:
 
-  * int gid.~: generator id { 1:max32 }
+  * int gid.~: generator id { 1:8129 }
 
 
-7.44. gtp_info
+7.45. gtp_info
 
 --------------
 
@@ -6749,7 +6847,7 @@ Configuration:
   * string gtp_info.~: info element to match
 
 
-7.45. gtp_type
+7.46. gtp_type
 
 --------------
 
@@ -6764,7 +6862,7 @@ Configuration:
   * string gtp_type.~: list of types to match
 
 
-7.46. gtp_version
+7.47. gtp_version
 
 --------------
 
@@ -6779,7 +6877,7 @@ Configuration:
   * int gtp_version.~: version to match { 0:2 }
 
 
-7.47. http_client_body
+7.48. http_client_body
 
 --------------
 
@@ -6790,7 +6888,7 @@ Type: ips_option
 Usage: detect
 
 
-7.48. http_cookie
+7.49. http_cookie
 
 --------------
 
@@ -6804,15 +6902,15 @@ Configuration:
 
   * implied http_cookie.request: match against the cookie from the
     request message even when examining the response
-  * implied http_cookie.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_cookie.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_cookie.with_trailer: parts of this rule examine HTTP
-    message trailers
+  * implied http_cookie.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_cookie.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_cookie.with_trailer: option is no longer used and
+    will be removed in a future release
 
 
-7.49. http_header
+7.50. http_header
 
 --------------
 
@@ -6829,15 +6927,15 @@ Configuration:
     is case insensitive.
   * implied http_header.request: match against the headers from the
     request message even when examining the response
-  * implied http_header.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_header.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_header.with_trailer: parts of this rule examine HTTP
-    message trailers
+  * implied http_header.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_header.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_header.with_trailer: option is no longer used and
+    will be removed in a future release
 
 
-7.50. http_header_test
+7.51. http_header_test
 
 --------------
 
@@ -6854,19 +6952,55 @@ Configuration:
     name is case insensitive.
   * implied http_header_test.request: match against the headers from
     the request message even when examining the response
-  * implied http_header_test.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_header_test.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_header_test.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_header_test.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_header_test.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_header_test.with_trailer: option is no longer used
+    and will be removed in a future release
   * interval http_header_test.check: range check to perform on header
     value { 0:999999999999999999 }
   * bool http_header_test.numeric: header value is a number
   * implied http_header_test.absent: header is absent
 
 
-7.51. http_method
+7.52. http_max_header_line
+
+--------------
+
+Help: rule option to perform range check on longest header line
+
+Type: ips_option
+
+Usage: detect
+
+Configuration:
+
+  * interval http_max_header_line.~range: check that longest line of
+    current header is in given range { 0:65535 }
+  * implied http_max_header_line.request: match against the version
+    from the request message even when examining the response
+
+
+7.53. http_max_trailer_line
+
+--------------
+
+Help: rule option to perform range check on longest trailer line
+
+Type: ips_option
+
+Usage: detect
+
+Configuration:
+
+  * interval http_max_trailer_line.~range: check that longest line of
+    current trailer is in given range { 0:65535 }
+  * implied http_max_trailer_line.request: match against the version
+    from the request message even when examining the response
+
+
+7.54. http_method
 
 --------------
 
@@ -6879,15 +7013,33 @@ Usage: detect
 
 Configuration:
 
-  * implied http_method.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_method.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_method.with_trailer: parts of this rule examine HTTP
-    message trailers
+  * implied http_method.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_method.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_method.with_trailer: option is no longer used and
+    will be removed in a future release
 
 
-7.52. http_num_headers
+7.55. http_num_cookies
+
+--------------
+
+Help: rule option to perform range check on number of cookies
+
+Type: ips_option
+
+Usage: detect
+
+Configuration:
+
+  * interval http_num_cookies.~range: check that number of cookies of
+    current header are in given range { 0:65535 }
+  * implied http_num_cookies.request: match against the version from
+    the request message even when examining the response
+
+
+7.56. http_num_headers
 
 --------------
 
@@ -6900,18 +7052,18 @@ Usage: detect
 Configuration:
 
   * interval http_num_headers.~range: check that number of headers of
-    current buffer are in given range { 0:200 }
+    current buffer are in given range { 0:65535 }
   * implied http_num_headers.request: match against the version from
     the request message even when examining the response
-  * implied http_num_headers.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_num_headers.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_num_headers.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_num_headers.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_num_headers.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_num_headers.with_trailer: option is no longer used
+    and will be removed in a future release
 
 
-7.53. http_num_trailers
+7.57. http_num_trailers
 
 --------------
 
@@ -6924,18 +7076,18 @@ Usage: detect
 Configuration:
 
   * interval http_num_trailers.~range: check that number of headers
-    of current buffer are in given range { 0:200 }
+    of current buffer are in given range { 0:65535 }
   * implied http_num_trailers.request: match against the version from
     the request message even when examining the response
-  * implied http_num_trailers.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_num_trailers.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_num_trailers.with_trailer: parts of this rule
-    examine HTTP message trailers
+  * implied http_num_trailers.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_num_trailers.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_num_trailers.with_trailer: option is no longer used
+    and will be removed in a future release
 
 
-7.54. http_param
+7.58. http_param
 
 --------------
 
@@ -6952,7 +7104,7 @@ Configuration:
   * implied http_param.nocase: case insensitive match
 
 
-7.55. http_raw_body
+7.59. http_raw_body
 
 --------------
 
@@ -6964,7 +7116,7 @@ Type: ips_option
 Usage: detect
 
 
-7.56. http_raw_cookie
+7.60. http_raw_cookie
 
 --------------
 
@@ -6979,15 +7131,15 @@ Configuration:
 
   * implied http_raw_cookie.request: match against the cookie from
     the request message even when examining the response
-  * implied http_raw_cookie.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_raw_cookie.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_raw_cookie.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_raw_cookie.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_cookie.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_cookie.with_trailer: option is no longer used
+    and will be removed in a future release
 
 
-7.57. http_raw_header
+7.61. http_raw_header
 
 --------------
 
@@ -7004,15 +7156,15 @@ Configuration:
     name is case insensitive.
   * implied http_raw_header.request: match against the headers from
     the request message even when examining the response
-  * implied http_raw_header.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_raw_header.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_raw_header.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_raw_header.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_header.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_header.with_trailer: option is no longer used
+    and will be removed in a future release
 
 
-7.58. http_raw_request
+7.62. http_raw_request
 
 --------------
 
@@ -7025,15 +7177,15 @@ Usage: detect
 
 Configuration:
 
-  * implied http_raw_request.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_raw_request.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_raw_request.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_raw_request.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_raw_request.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_request.with_trailer: option is no longer used
+    and will be removed in a future release
 
 
-7.59. http_raw_status
+7.63. http_raw_status
 
 --------------
 
@@ -7046,13 +7198,13 @@ Usage: detect
 
 Configuration:
 
-  * implied http_raw_status.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_raw_status.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_raw_status.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_status.with_trailer: option is no longer used
+    and will be removed in a future release
 
 
-7.60. http_raw_trailer
+7.64. http_raw_trailer
 
 --------------
 
@@ -7069,13 +7221,13 @@ Configuration:
     name is case insensitive.
   * implied http_raw_trailer.request: match against the trailers from
     the request message even when examining the response
-  * implied http_raw_trailer.with_header: parts of this rule examine
-    HTTP response message headers (must be combined with request)
-  * implied http_raw_trailer.with_body: parts of this rule examine
-    HTTP response message body (must be combined with request)
+  * implied http_raw_trailer.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_raw_trailer.with_body: option is no longer used and
+    will be removed in a future release
 
 
-7.61. http_raw_uri
+7.65. http_raw_uri
 
 --------------
 
@@ -7087,12 +7239,12 @@ Usage: detect
 
 Configuration:
 
-  * implied http_raw_uri.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_raw_uri.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_raw_uri.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_raw_uri.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_uri.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_raw_uri.with_trailer: option is no longer used and
+    will be removed in a future release
   * implied http_raw_uri.scheme: match against scheme section of URI
     only
   * implied http_raw_uri.host: match against host section of URI only
@@ -7104,7 +7256,7 @@ Configuration:
     URI only
 
 
-7.62. http_stat_code
+7.66. http_stat_code
 
 --------------
 
@@ -7116,13 +7268,13 @@ Usage: detect
 
 Configuration:
 
-  * implied http_stat_code.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_stat_code.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_stat_code.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_stat_code.with_trailer: option is no longer used and
+    will be removed in a future release
 
 
-7.63. http_stat_msg
+7.67. http_stat_msg
 
 --------------
 
@@ -7135,13 +7287,13 @@ Usage: detect
 
 Configuration:
 
-  * implied http_stat_msg.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_stat_msg.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_stat_msg.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_stat_msg.with_trailer: option is no longer used and
+    will be removed in a future release
 
 
-7.64. http_trailer
+7.68. http_trailer
 
 --------------
 
@@ -7157,13 +7309,13 @@ Configuration:
   * string http_trailer.field: restrict to given trailer
   * implied http_trailer.request: match against the trailers from the
     request message even when examining the response
-  * implied http_trailer.with_header: parts of this rule examine HTTP
-    response message headers (must be combined with request)
-  * implied http_trailer.with_body: parts of this rule examine HTTP
-    message body (must be combined with request)
+  * implied http_trailer.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_trailer.with_body: option is no longer used and will
+    be removed in a future release
 
 
-7.65. http_trailer_test
+7.69. http_trailer_test
 
 --------------
 
@@ -7180,17 +7332,17 @@ Configuration:
     Trailer name is case insensitive.
   * implied http_trailer_test.request: match against the trailers
     from the request message even when examining the response
-  * implied http_trailer_test.with_header: parts of this rule examine
-    HTTP headers
-  * implied http_trailer_test.with_body: parts of this rule examine
-    HTTP message body
+  * implied http_trailer_test.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_trailer_test.with_body: option is no longer used and
+    will be removed in a future release
   * interval http_trailer_test.check: range check to perform on
     trailer value { 0:999999999999999999 }
   * bool http_trailer_test.numeric: trailer value is a number
   * implied http_trailer_test.absent: trailer is absent
 
 
-7.66. http_true_ip
+7.70. http_true_ip
 
 --------------
 
@@ -7203,15 +7355,15 @@ Usage: detect
 
 Configuration:
 
-  * implied http_true_ip.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_true_ip.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_true_ip.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_true_ip.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_true_ip.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_true_ip.with_trailer: option is no longer used and
+    will be removed in a future release
 
 
-7.67. http_uri
+7.71. http_uri
 
 --------------
 
@@ -7224,12 +7376,12 @@ Usage: detect
 
 Configuration:
 
-  * implied http_uri.with_header: this rule is limited to examining
-    HTTP message headers
-  * implied http_uri.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_uri.with_trailer: parts of this rule examine HTTP
-    message trailers
+  * implied http_uri.with_header: option is no longer used and will
+    be removed in a future release
+  * implied http_uri.with_body: option is no longer used and will be
+    removed in a future release
+  * implied http_uri.with_trailer: option is no longer used and will
+    be removed in a future release
   * implied http_uri.scheme: match against scheme section of URI only
   * implied http_uri.host: match against host section of URI only
   * implied http_uri.port: match against port section of URI only
@@ -7239,7 +7391,7 @@ Configuration:
     only
 
 
-7.68. http_version
+7.72. http_version
 
 --------------
 
@@ -7253,15 +7405,15 @@ Configuration:
 
   * implied http_version.request: match against the version from the
     request message even when examining the response
-  * implied http_version.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_version.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_version.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_version.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_version.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_version.with_trailer: option is no longer used and
+    will be removed in a future release
 
 
-7.69. http_version_match
+7.73. http_version_match
 
 --------------
 
@@ -7277,15 +7429,15 @@ Configuration:
     versions to match
   * implied http_version_match.request: match against the version
     from the request message even when examining the response
-  * implied http_version_match.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_version_match.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_version_match.with_trailer: parts of this rule
-    examine HTTP message trailers
+  * implied http_version_match.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_version_match.with_body: option is no longer used
+    and will be removed in a future release
+  * implied http_version_match.with_trailer: option is no longer used
+    and will be removed in a future release
 
 
-7.70. icmp_id
+7.74. icmp_id
 
 --------------
 
@@ -7301,7 +7453,7 @@ Configuration:
     0:65535 }
 
 
-7.71. icmp_seq
+7.75. icmp_seq
 
 --------------
 
@@ -7317,7 +7469,7 @@ Configuration:
     given range { 0:65535 }
 
 
-7.72. icode
+7.76. icode
 
 --------------
 
@@ -7333,7 +7485,7 @@ Configuration:
     0:255 }
 
 
-7.73. id
+7.77. id
 
 --------------
 
@@ -7349,7 +7501,7 @@ Configuration:
     }
 
 
-7.74. iec104_apci_type
+7.78. iec104_apci_type
 
 --------------
 
@@ -7364,7 +7516,7 @@ Configuration:
   * string iec104_apci_type.~: APCI type to match
 
 
-7.75. iec104_asdu_func
+7.79. iec104_asdu_func
 
 --------------
 
@@ -7379,7 +7531,7 @@ Configuration:
   * string iec104_asdu_func.~: function code to match
 
 
-7.76. ip_proto
+7.80. ip_proto
 
 --------------
 
@@ -7394,7 +7546,7 @@ Configuration:
   * string ip_proto.~proto: [!|>|<] name or number
 
 
-7.77. ipopts
+7.81. ipopts
 
 --------------
 
@@ -7410,7 +7562,7 @@ Configuration:
     lsrre|ssrr|satid|any }
 
 
-7.78. isdataat
+7.82. isdataat
 
 --------------
 
@@ -7427,7 +7579,7 @@ Configuration:
     buffer
 
 
-7.79. itype
+7.83. itype
 
 --------------
 
@@ -7443,7 +7595,7 @@ Configuration:
     0:255 }
 
 
-7.80. js_data
+7.84. js_data
 
 --------------
 
@@ -7455,7 +7607,7 @@ Type: ips_option
 Usage: detect
 
 
-7.81. md5
+7.85. md5
 
 --------------
 
@@ -7475,7 +7627,7 @@ Configuration:
     of buffer
 
 
-7.82. metadata
+7.86. metadata
 
 --------------
 
@@ -7492,7 +7644,7 @@ Configuration:
     pairs
 
 
-7.83. mms_data
+7.87. mms_data
 
 --------------
 
@@ -7503,7 +7655,7 @@ Type: ips_option
 Usage: detect
 
 
-7.84. mms_func
+7.88. mms_func
 
 --------------
 
@@ -7518,7 +7670,7 @@ Configuration:
   * string mms_func.~: func to match
 
 
-7.85. modbus_data
+7.89. modbus_data
 
 --------------
 
@@ -7529,7 +7681,7 @@ Type: ips_option
 Usage: detect
 
 
-7.86. modbus_func
+7.90. modbus_func
 
 --------------
 
@@ -7544,7 +7696,7 @@ Configuration:
   * string modbus_func.~: function code to match
 
 
-7.87. modbus_unit
+7.91. modbus_unit
 
 --------------
 
@@ -7559,7 +7711,7 @@ Configuration:
   * int modbus_unit.~: Modbus unit ID { 0:255 }
 
 
-7.88. msg
+7.92. msg
 
 --------------
 
@@ -7574,7 +7726,7 @@ Configuration:
   * string msg.~: message describing rule
 
 
-7.89. mss
+7.93. mss
 
 --------------
 
@@ -7590,7 +7742,7 @@ Configuration:
     }
 
 
-7.90. pcre
+7.94. pcre
 
 --------------
 
@@ -7612,7 +7764,7 @@ Peg counts:
   * pcre.pcre_negated: total pcre rules using negation syntax (sum)
 
 
-7.91. pkt_data
+7.95. pkt_data
 
 --------------
 
@@ -7624,7 +7776,7 @@ Type: ips_option
 Usage: detect
 
 
-7.92. pkt_num
+7.96. pkt_num
 
 --------------
 
@@ -7640,7 +7792,7 @@ Configuration:
     { 1: }
 
 
-7.93. priority
+7.97. priority
 
 --------------
 
@@ -7656,7 +7808,7 @@ Configuration:
     1:max31 }
 
 
-7.94. raw_data
+7.98. raw_data
 
 --------------
 
@@ -7667,7 +7819,7 @@ Type: ips_option
 Usage: detect
 
 
-7.95. reference
+7.99. reference
 
 --------------
 
@@ -7682,7 +7834,7 @@ Configuration:
   * string reference.~ref: reference: <scheme>,<id>
 
 
-7.96. regex
+7.100. regex
 
 --------------
 
@@ -7706,7 +7858,7 @@ Configuration:
     instead of start of buffer
 
 
-7.97. rem
+7.101. rem
 
 --------------
 
@@ -7721,7 +7873,7 @@ Configuration:
   * string rem.~: comment
 
 
-7.98. replace
+7.102. replace
 
 --------------
 
@@ -7737,7 +7889,7 @@ Configuration:
   * string replace.~: byte code to replace with
 
 
-7.99. rev
+7.103. rev
 
 --------------
 
@@ -7752,7 +7904,7 @@ Configuration:
   * int rev.~: revision { 1:max32 }
 
 
-7.100. rpc
+7.104. rpc
 
 --------------
 
@@ -7769,7 +7921,7 @@ Configuration:
   * string rpc.~proc: procedure number or * for any
 
 
-7.101. s7commplus_content
+7.105. s7commplus_content
 
 --------------
 
@@ -7780,7 +7932,7 @@ Type: ips_option
 Usage: detect
 
 
-7.102. s7commplus_func
+7.106. s7commplus_func
 
 --------------
 
@@ -7795,7 +7947,7 @@ Configuration:
   * string s7commplus_func.~: function code to match
 
 
-7.103. s7commplus_opcode
+7.107. s7commplus_opcode
 
 --------------
 
@@ -7810,7 +7962,7 @@ Configuration:
   * string s7commplus_opcode.~: opcode code to match
 
 
-7.104. sd_pattern
+7.108. sd_pattern
 
 --------------
 
@@ -7834,7 +7986,7 @@ Peg counts:
   * sd_pattern.terminated: hyperscan terminated (sum)
 
 
-7.105. seq
+7.109. seq
 
 --------------
 
@@ -7850,7 +8002,7 @@ Configuration:
     range { 0: }
 
 
-7.106. service
+7.110. service
 
 --------------
 
@@ -7865,7 +8017,7 @@ Configuration:
   * string service.*: one or more comma-separated service names
 
 
-7.107. sha256
+7.111. sha256
 
 --------------
 
@@ -7885,7 +8037,7 @@ Configuration:
     start of buffer
 
 
-7.108. sha512
+7.112. sha512
 
 --------------
 
@@ -7905,7 +8057,7 @@ Configuration:
     start of buffer
 
 
-7.109. sid
+7.113. sid
 
 --------------
 
@@ -7920,7 +8072,7 @@ Configuration:
   * int sid.~: signature id { 1:max32 }
 
 
-7.110. sip_body
+7.114. sip_body
 
 --------------
 
@@ -7931,7 +8083,7 @@ Type: ips_option
 Usage: detect
 
 
-7.111. sip_header
+7.115. sip_header
 
 --------------
 
@@ -7943,11 +8095,11 @@ Type: ips_option
 Usage: detect
 
 
-7.112. sip_method
+7.116. sip_method
 
 --------------
 
-Help: detection option for sip stat code
+Help: detection option for sip method
 
 Type: ips_option
 
@@ -7958,7 +8110,7 @@ Configuration:
   * string sip_method.*method: sip method
 
 
-7.113. sip_stat_code
+7.117. sip_stat_code
 
 --------------
 
@@ -7973,7 +8125,7 @@ Configuration:
   * int sip_stat_code.*code: status code { 1:999 }
 
 
-7.114. so
+7.118. so
 
 --------------
 
@@ -7990,7 +8142,7 @@ Configuration:
     buffer
 
 
-7.115. soid
+7.119. soid
 
 --------------
 
@@ -8006,7 +8158,7 @@ Configuration:
     like 3_45678_9
 
 
-7.116. ssl_state
+7.120. ssl_state
 
 --------------
 
@@ -8035,7 +8187,7 @@ Configuration:
     unknown
 
 
-7.117. ssl_version
+7.121. ssl_version
 
 --------------
 
@@ -8062,7 +8214,7 @@ Configuration:
     tls1.2
 
 
-7.118. stream_reassemble
+7.122. stream_reassemble
 
 --------------
 
@@ -8074,7 +8226,7 @@ Usage: detect
 
 Configuration:
 
-  * enum stream_reassemble.action: stop or start stream reassembly {
+  * enum stream_reassemble.action: stop or start stream reassembly { 
     disable|enable }
   * enum stream_reassemble.direction: action applies to the given
     direction(s) { client|server|both }
@@ -8083,7 +8235,7 @@ Configuration:
     remainder of the session
 
 
-7.119. stream_size
+7.123. stream_size
 
 --------------
 
@@ -8101,7 +8253,7 @@ Configuration:
     direction(s) { either|to_server|to_client|both }
 
 
-7.120. tag
+7.124. tag
 
 --------------
 
@@ -8120,7 +8272,7 @@ Configuration:
   * int tag.bytes: tag for this many bytes { 1:max32 }
 
 
-7.121. target
+7.125. target
 
 --------------
 
@@ -8132,11 +8284,11 @@ Usage: detect
 
 Configuration:
 
-  * enum target.~: indicate the target of the attack { src_ip |
+  * enum target.~: indicate the target of the attack { src_ip | 
     dst_ip }
 
 
-7.122. tos
+7.126. tos
 
 --------------
 
@@ -8151,7 +8303,7 @@ Configuration:
   * interval tos.~range: check if IP TOS is in given range { 0:255 }
 
 
-7.123. ttl
+7.127. ttl
 
 --------------
 
@@ -8167,7 +8319,7 @@ Configuration:
     0:255 }
 
 
-7.124. urg
+7.128. urg
 
 --------------
 
@@ -8183,7 +8335,7 @@ Configuration:
     { 0:65535 }
 
 
-7.125. vba_data
+7.129. vba_data
 
 --------------
 
@@ -8195,7 +8347,7 @@ Type: ips_option
 Usage: detect
 
 
-7.126. window
+7.130. window
 
 --------------
 
@@ -8211,7 +8363,7 @@ Configuration:
     range { 0:65535 }
 
 
-7.127. wscale
+7.131. wscale
 
 --------------
 
@@ -8286,7 +8438,7 @@ Configuration:
     timestamp | tos | ttl | udp_len | vlan }
   * int alert_csv.limit = 0: set maximum size in MB before rollover
     (0 is unlimited) { 0:maxSZ }
-  * string alert_csv.separator = , : separate fields with this
+  * string alert_csv.separator = ', ': separate fields with this
     character sequence
 
 
@@ -8370,7 +8522,7 @@ Configuration:
     timestamp | tos | ttl | udp_len | vlan }
   * int alert_json.limit = 0: set maximum size in MB before rollover
     (0 is unlimited) { 0:maxSZ }
-  * string alert_json.separator = , : separate fields with this
+  * string alert_json.separator = ', ': separate fields with this
     character sequence
 
 
@@ -8390,7 +8542,7 @@ Configuration:
     each message { auth | authpriv | daemon | user | local0 | local1
     | local2 | local3 | local4 | local5 | local6 | local7 }
   * enum alert_syslog.level = info: part of priority applied to each
-    message { emerg | alert | crit | err | warning | notice | info |
+    message { emerg | alert | crit | err | warning | notice | info | 
     debug }
   * multi alert_syslog.options: used to open the syslog connection {
     cons | ndelay | perror | pid }
@@ -8789,7 +8941,7 @@ libraries see the Getting Started section of the manual.
     stdout
   * int alert_csv.limit = 0: set maximum size in MB before rollover
     (0 is unlimited) { 0:maxSZ }
-  * string alert_csv.separator = , : separate fields with this
+  * string alert_csv.separator = ', ': separate fields with this
     character sequence
   * bool alert_ex.upper = false: true/false → convert to upper/lower
     case
@@ -8817,7 +8969,7 @@ libraries see the Getting Started section of the manual.
     stdout
   * int alert_json.limit = 0: set maximum size in MB before rollover
     (0 is unlimited) { 0:maxSZ }
-  * string alert_json.separator = , : separate fields with this
+  * string alert_json.separator = ', ': separate fields with this
     character sequence
   * bool alerts.alert_with_interface_name = false: include interface
     in alert info (fast, full, or syslog only)
@@ -8838,7 +8990,7 @@ libraries see the Getting Started section of the manual.
     each message { auth | authpriv | daemon | user | local0 | local1
     | local2 | local3 | local4 | local5 | local6 | local7 }
   * enum alert_syslog.level = info: part of priority applied to each
-    message { emerg | alert | crit | err | warning | notice | info |
+    message { emerg | alert | crit | err | warning | notice | info | 
     debug }
   * multi alert_syslog.options: used to open the syslog connection {
     cons | ndelay | perror | pid }
@@ -8951,7 +9103,7 @@ libraries see the Getting Started section of the manual.
   * int byte_extract.bitmask: applies as an AND to the extracted
     value before storage in name { 0x1:0xFFFFFFFF }
   * int byte_extract.~count: number of bytes to pick up from the
-    buffer { 1:10 }
+    buffer (string can pick less) { 1:10 }
   * implied byte_extract.dce: dcerpc2 determines endianness
   * implied byte_extract.dec: convert from decimal string
   * implied byte_extract.hex: convert from hex string
@@ -8972,7 +9124,7 @@ libraries see the Getting Started section of the manual.
   * int byte_jump.bitmask: applies as an AND prior to evaluation {
     0x1:0xFFFFFFFF }
   * int byte_jump.~count: number of bytes to pick up from the buffer
-    { 0:10 }
+    (string can pick less) { 0:10 }
   * implied byte_jump.dce: dcerpc2 determines endianness
   * implied byte_jump.dec: convert from decimal string
   * implied byte_jump.from_beginning: jump from start of buffer
@@ -8993,8 +9145,8 @@ libraries see the Getting Started section of the manual.
   * implied byte_jump.string: convert from string
   * int byte_math.bitmask: applies as bitwise AND to the extracted
     value before storage in name { 0x1:0xFFFFFFFF }
-  * int byte_math.bytes: number of bytes to pick up from the buffer {
-    1:10 }
+  * int byte_math.bytes: number of bytes to pick up from the buffer
+    (string can pick less) { 1:10 }
   * implied byte_math.dce: dcerpc2 determines endianness
   * enum byte_math.endian: specify big/little endian { big|little }
   * string byte_math.offset: number of bytes into the buffer to start
@@ -9006,7 +9158,7 @@ libraries see the Getting Started section of the manual.
   * string byte_math.result: name of the variable to store the result
   * string byte_math.rvalue: value to use mathematical operation
     against
-  * enum byte_math.string: convert extracted string to dec/hex/oct {
+  * enum byte_math.string: convert extracted string to dec/hex/oct { 
     hex|dec|oct }
   * implied byte_test.big: big endian
   * int byte_test.bitmask: applies as an AND prior to evaluation {
@@ -9014,7 +9166,7 @@ libraries see the Getting Started section of the manual.
   * string byte_test.~compare: variable name or value to test the
     converted result against
   * int byte_test.~count: number of bytes to pick up from the buffer
-    { 1:10 }
+    (string can pick less) { 1:10 }
   * implied byte_test.dce: dcerpc2 determines endianness
   * implied byte_test.dec: convert from decimal string
   * implied byte_test.hex: convert from hex string
@@ -9069,13 +9221,13 @@ libraries see the Getting Started section of the manual.
     --daq-batch-size) { 1: }
   * string daq.inputs[].input: input source
   * string daq.module_dirs[].path: directory path
-  * enum daq.modules[].mode = passive: DAQ module mode { passive |
+  * enum daq.modules[].mode = passive: DAQ module mode { passive | 
     inline | read-file }
   * string daq.modules[].name: DAQ module name (required)
   * string daq.modules[].variables[].variable: DAQ module variable
     (foo[=bar])
   * int daq.snaplen = 1518: set snap length (same as -s) { 0:65535 }
-  * select data_log.key = http_request_header_event : name of the
+  * select data_log.key = 'http_request_header_event ': name of the
     event to log { http_request_header_event |
     http_response_header_event }
   * int data_log.limit = 0: set maximum size in MB before rollover (0
@@ -9094,7 +9246,7 @@ libraries see the Getting Started section of the manual.
   * int dce_smb.memcap = 8388608: Memory utilization limit on smb {
     512:maxSZ }
   * enum dce_smb.policy = WinXP: target based policy to use { Win2000
-    | WinXP | WinVista | Win2003 | Win2008 | Win7 | Samba |
+    | WinXP | WinVista | Win2003 | Win2008 | Win7 | Samba | 
     Samba-3.0.37 | Samba-3.0.22 | Samba-3.0.20 }
   * int dce_smb.reassemble_threshold = 0: minimum bytes received
     before performing reassembly { 0:65535 }
@@ -9109,7 +9261,7 @@ libraries see the Getting Started section of the manual.
   * int dce_smb.smb_max_chain = 3: SMB max chain size { 0:255 }
   * int dce_smb.smb_max_compound = 3: SMB max compound size { 0:255 }
   * int dce_smb.smb_max_credit = 8192: Maximum number of outstanding
-    request { 1:65536 }
+    request { 1:65535 }
   * multi dce_smb.valid_smb_versions = all: valid SMB versions { v1 |
     v2 | all }
   * bool dce_tcp.disable_defrag = false: disable DCE/RPC
@@ -9119,7 +9271,7 @@ libraries see the Getting Started section of the manual.
   * int dce_tcp.max_frag_len = 65535: maximum fragment size for
     defragmentation { 1514:65535 }
   * enum dce_tcp.policy = WinXP: target based policy to use { Win2000
-    | WinXP | WinVista | Win2003 | Win2008 | Win7 | Samba |
+    | WinXP | WinVista | Win2003 | Win2008 | Win7 | Samba | 
     Samba-3.0.37 | Samba-3.0.22 | Samba-3.0.20 }
   * int dce_tcp.reassemble_threshold = 0: minimum bytes received
     before performing reassembly { 0:65535 }
@@ -9135,6 +9287,9 @@ libraries see the Getting Started section of the manual.
   * int detection.asn1 = 0: maximum decode nodes { 0:65535 }
   * bool detection.enable_address_anomaly_checks = false: enable
     check and alerting of address anomalies
+  * bool detection.enable_strict_reduction = false: enable strict
+    deduplication of rule headers by ports (saves memory, but loses
+    some speed during config reading)
   * int detection_filter.count: hits in interval before allowing the
     rule to fire { 1:max32 }
   * int detection_filter.seconds: length of interval to count hits {
@@ -9147,6 +9302,8 @@ libraries see the Getting Started section of the manual.
     against all policies
   * bool detection.hyperscan_literals = false: use hyperscan for
     content literal searches instead of boyer-moore
+  * int detection.max_continuations_per_flow = 1024: maximum number
+    of continuations stored simultaneously on the flow { 0:65535 }
   * int detection.offload_limit = 99999: minimum sizeof PDU to
     offload fast pattern search (defaults to disabled) { 0:max32 }
   * int detection.offload_threads = 0: maximum number of simultaneous
@@ -9184,7 +9341,7 @@ libraries see the Getting Started section of the manual.
     that has authentication but not encryption
   * int event_filter[].count = 0: number of events in interval before
     tripping; -1 to disable { -1:max31 }
-  * int event_filter[].gid = 1: rule generator ID { 0:max32 }
+  * int event_filter[].gid = 1: rule generator ID { 0:8129 }
   * string event_filter[].ip: restrict filter to these addresses
     according to track
   * int event_filter[].seconds = 0: count interval { 0:max32 }
@@ -9201,7 +9358,7 @@ libraries see the Getting Started section of the manual.
   * bool event_queue.process_all_events = false: process just first
     action group or all action groups
   * string file_connector[].connector: connector name
-  * enum file_connector[].direction: usage { receive | transmit |
+  * enum file_connector[].direction: usage { receive | transmit | 
     duplex }
   * enum file_connector[].format: file format { binary | text }
   * string file_connector[].name: channel name
@@ -9219,23 +9376,14 @@ libraries see the Getting Started section of the manual.
     less than this { 0:max53 }
   * int file_id.decompress_buffer_size = 100000: file decompression
     buffer size { 1024:max31 }
-  * string file_id.file_rules[].category: file type category
-  * string file_id.file_rules[].group: comma separated list of groups
-    associated with file type
-  * int file_id.file_rules[].id = 0: file type id { 0:max32 }
-  * string file_id.file_rules[].magic[].content: file magic content
-  * int file_id.file_rules[].magic[].offset = 0: file magic offset {
-    0:max32 }
-  * string file_id.file_rules[].msg: information about the file type
-  * int file_id.file_rules[].rev = 0: rule revision { 0:max32 }
-  * string file_id.file_rules[].type: file type name
-  * string file_id.file_rules[].version: file type version
   * int file_id.lookup_timeout = 2: give up on lookup after this many
     seconds { 0:max31 }
   * int file_id.max_files_cached = 65536: maximal number of files
     cached in memory { 8:max53 }
   * int file_id.max_files_per_flow = 128: maximal number of files
     able to be concurrently processed per flow { 1:max53 }
+  * string file_id.rules_file: name of file with IPS rules for file
+    identification
   * int file_id.show_data_depth = 100: print this many octets {
     0:max53 }
   * int file_id.signature_depth = 10485760: stop signature at this
@@ -9251,6 +9399,12 @@ libraries see the Getting Started section of the manual.
     generated
   * bool file_log.log_sys_time = false: log the system time when
     event generated
+  * string file_meta.category: file type category
+  * string file_meta.group: comma separated list of groups associated
+    with file type
+  * int file_meta.id: file type id { 1:1023 }
+  * string file_meta.type: file type to set
+  * string file_meta.version: file type version
   * bool file_policy.enable_capture = false: enable file capture
   * bool file_policy.enable_signature = false: enable signature
     calculation
@@ -9272,7 +9426,7 @@ libraries see the Getting Started section of the manual.
   * string flags.~mask_flags: these flags are don’t cares
   * string flags.~test_flags: these flags are tested
   * string flowbits.~bits: bit [|bit]* or bit [&bit]*
-  * enum flowbits.~op: bit operation or noalert (no bits) { set |
+  * enum flowbits.~op: bit operation or noalert (no bits) { set | 
     unset | isset | isnotset | noalert }
   * implied flow.established: match only during data transfer phase
   * implied flow.from_client: same as to_server
@@ -9340,7 +9494,7 @@ libraries see the Getting Started section of the manual.
     on start up
   * bool ftp_server.telnet_cmds = false: detect Telnet escape
     sequences of FTP control channel
-  * int gid.~: generator id { 1:max32 }
+  * int gid.~: generator id { 1:8129 }
   * string gtp_info.~: info element to match
   * int gtp_inspect[].infos[].length = 0: information element type
     code { 0:255 }
@@ -9372,24 +9526,24 @@ libraries see the Getting Started section of the manual.
   * string hosts[].services[].name: service identifier
   * port hosts[].services[].port: port number
   * enum hosts[].services[].proto = tcp: IP protocol { tcp | udp }
-  * enum hosts[].tcp_policy: TCP reassembly policy { first | last |
-    linux | old_linux | bsd | macos | solaris | irix | hpux11 |
+  * enum hosts[].tcp_policy: TCP reassembly policy { first | last | 
+    linux | old_linux | bsd | macos | solaris | irix | hpux11 | 
     hpux10 | windows | win_2003 | vista | proxy }
   * addr host_tracker[].ip: hosts address / cidr
   * port host_tracker[].services[].port: port number
-  * enum host_tracker[].services[].proto: IP protocol { ip | tcp |
+  * enum host_tracker[].services[].proto: IP protocol { ip | tcp | 
     udp }
   * int http2_inspect.concurrent_streams_limit = 100: Maximum number
     of concurrent streams allowed in a single HTTP/2 flow { 100:1000
     }
   * implied http_cookie.request: match against the cookie from the
     request message even when examining the response
-  * implied http_cookie.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_cookie.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_cookie.with_trailer: parts of this rule examine HTTP
-    message trailers
+  * implied http_cookie.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_cookie.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_cookie.with_trailer: option is no longer used and
+    will be removed in a future release
   * string http_header.field: restrict to given header. Header name
     is case insensitive.
   * implied http_header.request: match against the headers from the
@@ -9402,18 +9556,19 @@ libraries see the Getting Started section of the manual.
   * bool http_header_test.numeric: header value is a number
   * implied http_header_test.request: match against the headers from
     the request message even when examining the response
-  * implied http_header_test.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_header_test.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_header_test.with_trailer: parts of this rule examine
-    HTTP message trailers
-  * implied http_header.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_header.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_header.with_trailer: parts of this rule examine HTTP
-    message trailers
+  * implied http_header_test.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_header_test.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_header_test.with_trailer: option is no longer used
+    and will be removed in a future release
+  * implied http_header.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_header.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_header.with_trailer: option is no longer used and
+    will be removed in a future release
+  * string http_inspect.allowed_methods: list of allowed methods
   * bool http_inspect.backslash_to_slash = true: replace \ with /
     when normalizing URIs
   * bit_list http_inspect.bad_characters: alert when any of specified
@@ -9426,6 +9581,8 @@ libraries see the Getting Started section of the manual.
     Visual Basic for Applications macro files in response bodies
   * bool http_inspect.decompress_zip = false: decompress zip files in
     response bodies
+  * string http_inspect.disallowed_methods: list of disallowed
+    methods
   * string http_inspect.ignore_unreserved: do not alert when the
     specified unreserved characters are percent-encoded in a
     URI.Unreserved characters are 0-9, a-z, A-Z, period, underscore,
@@ -9438,30 +9595,22 @@ libraries see the Getting Started section of the manual.
     mapping to normalize characters
   * string http_inspect.iis_unicode_map_file: file containing code
     points for IIS unicode. { (optional) }
-  * int http_inspect.js_norm_bytes_depth = -1: number of input
-    JavaScript bytes to normalize (-1 unlimited) { -1:max53 }
-  * int http_inspect.js_norm_identifier_depth = 65536: max number of
-    unique JavaScript identifiers to normalize { 0:65536 }
-  * string http_inspect.js_norm_ident_ignore[].ident_name: name of
-    the identifier to ignore
-  * int http_inspect.js_norm_max_bracket_depth = 256: maximum depth
-    of bracket nesting that enhanced JavaScript normalizer will
-    process { 1:65535 }
-  * int http_inspect.js_norm_max_scope_depth = 256: maximum depth of
-    scope nesting that enhanced JavaScript normalizer will process {
-    1:65535 }
-  * int http_inspect.js_norm_max_tmpl_nest = 32: maximum depth of
-    template literal nesting that enhanced javascript normalizer will
-    process { 0:255 }
-  * string http_inspect.js_norm_prop_ignore[].prop_name: name of the
-    object property to ignore
   * int http_inspect.maximum_chunk_length = 4294967295: maximum
     allowed length for a message body chunk { 0:4294967295 }
+  * int http_inspect.maximum_header_length = 4096: alert when the
+    length of a header exceeds this value { 0:65535 }
+  * int http_inspect.maximum_headers = 200: alert when the number of
+    headers in a message exceeds this value { 0:65535 }
   * int http_inspect.maximum_host_length = -1: maximum allowed length
     for Host header value (-1 no limit) { -1:max53 }
+  * int http_inspect.maximum_pipelined_requests = 99: alert when the
+    number of pipelined requests exceeds this value { 0:99 }
   * int http_inspect.max_javascript_whitespaces = 200: maximum
     consecutive whitespaces allowed within the JavaScript obfuscated
     data { 1:65535 }
+  * int http_inspect.max_mime_attach = 5: maximum number of mime
+    attachments that will be inspected in a section of a request
+    message { 1:65535 }
   * bool http_inspect.normalize_javascript = false: use legacy
     normalizer to normalize JavaScript in response bodies
   * bool http_inspect.normalize_utf = true: normalize charset utf
@@ -9493,70 +9642,82 @@ libraries see the Getting Started section of the manual.
   * string http_inspect.xff_headers = x-forwarded-for true-client-ip:
     specifies the xff type headers to parse and consider in the same
     order of preference as defined
-  * implied http_method.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_method.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_method.with_trailer: parts of this rule examine HTTP
-    message trailers
+  * interval http_max_header_line.~range: check that longest line of
+    current header is in given range { 0:65535 }
+  * implied http_max_header_line.request: match against the version
+    from the request message even when examining the response
+  * interval http_max_trailer_line.~range: check that longest line of
+    current trailer is in given range { 0:65535 }
+  * implied http_max_trailer_line.request: match against the version
+    from the request message even when examining the response
+  * implied http_method.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_method.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_method.with_trailer: option is no longer used and
+    will be removed in a future release
+  * interval http_num_cookies.~range: check that number of cookies of
+    current header are in given range { 0:65535 }
+  * implied http_num_cookies.request: match against the version from
+    the request message even when examining the response
   * interval http_num_headers.~range: check that number of headers of
-    current buffer are in given range { 0:200 }
+    current buffer are in given range { 0:65535 }
   * implied http_num_headers.request: match against the version from
     the request message even when examining the response
-  * implied http_num_headers.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_num_headers.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_num_headers.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_num_headers.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_num_headers.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_num_headers.with_trailer: option is no longer used
+    and will be removed in a future release
   * interval http_num_trailers.~range: check that number of headers
-    of current buffer are in given range { 0:200 }
+    of current buffer are in given range { 0:65535 }
   * implied http_num_trailers.request: match against the version from
     the request message even when examining the response
-  * implied http_num_trailers.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_num_trailers.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_num_trailers.with_trailer: parts of this rule
-    examine HTTP message trailers
+  * implied http_num_trailers.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_num_trailers.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_num_trailers.with_trailer: option is no longer used
+    and will be removed in a future release
   * implied http_param.nocase: case insensitive match
   * string http_param.~param: parameter to match
   * implied http_raw_cookie.request: match against the cookie from
     the request message even when examining the response
-  * implied http_raw_cookie.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_raw_cookie.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_raw_cookie.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_raw_cookie.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_cookie.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_cookie.with_trailer: option is no longer used
+    and will be removed in a future release
   * string http_raw_header.field: restrict to given header. Header
     name is case insensitive.
   * implied http_raw_header.request: match against the headers from
     the request message even when examining the response
-  * implied http_raw_header.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_raw_header.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_raw_header.with_trailer: parts of this rule examine
-    HTTP message trailers
-  * implied http_raw_request.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_raw_request.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_raw_request.with_trailer: parts of this rule examine
-    HTTP message trailers
-  * implied http_raw_status.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_raw_status.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_raw_header.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_header.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_header.with_trailer: option is no longer used
+    and will be removed in a future release
+  * implied http_raw_request.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_request.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_raw_request.with_trailer: option is no longer used
+    and will be removed in a future release
+  * implied http_raw_status.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_status.with_trailer: option is no longer used
+    and will be removed in a future release
   * string http_raw_trailer.field: restrict to given trailer. Trailer
     name is case insensitive.
   * implied http_raw_trailer.request: match against the trailers from
     the request message even when examining the response
-  * implied http_raw_trailer.with_body: parts of this rule examine
-    HTTP response message body (must be combined with request)
-  * implied http_raw_trailer.with_header: parts of this rule examine
-    HTTP response message headers (must be combined with request)
+  * implied http_raw_trailer.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_trailer.with_header: option is no longer used
+    and will be removed in a future release
   * implied http_raw_uri.fragment: match against fragment section of
     URI only
   * implied http_raw_uri.host: match against host section of URI only
@@ -9566,20 +9727,20 @@ libraries see the Getting Started section of the manual.
     only
   * implied http_raw_uri.scheme: match against scheme section of URI
     only
-  * implied http_raw_uri.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_raw_uri.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_raw_uri.with_trailer: parts of this rule examine
-    HTTP message trailers
-  * implied http_stat_code.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_stat_code.with_trailer: parts of this rule examine
-    HTTP message trailers
-  * implied http_stat_msg.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_stat_msg.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_raw_uri.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_raw_uri.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_raw_uri.with_trailer: option is no longer used and
+    will be removed in a future release
+  * implied http_stat_code.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_stat_code.with_trailer: option is no longer used and
+    will be removed in a future release
+  * implied http_stat_msg.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_stat_msg.with_trailer: option is no longer used and
+    will be removed in a future release
   * string http_trailer.field: restrict to given trailer
   * implied http_trailer.request: match against the trailers from the
     request message even when examining the response
@@ -9591,20 +9752,20 @@ libraries see the Getting Started section of the manual.
   * bool http_trailer_test.numeric: trailer value is a number
   * implied http_trailer_test.request: match against the trailers
     from the request message even when examining the response
-  * implied http_trailer_test.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_trailer_test.with_header: parts of this rule examine
-    HTTP headers
-  * implied http_trailer.with_body: parts of this rule examine HTTP
-    message body (must be combined with request)
-  * implied http_trailer.with_header: parts of this rule examine HTTP
-    response message headers (must be combined with request)
-  * implied http_true_ip.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_true_ip.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_true_ip.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_trailer_test.with_body: option is no longer used and
+    will be removed in a future release
+  * implied http_trailer_test.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_trailer.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_trailer.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_true_ip.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_true_ip.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_true_ip.with_trailer: option is no longer used and
+    will be removed in a future release
   * implied http_uri.fragment: match against fragment section of URI
     only
   * implied http_uri.host: match against host section of URI only
@@ -9612,30 +9773,30 @@ libraries see the Getting Started section of the manual.
   * implied http_uri.port: match against port section of URI only
   * implied http_uri.query: match against query section of URI only
   * implied http_uri.scheme: match against scheme section of URI only
-  * implied http_uri.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_uri.with_header: this rule is limited to examining
-    HTTP message headers
-  * implied http_uri.with_trailer: parts of this rule examine HTTP
-    message trailers
+  * implied http_uri.with_body: option is no longer used and will be
+    removed in a future release
+  * implied http_uri.with_header: option is no longer used and will
+    be removed in a future release
+  * implied http_uri.with_trailer: option is no longer used and will
+    be removed in a future release
   * implied http_version_match.request: match against the version
     from the request message even when examining the response
   * string http_version_match.~version_list: space-separated list of
     versions to match
-  * implied http_version_match.with_body: parts of this rule examine
-    HTTP message body
-  * implied http_version_match.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_version_match.with_trailer: parts of this rule
-    examine HTTP message trailers
+  * implied http_version_match.with_body: option is no longer used
+    and will be removed in a future release
+  * implied http_version_match.with_header: option is no longer used
+    and will be removed in a future release
+  * implied http_version_match.with_trailer: option is no longer used
+    and will be removed in a future release
   * implied http_version.request: match against the version from the
     request message even when examining the response
-  * implied http_version.with_body: parts of this rule examine HTTP
-    message body
-  * implied http_version.with_header: this rule is limited to
-    examining HTTP message headers
-  * implied http_version.with_trailer: parts of this rule examine
-    HTTP message trailers
+  * implied http_version.with_body: option is no longer used and will
+    be removed in a future release
+  * implied http_version.with_header: option is no longer used and
+    will be removed in a future release
+  * implied http_version.with_trailer: option is no longer used and
+    will be removed in a future release
   * interval icmp_id.~range: check if ICMP ID is in given range {
     0:65535 }
   * interval icmp_seq.~range: check if ICMP sequence number is in
@@ -9667,7 +9828,7 @@ libraries see the Getting Started section of the manual.
   * int inspection.max_aux_ip = 16: maximum number of auxiliary IPs
     per flow to detect and save (-1 = disable, 0 = detect but don’t
     save, 1+ = save in FIFO manner) { -1:127 }
-  * enum inspection.mode = inline-test: set policy mode { inline |
+  * enum inspection.mode = inline-test: set policy mode { inline | 
     inline-test }
   * string inspection.uuid: correlate events by uuid
   * select ipopts.~opt: output format { rr|eol|nop|ts|sec|esec|lsrr|
@@ -9683,12 +9844,10 @@ libraries see the Getting Started section of the manual.
     rules w/o stubs
   * int ips.id = 0: correlate unified2 events with configuration {
     0:65535 }
-  * string ips.includer: for internal use; where includes are
-    included from { (optional) }
   * string ips.include: snort rules and includes
   * enum ips.mode: set policy mode { tap | inline | inline-test }
-  * bool ips.obfuscate_pii = false: mask all but the last 4
-    characters of credit card and social security numbers
+  * bool ips.obfuscate_pii = true: mask all but the last 4 characters
+    of credit card, SSN, phone number, and email
   * string ips.rules: snort rules and includes (may contain states
     too)
   * string ips.states: snort rule states and includes (may contain
@@ -9703,6 +9862,22 @@ libraries see the Getting Started section of the manual.
     buffer
   * interval itype.~range: check if ICMP type is in given range {
     0:255 }
+  * int js_norm.bytes_depth = -1: number of input JavaScript bytes to
+    normalize (-1 unlimited) { -1:max53 }
+  * int js_norm.identifier_depth = 65536: max number of unique
+    JavaScript identifiers to normalize { 0:65536 }
+  * string js_norm.ident_ignore[].ident_name: name of the identifier
+    to ignore
+  * int js_norm.max_bracket_depth = 256: maximum depth of bracket
+    nesting that enhanced JavaScript normalizer will process {
+    1:65535 }
+  * int js_norm.max_scope_depth = 256: maximum depth of scope nesting
+    that enhanced JavaScript normalizer will process { 1:65535 }
+  * int js_norm.max_tmpl_nest = 32: maximum depth of template literal
+    nesting that enhanced JavaScript normalizer will process { 0:255
+    }
+  * string js_norm.prop_ignore[].prop_name: name of the object
+    property to ignore
   * bool latency.packet.fastpath = false: fastpath expensive packets
     (max_time exceeded)
   * int latency.packet.max_time = 500: set timeout for packet latency
@@ -9746,13 +9921,17 @@ libraries see the Getting Started section of the manual.
   * int modbus_unit.~: Modbus unit ID { 0:255 }
   * int mpls.max_stack_depth = -1: set maximum MPLS stack depth {
     -1:255 }
-  * enum mpls.payload_type = auto: force encapsulated payload type {
+  * enum mpls.payload_type = auto: force encapsulated payload type { 
     auto | eth | ip4 | ip6 }
   * string msg.~: message describing rule
   * interval mss.~range: check if TCP MSS is in given range { 0:65535
     }
   * string netflow.dump_file: file name to dump netflow cache on
     shutdown; won’t dump by default
+  * int netflow.flow_memcap = 0: maximum memory for flow record cache
+    in bytes, 0 = unlimited { 0:maxSZ }
+  * string netflow.netflow_service_id_path: path to file containing
+    service IDs for NetFlow
   * bool netflow.rules[].create_host = false: generate a new host
     event
   * bool netflow.rules[].create_service = false: generate a new or
@@ -9766,6 +9945,8 @@ libraries see the Getting Started section of the manual.
     networks
   * string netflow.rules[].zones: generate events only for NetFlow
     packets that originate from these zones
+  * int netflow.template_memcap = 0: maximum memory for template
+    cache in bytes, 0 = unlimited { 0:maxSZ }
   * int netflow.update_timeout = 3600: the interval at which the
     system updates host cache information { 0:max32 }
   * multi network.checksum_drop = none: drop if checksum is bad { all
@@ -9877,7 +10058,7 @@ libraries see the Getting Started section of the manual.
     bytes for flow tracking { 236:maxSZ }
   * int perf_monitor.flow_ports = 1023: maximum ports to track {
     0:65535 }
-  * enum perf_monitor.format = csv: output format for stats { csv |
+  * enum perf_monitor.format = csv: output format for stats { csv | 
     text | json }
   * int perf_monitor.max_file_size = 1073741824: files will be rolled
     over if they exceed this size { 4096:max53 }
@@ -10042,6 +10223,8 @@ libraries see the Getting Started section of the manual.
   * int process.umask: set process umask (same as -m) { 0x000:0x1FF }
   * bool process.utc = false: use UTC instead of local time for
     timestamps
+  * int process.watchdog_min_thread_count = 1: minimum unresponsive
+    threads for watchdog to trigger { 1:65535 }
   * int process.watchdog_timer = 0: watchdog timer for packet threads
     (seconds, 0 to disable) { 0:60 }
   * int profiler.memory.count = 0: limit results to count items per
@@ -10050,29 +10233,29 @@ libraries see the Getting Started section of the manual.
     = no limit) { -1:255 }
   * bool profiler.memory.show = true: show module memory profile
     stats
-  * enum profiler.memory.sort = total_used: sort by given field {
+  * enum profiler.memory.sort = total_used: sort by given field { 
     none | allocations | total_used | avg_allocation }
   * int profiler.modules.count = 0: limit results to count items per
     level (0 = no limit) { 0:max32 }
   * int profiler.modules.max_depth = -1: limit depth to max_depth (-1
     = no limit) { -1:255 }
   * bool profiler.modules.show = true: show module time profile stats
-  * enum profiler.modules.sort = total_time: sort by given field {
+  * enum profiler.modules.sort = total_time: sort by given field { 
     none | checks | avg_check | total_time }
   * int profiler.rules.count = 0: print results to given level (0 =
     all) { 0:max32 }
   * bool profiler.rules.show = true: show rule time profile stats
   * enum profiler.rules.sort = total_time: sort by given field { none
-    | checks | avg_check | total_time | matches | no_matches |
+    | checks | avg_check | total_time | matches | no_matches | 
     avg_match | avg_no_match }
   * string rate_filter[].apply_to: restrict filter to these addresses
     according to track
   * int rate_filter[].count = 1: number of events in interval before
     tripping { 0:max32 }
-  * int rate_filter[].gid = 1: rule generator ID { 0:max32 }
+  * int rate_filter[].gid = 1: rule generator ID { 0:8129 }
   * dynamic rate_filter[].new_action = alert: take this action on
-    future hits until timeout { alert | block | drop | log | pass |
-    react | reject | rewrite }
+    future hits until timeout { alert | block | drop | file_id | log
+    | pass | react | reject | rewrite }
   * int rate_filter[].seconds = 1: count interval { 0:max32 }
   * int rate_filter[].sid = 1: rule signature ID { 0:max32 }
   * int rate_filter[].timeout = 1: count interval { 0:max32 }
@@ -10093,7 +10276,7 @@ libraries see the Getting Started section of the manual.
     instead of start of buffer
   * enum reject.control = none: send ICMP unreachable(s) { none|
     network|host|port|forward|all }
-  * enum reject.reset = both: send TCP reset to one or both ends {
+  * enum reject.reset = both: send TCP reset to one or both ends { 
     none|source|dest|both }
   * string rem.~: comment
   * string replace.~: byte code to replace with
@@ -10133,7 +10316,7 @@ libraries see the Getting Started section of the manual.
   * string rna.smb_fingerprints[].mss = X: fingerprint mss
   * string rna.smb_fingerprints[].tcp_window: fingerprint tcp window
   * string rna.smb_fingerprints[].topts: fingerprint tcp options
-  * int rna.smb_fingerprints[].ttl = 0: fingerprint ttl { 0:256 }
+  * int rna.smb_fingerprints[].ttl = 0: fingerprint ttl { 0:255 }
   * int rna.smb_fingerprints[].type = 0: fingerprint type { 0:max32 }
   * enum rna.smb_fingerprints[].ua_type = os: type of user agent
     fingerprints { os | device | jail-broken | jail-broken-host }
@@ -10155,7 +10338,7 @@ libraries see the Getting Started section of the manual.
   * string rna.tcp_fingerprints[].mss = X: fingerprint mss
   * string rna.tcp_fingerprints[].tcp_window: fingerprint tcp window
   * string rna.tcp_fingerprints[].topts: fingerprint tcp options
-  * int rna.tcp_fingerprints[].ttl = 0: fingerprint ttl { 0:256 }
+  * int rna.tcp_fingerprints[].ttl = 0: fingerprint ttl { 0:255 }
   * int rna.tcp_fingerprints[].type = 0: fingerprint type { 0:max32 }
   * enum rna.tcp_fingerprints[].ua_type = os: type of user agent
     fingerprints { os | device | jail-broken | jail-broken-host }
@@ -10177,7 +10360,7 @@ libraries see the Getting Started section of the manual.
   * string rna.ua_fingerprints[].mss = X: fingerprint mss
   * string rna.ua_fingerprints[].tcp_window: fingerprint tcp window
   * string rna.ua_fingerprints[].topts: fingerprint tcp options
-  * int rna.ua_fingerprints[].ttl = 0: fingerprint ttl { 0:256 }
+  * int rna.ua_fingerprints[].ttl = 0: fingerprint ttl { 0:255 }
   * int rna.ua_fingerprints[].type = 0: fingerprint type { 0:max32 }
   * enum rna.ua_fingerprints[].ua_type = os: type of user agent
     fingerprints { os | device | jail-broken | jail-broken-host }
@@ -10199,7 +10382,7 @@ libraries see the Getting Started section of the manual.
   * string rna.udp_fingerprints[].mss = X: fingerprint mss
   * string rna.udp_fingerprints[].tcp_window: fingerprint tcp window
   * string rna.udp_fingerprints[].topts: fingerprint tcp options
-  * int rna.udp_fingerprints[].ttl = 0: fingerprint ttl { 0:256 }
+  * int rna.udp_fingerprints[].ttl = 0: fingerprint ttl { 0:255 }
   * int rna.udp_fingerprints[].type = 0: fingerprint type { 0:max32 }
   * enum rna.udp_fingerprints[].ua_type = os: type of user agent
     fingerprints { os | device | jail-broken | jail-broken-host }
@@ -10339,7 +10522,7 @@ libraries see the Getting Started section of the manual.
   * int smtp.max_response_line_len = 512: max SMTP response line {
     0:65535 }
   * string smtp.normalize_cmds: list of commands to normalize
-  * enum smtp.normalize = none: turns on/off normalization { none |
+  * enum smtp.normalize = none: turns on/off normalization { none | 
     cmds | all }
   * int smtp.qp_decode_depth = -1: quoted-Printable decoding depth
     (-1 no limit) { -1:65535 }
@@ -10617,21 +10800,15 @@ libraries see the Getting Started section of the manual.
   * implied ssl_version.!tls1.2: check for records that are not
     tls1.2
   * implied ssl_version.tls1.2: check for tls1.2
-  * int stream.file_cache.cap_weight = 32: additional bytes to track
-    per flow for better estimation against cap { 0:65535 }
   * int stream.file_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
   * bool stream_file.upload = false: indicate file transfer direction
   * int stream.held_packet_timeout = 1000: timeout in milliseconds
     for held packets { 1:max32 }
-  * int stream.icmp_cache.cap_weight = 0: additional bytes to track
-    per flow for better estimation against cap { 0:65535 }
   * int stream.icmp_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
   * int stream_icmp.session_timeout = 60: session tracking timeout {
     1:max31 }
-  * int stream.ip_cache.cap_weight = 0: additional bytes to track per
-    flow for better estimation against cap { 0:65535 }
   * int stream.ip_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
   * bool stream.ip_frags_only = false: don’t process non-frag flows
@@ -10651,7 +10828,7 @@ libraries see the Getting Started section of the manual.
     before pruning { 2:max32 }
   * int stream.pruning_timeout = 30: minimum inactive time before
     being eligible for pruning { 1:max32 }
-  * enum stream_reassemble.action: stop or start stream reassembly {
+  * enum stream_reassemble.action: stop or start stream reassembly { 
     disable|enable }
   * enum stream_reassemble.direction: action applies to the given
     direction(s) { client|server|both }
@@ -10662,8 +10839,6 @@ libraries see the Getting Started section of the manual.
     direction(s) { either|to_server|to_client|both }
   * interval stream_size.~range: check if the stream size is in the
     given range { 0: }
-  * int stream.tcp_cache.cap_weight = 11000: additional bytes to
-    track per flow for better estimation against cap { 0:65535 }
   * int stream.tcp_cache.idle_timeout = 3600: maximum inactive time
     before retiring session tracker { 1:max32 }
   * int stream_tcp.flush_factor = 0: flush upon seeing a drop in
@@ -10678,8 +10853,8 @@ libraries see the Getting Started section of the manual.
   * int stream_tcp.overlap_limit = 0: maximum number of allowed
     overlapping segments per session { 0:max32 }
   * enum stream_tcp.policy = bsd: determines operating system
-    characteristics like reassembly { first | last | linux |
-    old_linux | bsd | macos | solaris | irix | hpux11 | hpux10 |
+    characteristics like reassembly { first | last | linux | 
+    old_linux | bsd | macos | solaris | irix | hpux11 | hpux10 | 
     windows | win_2003 | vista | proxy }
   * int stream_tcp.queue_limit.max_bytes = 4194304: don’t queue more
     than given bytes per session and direction, 0 = unlimited {
@@ -10701,19 +10876,15 @@ libraries see the Getting Started section of the manual.
   * int stream_tcp.small_segments.maximum_size = 0: minimum bytes for
     a TCP segment not to be considered small (129:12) { 0:2048 }
   * bool stream_tcp.track_only = false: disable reassembly if true
-  * int stream.udp_cache.cap_weight = 0: additional bytes to track
-    per flow for better estimation against cap { 0:65535 }
   * int stream.udp_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
   * int stream_udp.session_timeout = 30: session tracking timeout {
     1:max31 }
-  * int stream.user_cache.cap_weight = 0: additional bytes to track
-    per flow for better estimation against cap { 0:65535 }
   * int stream.user_cache.idle_timeout = 180: maximum inactive time
     before retiring session tracker { 1:max32 }
   * int stream_user.session_timeout = 60: session tracking timeout {
     1:max31 }
-  * int suppress[].gid = 0: rule generator ID { 0:max32 }
+  * int suppress[].gid = 0: rule generator ID { 0:8129 }
   * string suppress[].ip: restrict suppression to these addresses
     according to track
   * int suppress[].sid = 0: rule signature ID { 0:max32 }
@@ -10724,7 +10895,7 @@ libraries see the Getting Started section of the manual.
     host { session|host_src|host_dst }
   * int tag.packets: tag this many packets { 1:max32 }
   * int tag.seconds: tag for this many seconds { 1:max32 }
-  * enum target.~: indicate the target of the attack { src_ip |
+  * enum target.~: indicate the target of the attack { src_ip | 
     dst_ip }
   * string tcp_connector[].address: address
   * port tcp_connector[].base_port: base port number
@@ -10752,12 +10923,10 @@ libraries see the Getting Started section of the manual.
   * int trace.modules.dce_smb.all: enable all trace options { 0:255 }
   * int trace.modules.dpx.all: enable all trace options { 0:255 }
   * int trace.modules.file_id.all: enable all trace options { 0:255 }
-  * int trace.modules.http_inspect.all: enable all trace options {
-    0:255 }
-  * int trace.modules.http_inspect.js_dump: enable JavaScript data
-    logging { 0:255 }
-  * int trace.modules.http_inspect.js_proc: enable JavaScript
-    processing logging { 0:255 }
+  * int trace.modules.js_norm.all: enable all trace options { 0:255 }
+  * int trace.modules.js_norm.dump: enable data logging { 0:255 }
+  * int trace.modules.js_norm.proc: enable processing logging { 0:255
+    }
   * int trace.modules.snort.all: enable all trace options { 0:255 }
   * int trace.modules.snort.inspector_manager: enable inspector
     manager trace logging { 0:255 }
@@ -10785,13 +10954,15 @@ libraries see the Getting Started section of the manual.
     (in Unix Epoch format)
   * interval urg.~range: check if tcp urgent offset is in given range
     { 0:65535 }
+  * int_list vlan.extra_tpid_ether_types = 0x9100 0x9200: set
+    non-standard QinQ ether types { 65535 }
   * interval window.~range: check if TCP window size is in given
     range { 0:65535 }
   * multi wizard.curses: enable service identification based on
-    internal algorithm { dce_smb | dce_udp | dce_tcp | mms | sslv2 }
-  * bool wizard.hexes[].client_first = true: which end initiates data
-    transfer
-  * select wizard.hexes[].proto = tcp: protocol to scan { tcp | udp }
+    internal algorithm { dce_smb | dce_udp | dce_tcp | mms |
+    s7commplus | sslv2 }
+  * select wizard.hexes[].proto = any: protocol to scan { tcp | udp |
+    any }
   * string wizard.hexes[].service: name of service
   * string wizard.hexes[].to_client[].hex: sequence of data with wild
     chars (?)
@@ -10799,10 +10970,8 @@ libraries see the Getting Started section of the manual.
     chars (?)
   * int wizard.max_search_depth = 8192: maximum scan depth per flow {
     0:65535 }
-  * bool wizard.spells[].client_first = true: which end initiates
-    data transfer
-  * select wizard.spells[].proto = tcp: protocol to scan { tcp | udp
-    }
+  * select wizard.spells[].proto = any: protocol to scan { tcp | udp
+    | any }
   * string wizard.spells[].service: name of service
   * string wizard.spells[].to_client[].spell: sequence of data with
     wild cards (*)
@@ -10943,10 +11112,12 @@ libraries see the Getting Started section of the manual.
   * dce_smb.faults: total connection-oriented faults (sum)
   * dce_smb.files_processed: total smb files processed (sum)
   * dce_smb.ignored_bytes: total ignored bytes (sum)
+  * dce_smb.ignore_dup_sessions: total smb req/resp dropped because
+    of dup msg id (sum)
   * dce_smb.max_concurrent_sessions: maximum concurrent sessions
     (max)
-  * dce_smb.max_outstanding_requests: total smb maximum outstanding
-    requests (sum)
+  * dce_smb.max_outstanding_requests: maximum outstanding requests
+    (max)
   * dce_smb.ms_rpc_http_pdus: total connection-oriented MS requests
     to send RPC over HTTP (sum)
   * dce_smb.orphaned: total connection-oriented orphaned (sum)
@@ -11178,8 +11349,22 @@ libraries see the Getting Started section of the manual.
   * detection.alt_searches: alt fast pattern searches in packet data
     (sum)
   * detection.analyzed: total packets processed (now)
+  * detection.cont_creations: total number of continuations created
+    (sum)
+  * detection.cont_evals: total number of condition-met continuations
+    (sum)
   * detection.context_stalls: times processing stalled to wait for an
     available context (sum)
+  * detection.cont_flows: total number of flows using continuation
+    (sum)
+  * detection.cont_matches: total number of continuations matched
+    (sum)
+  * detection.cont_max_num: peak number of simultaneous continuations
+    per flow (max)
+  * detection.cont_mismatches: total number of continuations
+    mismatched (sum)
+  * detection.cont_recalls: total number of continuations recalled
+    (sum)
   * detection.cooked_searches: fast pattern searches in cooked packet
     data (sum)
   * detection.event_limit: events filtered (sum)
@@ -11349,16 +11534,12 @@ libraries see the Getting Started section of the manual.
   * http_inspect.get_requests: GET requests inspected (sum)
   * http_inspect.head_requests: HEAD requests inspected (sum)
   * http_inspect.inspections: total message sections inspected (sum)
-  * http_inspect.js_bytes: total number of JavaScript bytes processed
-    (sum)
   * http_inspect.js_external_scripts: total number of external
     JavaScripts processed (sum)
-  * http_inspect.js_identifier_overflows: total number of unique
-    JavaScript identifier limit overflows (sum)
-  * http_inspect.js_identifiers: total number of unique JavaScript
-    identifiers processed (sum)
   * http_inspect.js_inline_scripts: total number of inline
     JavaScripts processed (sum)
+  * http_inspect.js_pdf_scripts: total number of PDF files processed
+    (sum)
   * http_inspect.max_concurrent_sessions: maximum concurrent http
     sessions (max)
   * http_inspect.options_requests: OPTIONS requests inspected (sum)
@@ -11383,6 +11564,8 @@ libraries see the Getting Started section of the manual.
     messages (sum)
   * http_inspect.script_detections: early inspections of scripts in
     HTTP responses (sum)
+  * http_inspect.skip_mime_attach: total number of HTTP requests with
+    too many MIME attachments to inspect (sum)
   * http_inspect.ssl_srch_abandoned_early: total SSL search abandoned
     too soon (sum)
   * http_inspect.total_bytes: total HTTP data bytes inspected (sum)
@@ -11405,6 +11588,7 @@ libraries see the Getting Started section of the manual.
   * imap.b64_attachments: total base64 attachments decoded (sum)
   * imap.b64_decoded_bytes: total base64 decoded bytes (sum)
   * imap.concurrent_sessions: total concurrent imap sessions (now)
+  * imap.js_pdf_scripts: total number of PDF files processed (sum)
   * imap.max_concurrent_sessions: maximum concurrent imap sessions
     (max)
   * imap.non_encoded_attachments: total non-encoded attachments
@@ -11423,6 +11607,11 @@ libraries see the Getting Started section of the manual.
   * imap.uu_decoded_bytes: total uu decoded bytes (sum)
   * ipv4.bad_checksum: nonzero ip checksums (sum)
   * ipv4.checksum_bypassed: checksum calculations bypassed (sum)
+  * js_norm.bytes: total number of bytes processed (sum)
+  * js_norm.identifier_overflows: total number of unique identifier
+    limit overflows (sum)
+  * js_norm.identifiers: total number of unique identifiers processed
+    (sum)
   * latency.max_usecs: maximum usecs elapsed (sum)
   * latency.packet_timeouts: packets that timed out (sum)
   * latency.rule_eval_timeouts: rule evals that timed out (sum)
@@ -11432,9 +11621,9 @@ libraries see the Getting Started section of the manual.
   * latency.total_usecs: total usecs elapsed (sum)
   * memory.allocated: total amount of memory allocated (now)
   * memory.allocations: total number of allocations (now)
-  * memory.deallocated: total amount of memory allocated (now)
+  * memory.deallocated: total amount of memory deallocated (now)
   * memory.deallocations: total number of deallocations (now)
-  * memory.max_in_use: highest allocated - deallocated (max)
+  * memory.max_in_use: maximum memory used (max)
   * memory.reap_attempts: attempts to reclaim memory (now)
   * memory.reap_failures: failures to reclaim memory (now)
   * mem_test.packets: total packets (sum)
@@ -11449,6 +11638,14 @@ libraries see the Getting Started section of the manual.
   * modbus.max_concurrent_sessions: maximum concurrent modbus
     sessions (max)
   * modbus.sessions: total sessions processed (sum)
+  * netflow.cache_adds: netflow cache added new entry (sum)
+  * netflow.cache_hits: netflow cache found existing entry (sum)
+  * netflow.cache_max: netflow cache’s maximum byte usage (sum)
+  * netflow.cache_misses: netflow cache did not find entry (sum)
+  * netflow.cache_prunes: netflow cache pruned entry to make space
+    for new entry (sum)
+  * netflow.cache_replaces: netflow cache found entry and replaced
+    its value (sum)
   * netflow.invalid_netflow_record: count of invalid netflow records
     (sum)
   * netflow.packets: total packets processed (sum)
@@ -11569,6 +11766,7 @@ libraries see the Getting Started section of the manual.
   * pop.b64_attachments: total base64 attachments decoded (sum)
   * pop.b64_decoded_bytes: total base64 decoded bytes (sum)
   * pop.concurrent_sessions: total concurrent pop sessions (now)
+  * pop.js_pdf_scripts: total number of PDF files processed (sum)
   * pop.max_concurrent_sessions: maximum concurrent pop sessions
     (max)
   * pop.non_encoded_attachments: total non-encoded attachments
@@ -11692,6 +11890,7 @@ libraries see the Getting Started section of the manual.
   * smtp.b64_attachments: total base64 attachments decoded (sum)
   * smtp.b64_decoded_bytes: total base64 decoded bytes (sum)
   * smtp.concurrent_sessions: total concurrent smtp sessions (now)
+  * smtp.js_pdf_scripts: total number of PDF files processed (sum)
   * smtp.max_concurrent_sessions: maximum concurrent smtp sessions
     (max)
   * smtp.non_encoded_attachments: total non-encoded attachments
@@ -12010,6 +12209,7 @@ libraries see the Getting Started section of the manual.
   * 150: file_id
   * 151: iec104
   * 152: mms
+  * 154: js_norm
   * 175: domain_filter
   * 256: dpx
 
@@ -12930,14 +13130,17 @@ directory tree. For example /foo/../../bar which specifies an object
 not under the root directory /. This alert can only be generated if
 the simplify_path option is configured.
 
-119:19 (http_inspect) HTTP header line exceeds 4096 bytes
+119:19 (http_inspect) HTTP header line exceeds maximum_header_length
+option bytes
 
-HTTP header line exceeds 4096 bytes. This does not apply to the start
-line. Header line length includes both header field name and value.
+HTTP header line exceeds maximum_header_length option bytes. This
+does not apply to the start line. Header line length includes both
+header field name and value.
 
-119:20 (http_inspect) HTTP message has more than 200 header fields
+119:20 (http_inspect) HTTP message has more than maximum_headers
+option header fields
 
-HTTP message has more than 200 header fields.
+HTTP message has more than maximum_headers option header fields.
 
 119:21 (http_inspect) HTTP message has more than one Content-Length
 header value
@@ -12978,11 +13181,12 @@ not percent-encoded
 
 HTTP request URI has space character that is not percent-encoded.
 
-119:34 (http_inspect) HTTP connection has more than 100 simultaneous
-pipelined requests that have not been answered
+119:34 (http_inspect) HTTP connection has more than
+maximum_pipelined_requests simultaneous pipelined requests that have
+not been answered
 
-HTTP connection has more than 100 simultaneous pipelined requests
-that have not been answered.
+HTTP connection has more than maximum_pipelined_requests simultaneous
+pipelined requests that have not been answered.
 
 119:102 (http_inspect) invalid status code in HTTP response
 
@@ -13183,12 +13387,6 @@ chunked
 
 An HTTP message includes a Transfer-Encoding header value that
 specifies other encodings before "chunked."
-
-119:224 (http_inspect) misformatted HTTP traffic
-
-The traffic contains an HTTP version, but does not contain a
-recognizable start line. This conclusion applies only to one
-direction of the flow. The opposite direction may be OK.
 
 119:225 (http_inspect) unsupported Content-Encoding used
 
@@ -13421,25 +13619,6 @@ A client sent a request to upgrade an HTTP/1 connection to HTTP/2.
 A server granted a request to upgrade a connection from HTTP/1 to
 HTTP/2.
 
-119:265 (http_inspect) bad token in JavaScript
-
-Enhanced JavaScript normalizer has encountered a symbol that is not
-expected as a part of a valid JavaScript statement, making further
-normalization impossible.
-
-119:266 (http_inspect) unexpected script opening tag in JavaScript
-
-HTML <script> tag must not have a nested <script> tag inside it. If a
-nested tag is encountered, this alert is raised. This alert is raised
-by the enhanced JavaScript normalizer.
-
-119:267 (http_inspect) unexpected script closing tag in JavaScript
-
-This alert is raised when </script> end-tag is encountered inside a
-JavaScript comment or literal, which is a syntax error, as the last
-comment or literal is not closed before script end. This alert is
-raised by the enhanced JavaScript normalizer.
-
 119:268 (http_inspect) JavaScript code under the external script tags
 
 When HTML <script> tag contains a reference to an external script, it
@@ -13455,31 +13634,6 @@ without a following end-tag). If a self-closing "short-form" script
 tag is encountered, this alert is raised. This alert is raised by the
 enhanced JavaScript normalizer.
 
-119:270 (http_inspect) max number of unique JavaScript identifiers
-reached
-
-JavaScript normalization includes identifier substitution, which
-brings arbitrary JavaScript identifiers to a common form. Amount of
-unique identifiers to normalize is limited, for memory
-considerations, with http_inspect.js_norm_identifier_depth parameter.
-When this threshold is reached, a corresponding alert is raised. This
-alert is not expected for typical network traffic and may be an
-indication that an attacker is trying to exhaust resources. This
-alert is raised by the enhanced JavaScript normalizer.
-
-119:271 (http_inspect) excessive JavaScript bracket nesting
-
-In JavaScript, template literals can have substitutions, that in turn
-can have nested template literals, which requires a stack to track
-for proper whitespace normalization. Also, the normalization tracks
-the current bracket scope, which requires a stack as well. When the
-depth of nesting exceeds limit set in
-http_inspect.js_norm_max_tmpl_nest or in
-http_inspect.js_norm_max_bracket_depth, this alert is raised. This
-alert is not expected for typical network traffic and may be an
-indication that an attacker is trying to exhaust resources. This
-alert is raised by the enhanced JavaScript normalizer.
-
 119:272 (http_inspect) Consecutive commas in HTTP Accept-Encoding
 header
 
@@ -13487,26 +13641,6 @@ There are consecutive commas, possibly separated by whitespace, in an
 HTTP Accept-Encoding header. This pattern constitutes a Microsoft
 Windows HTTP protocol stack remote code execution attempt. Reference:
 CVE-2021-31166.
-
-119:273 (http_inspect) missed PDUs during JavaScript normalization
-
-This alert is raised for the following situation. During JavaScript
-normalization middle PDUs can be missed and not normalized. Usually
-it happens when rules have file_data and js_data ips options and
-fast-pattern (FP) search is applying to file_data. Some PDUs don’t
-match file_data FP search and JavaScript normalization won’t be
-executed for these PDUs. The normalization of the following PDUs for
-inline/external scripts will be stopped for current request within
-the flow. This alert is raised by the enhanced JavaScript normalizer.
-
-119:274 (http_inspect) excessive JavaScript scope nesting
-
-To resolve variable names in JavaScript, a current stack of variable
-scopes has to be tracked. When the depth of nesting exceeds the limit
-set in http_inspect.js_norm_max_scope_depth, this alert is raised.
-This alert is not expected for typical network traffic and may be an
-indication that an attacker is trying to exhaust resources. This
-alert is raised by the enhanced JavaScript normalizer.
 
 119:275 (http_inspect) HTTP/1 version other than 1.0 or 1.1
 
@@ -13528,6 +13662,51 @@ traffic.
 
 The HTTP message body is gzip encoded and the FEXTRA flag is set in
 the gzip header.
+
+119:279 (http_inspect) invalid status line
+
+HTTP Status-Line failed validation checks. Checks include minimum
+length, format, characters used, etc.
+
+119:280 (http_inspect) HTTP message headers longer than 63780 bytes
+
+HTTP message headers longer than 63780 bytes
+
+119:281 (http_inspect) invalid request line
+
+HTTP Request-Line failed validation checks. Checks include minimum
+length, format, characters used, etc.
+
+119:282 (http_inspect) too many white space characters when start
+line is expected
+
+Packet with more than 20 white space characters when an HTTP
+Start-Line is required.
+
+119:283 (http_inspect) HTTP message status line longer than 63780
+bytes
+
+HTTP message Status-Line longer than 63780 bytes
+
+119:284 (http_inspect) partial start line
+
+Connection closed in the middle of a Request-Line or Status-Line.
+
+119:285 (http_inspect) HTTP message request line longer than 63780
+bytes
+
+HTTP message Request-Line longer than 63780 bytes
+
+119:286 (http_inspect) HTTP/2 preface received instead of an HTTP/1
+method
+
+HTTP/2 preface received instead of an HTTP/1 method
+
+119:287 (http_inspect) HTTP request method is not on allowed methods
+list or is on disallowed methods list
+
+HTTP request method is not on allowed methods list or is on
+disallowed methods list.
 
 121:1 (http2_inspect) invalid flag set on HTTP/2 frame
 
@@ -13708,6 +13887,29 @@ SETTINGS frame
 not expected
 
 Nonempty HTTP/2 Data frame where a message body was not expected.
+
+121:38 (http2_inspect) HTTP/2 non-Data frame longer than 63780 bytes
+
+HTTP/2 non-Data frame longer than 63780 bytes. For HEADERS and
+PUSH_PROMISE frames this includes the size of any following
+continuation frames.
+
+121:39 (http2_inspect) not HTTP/2 traffic or unrecoverable HTTP/2
+protocol error
+
+HTTP/2 inspector is unable to parse this flow. Either the connection
+is not actually using HTTP/2 or some sort of unrecoverable HTTP/2
+protocol error has occurred. This conclusion applies only to one
+direction of the flow. The opposite direction may be OK.
+
+121:40 (http2_inspect) invalid HTTP/2 PRIORITY frame
+
+Invalid HTTP/2 PRIORITY frame. Stream ID is 0 or length is not 5.
+
+121:41 (http2_inspect) invalid HTTP/2 GOAWAY frame
+
+Invalid HTTP/2 GOAWAY frame. R bit is set or stream ID is not 0 or
+length is less than 8.
 
 122:1 (port_scan) TCP portscan
 
@@ -13966,6 +14168,10 @@ AUTH command exceeds the configured max_auth_command_line_len.
 124:16 (smtp) file decompression failed
 
 File decompression failed.
+
+124:17 (smtp) STARTTLS command injection attempt
+
+SMTP STARTTLS command injection attempt.
 
 125:1 (ftp_server) TELNET cmd on FTP command channel
 
@@ -15176,6 +15382,79 @@ set to a reserved value
 (iec104) IEC104 APCI I Qualifier of Set Point Command ql field set to
 a reserved value
 
+154:1 (js_norm) nested unescape functions
+
+Enhanced JavaScript normalizer has encountered nested unescape
+functions
+
+154:2 (js_norm) mixed unescape sequence
+
+Enhanced JavaScript normalizer has encountered mixed unescape
+sequence
+
+154:3 (js_norm) bad token
+
+Enhanced JavaScript normalizer has encountered a symbol that is not
+expected as a part of a valid JavaScript statement, making further
+normalization impossible.
+
+154:4 (js_norm) unexpected HTML script opening tag
+
+HTML <script> tag must not have a nested <script> tag inside it. If a
+nested tag is encountered, this alert is raised. This alert is raised
+by the enhanced JavaScript normalizer.
+
+154:5 (js_norm) unexpected HTML script closing tag
+
+This alert is raised when </script> end-tag is encountered inside a
+JavaScript comment or literal, which is a syntax error, as the last
+comment or literal is not closed before script end. This alert is
+raised by the enhanced JavaScript normalizer.
+
+154:6 (js_norm) max number of unique identifiers reached
+
+JavaScript normalization includes identifier substitution, which
+brings arbitrary JavaScript identifiers to a common form. Amount of
+unique identifiers to normalize is limited, for memory
+considerations, with http_inspect.js_norm_identifier_depth parameter.
+When this threshold is reached, a corresponding alert is raised. This
+alert is not expected for typical network traffic and may be an
+indication that an attacker is trying to exhaust resources. This
+alert is raised by the enhanced JavaScript normalizer.
+
+154:7 (js_norm) excessive bracket nesting
+
+In JavaScript, template literals can have substitutions, that in turn
+can have nested template literals, which requires a stack to track
+for proper whitespace normalization. Also, the normalization tracks
+the current bracket scope, which requires a stack as well. When the
+depth of nesting exceeds limit set in
+http_inspect.js_norm_max_tmpl_nest or in
+http_inspect.js_norm_max_bracket_depth, this alert is raised. This
+alert is not expected for typical network traffic and may be an
+indication that an attacker is trying to exhaust resources. This
+alert is raised by the enhanced JavaScript normalizer.
+
+154:8 (js_norm) data gaps during normalization
+
+This alert is raised for the following situation. During JavaScript
+normalization some data can be lost and not normalized. Usually it
+happens when rules have file_data and js_data ips options and
+fast-pattern (FP) search is applying to file_data. Some data doesn’t
+match file_data FP search and JavaScript normalization won’t be
+executed for it. The following normalization for inline/external
+scripts will be stopped for current request within the flow. This
+alert is raised by the enhanced JavaScript normalizer.
+
+154:9 (js_norm) excessive scope nesting
+
+To resolve variable names in JavaScript, a current stack of variable
+scopes has to be tracked. When the depth of nesting exceeds the limit
+set in http_inspect.js_norm_max_scope_depth, this alert is raised.
+This alert is not expected for typical network traffic and may be an
+indication that an attacker is trying to exhaust resources. This
+alert is raised by the enhanced JavaScript normalizer.
+
 175:1 (domain_filter) configured domain detected
 
 (domain_filter) configured domain detected
@@ -15224,6 +15503,8 @@ a reserved value
   * rna.delete_mac_host_proto(mac, proto): delete a protocol
     associated with a MAC host
   * rna.purge_data(): purge all host cache and mac cache data
+  * snort.set_watchdog_params(timer, min_thread_count): set watchdog
+    parameters
   * snort.show_plugins(): show available plugins
   * snort.delete_inspector(inspector): delete an inspector from the
     default policy
@@ -15233,7 +15514,6 @@ a reserved value
   * snort.reload_config(filename): load new configuration
   * snort.reload_policy(filename): reload part or all of the default
     policy
-  * snort.reload_module(module): reload module
   * snort.reload_daq(): reload daq module
   * snort.reload_hosts(filename): load a new hosts table
   * snort.pause(): suspend packet processing
@@ -15383,6 +15663,8 @@ and are not applicable elsewhere.
     file data
   * file_id (inspector): configure file identification
   * file_log (inspector): log file event to file.log
+  * file_meta (ips_option): rule option to set file metadata (file
+    type and id)
   * file_policy (basic): configure file policy
   * file_type (ips_option): rule option to check file type
   * flags (ips_option): rule option to test TCP control flags
@@ -15423,8 +15705,14 @@ and are not applicable elsewhere.
     on specified header field, check whether it is a number, or check
     if the field is absent
   * http_inspect (inspector): HTTP inspector
+  * http_max_header_line (ips_option): rule option to perform range
+    check on longest header line
+  * http_max_trailer_line (ips_option): rule option to perform range
+    check on longest trailer line
   * http_method (ips_option): rule option to set the detection cursor
     to the HTTP request method
+  * http_num_cookies (ips_option): rule option to perform range check
+    on number of cookies
   * http_num_headers (ips_option): rule option to perform range check
     on number of headers
   * http_num_trailers (ips_option): rule option to perform range
@@ -15490,6 +15778,7 @@ and are not applicable elsewhere.
   * itype (ips_option): rule option to check ICMP type
   * js_data (ips_option): rule option to set detection cursor to
     normalized JavaScript data
+  * js_norm (basic): JavaScript normalizer
   * latency (basic): packet and rule latency monitoring and control
   * llc (codec): support for logical link control
   * log_codecs (logger): log protocols in packet by layer
@@ -15583,7 +15872,7 @@ and are not applicable elsewhere.
     the request body
   * sip_header (ips_option): rule option to set the detection cursor
     to the SIP header buffer
-  * sip_method (ips_option): detection option for sip stat code
+  * sip_method (ips_option): detection option for sip method
   * sip_stat_code (ips_option): detection option for sip stat code
   * smtp (inspector): smtp inspection
   * snort (basic): command line configuration and shell commands
@@ -15769,6 +16058,7 @@ and are not applicable elsewhere.
   * ips_action::block: block current packet and all the subsequent
     packets in this flow
   * ips_action::drop: drop the current packet
+  * ips_action::file_id: file_id file type id
   * ips_action::log: log the current packet
   * ips_action::pass: mark the current packet as passed
   * ips_action::react: send response to client and terminate session
@@ -15835,6 +16125,8 @@ and are not applicable elsewhere.
   * ips_option::enip_rsp: detection option to match ENIP response
   * ips_option::file_data: rule option to set detection cursor to
     file data
+  * ips_option::file_meta: rule option to set file metadata (file
+    type and id)
   * ips_option::file_type: rule option to check file type
   * ips_option::flags: rule option to test TCP control flags
   * ips_option::flow: rule option to check session properties
@@ -15855,8 +16147,14 @@ and are not applicable elsewhere.
   * ips_option::http_header_test: rule option to perform range check
     on specified header field, check whether it is a number, or check
     if the field is absent
+  * ips_option::http_max_header_line: rule option to perform range
+    check on longest header line
+  * ips_option::http_max_trailer_line: rule option to perform range
+    check on longest trailer line
   * ips_option::http_method: rule option to set the detection cursor
     to the HTTP request method
+  * ips_option::http_num_cookies: rule option to perform range check
+    on number of cookies
   * ips_option::http_num_headers: rule option to perform range check
     on number of headers
   * ips_option::http_num_trailers: rule option to perform range check
@@ -15957,7 +16255,7 @@ and are not applicable elsewhere.
     the request body
   * ips_option::sip_header: rule option to set the detection cursor
     to the SIP header buffer
-  * ips_option::sip_method: detection option for sip stat code
+  * ips_option::sip_method: detection option for sip method
   * ips_option::sip_stat_code: detection option for sip stat code
   * ips_option::so: rule option to call custom eval function
   * ips_option::soid: rule option to specify a shared object rule ID

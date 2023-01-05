@@ -289,7 +289,7 @@ static const Parameter rna_fp_params[] =
     { "uuid", Parameter::PT_STRING, nullptr, nullptr,
       "fingerprint uuid" },
 
-    { "ttl", Parameter::PT_INT, "0:256", "0",
+    { "ttl", Parameter::PT_INT, "0:255", "0",
       "fingerprint ttl" },
 
     { "tcp_window", Parameter::PT_STRING, nullptr, nullptr,
@@ -448,7 +448,14 @@ bool RnaModule::begin(const char* fqn, int, SnortConfig*)
 bool RnaModule::set(const char* fqn, Value& v, SnortConfig*)
 {
     if (v.is("rna_conf_path"))
+    {
+        struct stat buf;
         mod_conf->rna_conf_path = string(v.get_string());
+        if (stat(mod_conf->rna_conf_path.c_str(), &buf) != 0)
+        {
+            WarningMessage("WARNING: Missing/Incorrect 'rna.conf' path : \"%s\", using system defaults\n" , mod_conf->rna_conf_path.c_str());
+        }
+    }
     else if (v.is("enable_logger"))
         mod_conf->enable_logger = v.get_bool();
     else if (v.is("log_when_idle"))
@@ -482,7 +489,7 @@ bool RnaModule::set(const char* fqn, Value& v, SnortConfig*)
         else if (v.is("ws"))
             fingerprint.ws = v.get_string();
         else if (v.is("df"))
-            fingerprint.df = v.get_uint8();
+            fingerprint.df = v.get_bool();
         else if (v.is("ua_type"))
             fingerprint.ua_type = (UserAgentInfoType)v.get_uint8();
         else if (v.is("host_name"))
@@ -503,9 +510,9 @@ bool RnaModule::set(const char* fqn, Value& v, SnortConfig*)
         else if (v.is("dhcp60"))
             fingerprint.dhcp60 = v.get_string();
         else if (v.is("major"))
-            fingerprint.smb_major = v.get_uint16();
+            fingerprint.smb_major = v.get_uint32();
         else if (v.is("minor"))
-            fingerprint.smb_minor = v.get_uint16();
+            fingerprint.smb_minor = v.get_uint32();
         else if (v.is("flags"))
             fingerprint.smb_flags = v.get_uint32();
         else
@@ -701,3 +708,4 @@ TEST_CASE("RNA module", "[rna_module]")
 }
 
 #endif
+

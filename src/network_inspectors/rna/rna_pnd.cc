@@ -35,6 +35,7 @@
 #include "protocols/icmp4.h"
 #include "protocols/icmp6.h"
 #include "protocols/protocol_ids.h"
+#include "pub_sub/rna_events.h"
 
 #include "rna_app_discovery.h"
 #include "rna_cpe_os.h"
@@ -182,20 +183,109 @@ bool RnaPnd::analyze_netflow(snort::DataEvent& event)
     if ( !p )
         return false;
 
-    const auto& src_ip = p->ptrs.ip_api.get_src();
-    const auto& src_ip_ptr = (const struct in6_addr*) src_ip->get_ip6_ptr();
-    const auto& src_mac = layer::get_eth_layer(p)->ether_src;
-    NetflowEvent* nfe = static_cast<NetflowEvent*>(&event);
-    const NetflowSessionRecord* nf_record = nfe->get_record();
+    NetFlowEvent* nfe = static_cast<NetFlowEvent*>(&event);
 
-    // process host and service log events
-    UNUSED(src_ip_ptr);
-    UNUSED(src_mac);
-    UNUSED(nf_record);
+    analyze_netflow_host(nfe);
+
+    if (nfe->get_create_service())
+        analyze_netflow_service(nfe);
 
     return true;
 }
 
+void RnaPnd::analyze_netflow_host(NetFlowEvent* nfe)
+{
+    const Packet* p = nfe->get_packet();
+    if ( !p )
+        return;
+
+    bool new_host = false;
+    const auto& src_ip = nfe->get_record()->initiator_ip;
+    const auto& src_ip_ptr = (const struct in6_addr*) src_ip.get_ip6_ptr();
+
+    // This case must be handled first before adding the host to the
+    // host cache. Otherwise, new rules evals with create_host = true
+    // will fail since the host will already exist.
+    if (!nfe->get_create_host() and !nfe->get_create_service())
+    {
+        uint32_t service = nfe->get_service_id();
+        RNAEvent new_flow_event(p, nfe->get_record(), service);
+        DataBus::publish(RNA_NEW_NETFLOW_CONN, new_flow_event);
+        return;
+    }
+
+    auto ht = find_or_create_host_tracker(src_ip, new_host);
+
+    if ( !new_host )
+        ht->update_last_seen();
+
+    const uint8_t src_mac[6] = {0};
+
+    if ( new_host )
+    {
+        if ( nfe->get_create_host() )
+            logger.log(RNA_EVENT_NEW, NEW_HOST, p, &ht, src_ip_ptr, src_mac);
+        else
+            return;
+    }
+
+    uint16_t ptype = rna_get_eth(p);
+    if ( ptype > to_utype(ProtocolId::ETHERTYPE_MINIMUM) )
+    {
+        if ( ht->add_network_proto(ptype) )
+            logger.log(RNA_EVENT_NEW, NEW_NET_PROTOCOL, p, &ht, ptype, src_mac, src_ip_ptr,
+                packet_time());
+    }
+
+    ptype = to_utype(p->get_ip_proto_next());
+    if ( ht->add_xport_proto(ptype) )
+        logger.log(RNA_EVENT_NEW, NEW_XPORT_PROTOCOL, p, &ht, ptype, src_mac, src_ip_ptr,
+            packet_time());
+
+    if ( !new_host )
+        generate_change_host_update(&ht, p, &src_ip, src_mac, packet_time());
+}
+
+void RnaPnd::analyze_netflow_service(NetFlowEvent* nfe)
+{
+
+    const Packet* p = nfe->get_packet();
+    if ( !p )
+        return;
+
+    bool new_host = false;
+    const auto& src_ip = nfe->get_record()->initiator_ip;
+    const auto& mac_addr = layer::get_eth_layer(p)->ether_src;
+    uint32_t service = nfe->get_service_id();
+    uint16_t port = 0;
+    IpProtocol proto = (IpProtocol) nfe->get_record()->proto;
+
+    if (nfe->is_initiator_swapped())
+        port = nfe->get_record()->initiator_port;
+    else
+        port = nfe->get_record()->responder_port;
+
+    auto ht = find_or_create_host_tracker(src_ip, new_host);
+    ht->update_last_seen();
+
+    bool is_new = false;
+    auto ha = ht->add_service(port, proto, (uint32_t) packet_time(), is_new, service);
+
+    ht->update_service_info(ha, nullptr, nullptr, conf->max_host_service_info);
+
+    if ( is_new )
+    {
+        if ( proto == IpProtocol::TCP )
+            logger.log(RNA_EVENT_NEW, NEW_TCP_SERVICE, p, &ht,
+                (const struct in6_addr*) src_ip.get_ip6_ptr(), mac_addr, &ha);
+        else
+            logger.log(RNA_EVENT_NEW, NEW_UDP_SERVICE, p, &ht,
+                (const struct in6_addr*) src_ip.get_ip6_ptr(), mac_addr, &ha);
+
+        ha.hits = 0;
+        ht->update_service(ha);
+    }
+}
 void RnaPnd::discover_network_icmp(const Packet* p)
 {
     discover_network(p, 0);

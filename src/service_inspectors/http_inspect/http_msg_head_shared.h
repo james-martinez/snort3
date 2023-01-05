@@ -49,6 +49,7 @@ public:
     // Tables of header field names and header value names
     static const StrCode header_list[];
     static const StrCode content_code_list[];
+    static const StrCode content_type_list[];
     static const StrCode charset_code_list[];
     static const StrCode charset_code_opt_list[];
     static const StrCode transfer_encoding_list[];
@@ -58,10 +59,10 @@ public:
     // verdicts.
     uint64_t get_file_cache_index();
     const Field& get_content_disposition_filename();
-    bool is_external_js();
     int32_t get_num_headers() const { return num_headers; }
+    int32_t get_max_header_line() const { return max_header_line; }
+    int32_t get_content_type();
 
-    static const int MAX_HEADERS = 200;  // I'm an arbitrary number. FIXIT-RC
 protected:
     HttpMsgHeadShared(const uint8_t* buffer, const uint16_t buf_size,
         HttpFlowData* session_data_, HttpCommon::SourceId source_id_, bool buf_owner, snort::Flow* flow_,
@@ -72,15 +73,19 @@ protected:
     // Do a case insensitive search for "boundary=" in a Field
     static bool boundary_present(const Field& field);
 
+    // All of these are indexed by the relative position of the header field in the message
+
+    Field* header_line = nullptr;
+    HttpEnums::HeaderId* header_name_id = nullptr;
+    int32_t num_headers = HttpCommon::STAT_NOT_COMPUTE;
+    int32_t max_header_line = HttpCommon::STAT_NOT_COMPUTE;
+
 #ifdef REG_TEST
     void print_headers(FILE* output);
 #endif
 
 private:
     static const int MAX = HttpEnums::HEAD__MAX_VALUE + HttpEnums::MAX_CUSTOM_HEADERS;
-
-    // All of these are indexed by the relative position of the header field in the message
-    static const int MAX_HEADER_LENGTH = 4096; // Based on max cookie size of some browsers
 
     void parse_header_block();
     int32_t find_next_header(const uint8_t* buffer, int32_t length, int32_t& num_seps);
@@ -92,15 +97,12 @@ private:
     Field classic_raw_header;    // raw headers with cookies spliced out
     Field classic_norm_header;   // URI normalization applied
     Field classic_norm_cookie;   // URI normalization applied to concatenated cookie values
-    Field* header_line = nullptr;
     Field* header_name = nullptr;
-    HttpEnums::HeaderId* header_name_id = nullptr;
     Field* header_value = nullptr;
 
     NormalizedHeader* get_header_node(HttpEnums::HeaderId k) const;
     NormalizedHeader* norm_heads = nullptr;
 
-    int32_t num_headers = HttpCommon::STAT_NOT_COMPUTE;
     std::bitset<MAX> headers_present = 0;
 
     void extract_filename_from_content_disposition();
@@ -109,7 +111,7 @@ private:
     bool file_cache_index_computed = false;
 
     bool own_msg_buffer;
-    int js_external = HttpCommon::STAT_NOT_COMPUTE;
+    int32_t content_type = HttpCommon::STAT_NOT_COMPUTE;
 };
 
 #endif

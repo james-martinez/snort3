@@ -61,6 +61,18 @@ struct Packet;
 #define SCAN_CERTVIZ_ENABLED_FLAG   (1<<10)
 #define SCAN_SPOOFED_SNI_FLAG       (1<<11)
 
+enum FirstPktAppIdDiscovered
+{
+    NO_APPID_FOUND = 0,
+    FIRST_CLIENT_APPID_FOUND,
+    FIRST_SERVICE_APPID_FOUND,
+    FIRST_PAYLOAD_APPID_FOUND,
+    FIRST_CLIENT_PAYLOAD_APPID_FOUND,
+    FIRST_SERVICE_PAYLOAD_APPID_FOUND,
+    FIRST_SERVICE_CLIENT_APPID_FOUND,
+    FIRST_ALL_APPID_FOUND
+};
+
 class AppIdPatternMatchNode
 {
 public:
@@ -150,6 +162,8 @@ private:
         AppidSessionDirection direction);
     static bool do_host_port_based_discovery(snort::Packet* p, AppIdSession& asd,
         IpProtocol protocol, AppidSessionDirection direction, ThirdPartyAppIdContext* tp_appid_ctxt);
+    static bool detect_on_first_pkt(snort::Packet* p, AppIdSession& asd, IpProtocol protocol,
+        AppidSessionDirection direction, AppId& service_id, AppId& client_id, AppId& payload_id);
 };
 #endif
 

@@ -32,7 +32,7 @@ using namespace HttpEnums;
 using namespace HttpCommon;
 
 ScanResult HttpStartCutter::cut(const uint8_t* buffer, uint32_t length,
-    HttpInfractions* infractions, HttpEventGen* events, uint32_t, bool, H2BodyState)
+    HttpInfractions* infractions, HttpEventGen* events, uint32_t, bool, HXBodyState)
 {
     for (uint32_t k = 0; k < length; k++)
     {
@@ -57,7 +57,7 @@ ScanResult HttpStartCutter::cut(const uint8_t* buffer, uint32_t length,
                 else
                 {
                     *infractions += INF_TOO_MUCH_LEADING_WS;
-                    events->generate_misformatted_http(buffer, length);
+                    events->create_event(HttpEnums::EVENT_TOO_MUCH_LEADING_WS);
                     return SCAN_ABORT;
                 }
             }
@@ -82,7 +82,6 @@ ScanResult HttpStartCutter::cut(const uint8_t* buffer, uint32_t length,
                 break;
             case V_BAD:
                 *infractions += INF_NOT_HTTP;
-                events->generate_misformatted_http(buffer, length);
                 return SCAN_ABORT;
             case V_TBD:
                 break;
@@ -117,7 +116,7 @@ ScanResult HttpStartCutter::cut(const uint8_t* buffer, uint32_t length,
 }
 
 HttpStartCutter::ValidationResult HttpRequestCutter::validate(uint8_t octet,
-    HttpInfractions* infractions, HttpEventGen*)
+    HttpInfractions* infractions, HttpEventGen* events)
 {
     // Request line must begin with a method. There is no list of all possible methods because
     // extension is allowed, so there is no absolute way to tell whether something is a method.
@@ -141,6 +140,7 @@ HttpStartCutter::ValidationResult HttpRequestCutter::validate(uint8_t octet,
             if (octets_checked >= preface_len)
             {
                 *infractions += INF_HTTP2_IN_HI;
+                events->create_event(HttpEnums::EVENT_UNEXPECTED_H2_PREFACE);
                 return V_BAD;
             }
             return V_TBD;
@@ -155,7 +155,10 @@ HttpStartCutter::ValidationResult HttpRequestCutter::validate(uint8_t octet,
     if ((octet == ' ') || (octet == '\t'))
         return V_GOOD;
     if (!token_char[octet] || ++octets_checked > max_method_length)
+    {
+        events->create_event(HttpEnums::EVENT_BAD_REQ_LINE);
         return V_BAD;
+    }
     return V_TBD;
 }
 
@@ -176,7 +179,10 @@ HttpStartCutter::ValidationResult HttpStatusCutter::validate(uint8_t octet,
             events->create_event(EVENT_VERSION_NOT_UPPERCASE);
         }
         else
+        {
+            events->create_event(HttpEnums::EVENT_BAD_STAT_LINE);
             return V_BAD;
+        }
     }
     if (++octets_checked >= match_size)
         return V_GOOD;
@@ -184,7 +190,7 @@ HttpStartCutter::ValidationResult HttpStatusCutter::validate(uint8_t octet,
 }
 
 ScanResult HttpHeaderCutter::cut(const uint8_t* buffer, uint32_t length,
-    HttpInfractions* infractions, HttpEventGen* events, uint32_t, bool, H2BodyState)
+    HttpInfractions* infractions, HttpEventGen* events, uint32_t, bool, HXBodyState)
 {
     // Header separators: leading \r\n, leading \n, leading \r\r\n, nonleading \r\n\r\n, nonleading
     // \n\r\n, nonleading \r\r\n, nonleading \r\n\n, and nonleading \n\n. The separator itself
@@ -324,7 +330,7 @@ HttpBodyCutter::~HttpBodyCutter()
 }
 
 ScanResult HttpBodyClCutter::cut(const uint8_t* buffer, uint32_t length, HttpInfractions*,
-    HttpEventGen*, uint32_t flow_target, bool stretch, H2BodyState)
+    HttpEventGen*, uint32_t flow_target, bool stretch, HXBodyState)
 {
     assert(remaining > octets_seen);
 
@@ -401,7 +407,7 @@ ScanResult HttpBodyClCutter::cut(const uint8_t* buffer, uint32_t length, HttpInf
 }
 
 ScanResult HttpBodyOldCutter::cut(const uint8_t* buffer, uint32_t length, HttpInfractions*,
-    HttpEventGen*, uint32_t flow_target, bool stretch, H2BodyState)
+    HttpEventGen*, uint32_t flow_target, bool stretch, HXBodyState)
 {
     if (flow_target == 0)
     {
@@ -447,7 +453,7 @@ void HttpBodyChunkCutter::transition_to_chunk_bad(bool& accelerate_this_packet)
 
 ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
     HttpInfractions* infractions, HttpEventGen* events, uint32_t flow_target, bool stretch,
-    H2BodyState)
+    HXBodyState)
 {
     // Are we skipping through the rest of this chunked body to the trailers and the next message?
     const bool discard_mode = (flow_target == 0);
@@ -752,9 +758,9 @@ ScanResult HttpBodyChunkCutter::cut(const uint8_t* buffer, uint32_t length,
     return SCAN_NOT_FOUND;
 }
 
-ScanResult HttpBodyH2Cutter::cut(const uint8_t* buffer, uint32_t length,
+ScanResult HttpBodyHXCutter::cut(const uint8_t* buffer, uint32_t length,
     HttpInfractions* infractions, HttpEventGen* events, uint32_t flow_target, bool stretch,
-    H2BodyState state)
+    HXBodyState state)
 {
     // If the headers included a content length header (expected length >= 0), check it against the
     // actual message body length. Alert if it does not match at the end of the message body or if
@@ -767,7 +773,7 @@ ScanResult HttpBodyH2Cutter::cut(const uint8_t* buffer, uint32_t length,
             events->create_event(EVENT_H2_DATA_OVERRUNS_CL);
             expected_body_length = STAT_NOT_COMPUTE;
         }
-        else if (state != H2_BODY_NOT_COMPLETE and
+        else if (state != HX_BODY_NOT_COMPLETE and
             ((total_octets_scanned + length) < expected_body_length))
         {
             *infractions += INF_H2_DATA_UNDERRUNS_CL;
@@ -779,13 +785,13 @@ ScanResult HttpBodyH2Cutter::cut(const uint8_t* buffer, uint32_t length,
     {
         num_flush = length;
         total_octets_scanned += length;
-        if (state != H2_BODY_NOT_COMPLETE)
+        if (state != HX_BODY_NOT_COMPLETE)
             return SCAN_DISCARD;
 
         return SCAN_DISCARD_PIECE;
     }
 
-    if (state == H2_BODY_NOT_COMPLETE)
+    if (state == HX_BODY_NOT_COMPLETE)
     {
         if (octets_seen + length < flow_target)
         {
@@ -806,7 +812,7 @@ ScanResult HttpBodyH2Cutter::cut(const uint8_t* buffer, uint32_t length,
             return SCAN_FOUND_PIECE;
         }
     }
-    else if (state == H2_BODY_LAST_SEG)
+    else if (state == HX_BODY_LAST_SEG)
     {
         const uint32_t adjusted_target = stretch ? MAX_SECTION_STRETCH + flow_target : flow_target;
         if (octets_seen + length <= adjusted_target)

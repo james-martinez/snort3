@@ -28,6 +28,7 @@ const char* push_include_path(const char*);
 void pop_include_path();
 void snort_whitelist_append(const char*);
 void snort_whitelist_add_prefix(const char*);
+int get_module_version(const char* name, const char* type);
 ]]
 
 function whitelist_append(list, is_prefix)
@@ -61,6 +62,10 @@ function initialize_whitelist(tab)
             end
         end
     end
+end
+
+function get_module_version(name, type)
+    return ffi.C.get_module_version(name, type)
 end
 
 ---------------------------------------------------------------------------
@@ -113,13 +118,20 @@ function include(file)
         if ( sandbox_env.ips ) then
             ips = sandbox_env.ips
         end
+
+        if ( sandbox_env.file_id ) then
+            file_id = sandbox_env.file_id
+        end
     else
         dofile(fname)
     end
 
-    local iname = path_top()
-    if ( (ips ~= nil) and (ips.includer == nil) and (iname ~= nil) ) then
-        ips.includer = iname
+    if ( (ips ~= nil) and (ips.includer == nil) ) then
+        ips.includer = fname
+    end
+
+    if ( file_id ~= nil and file_id.includer == nil ) then
+        file_id.includer = fname
     end
 
     path_pop()
@@ -138,11 +150,14 @@ function create_sandbox_env()
         snort_whitelist_add_prefix = snort_whitelist_add_prefix,
         snort_whitelist_append = snort_whitelist_append,
         SNORT_VERSION = SNORT_VERSION,
+        SNORT_BUILD = SNORT_BUILD,
         SNORT_MAJOR_VERSION = SNORT_MAJOR_VERSION,
         SNORT_MINOR_VERSION = SNORT_MINOR_VERSION,
         SNORT_PATCH_VERSION = SNORT_PATCH_VERSION,
         SNORT_SUBLEVEL_VERSION = SNORT_SUBLEVEL_VERSION,
+        get_module_version = get_module_version,
         tweaks = tweaks,
+        SNORT_DEP_VERSIONS = SNORT_DEP_VERSIONS
     }
 
     for k, v in pairs(export_to_sandbox) do

@@ -33,6 +33,7 @@
 #include "protocols/tcp.h"
 #include "protocols/udp.h"
 #include "protocols/vlan.h"
+#include "pub_sub/packet_events.h"
 #include "stream/stream.h"
 #include "utils/util.h"
 
@@ -452,8 +453,21 @@ unsigned FlowControl::process(Flow* flow, Packet* p)
             set_ips_policy(p->context->conf, flow->ips_policy_id);
         }
         p->filtering_state = flow->filtering_state;
+        update_stats(flow, p);
+        if (p->is_retry())
+        {
+            RetryPacketEvent retry_event(p);
+            DataBus::publish(PKT_RETRY_EVENT, retry_event);
+            flow->flags.retry_queued = false;
+        }
+        else if ( flow->flags.retry_queued and ( !p->is_cooked() or p->is_defrag() ) )
+        {
+            RetryPacketEvent retry_event(p);
+            DataBus::publish(PKT_RETRY_EVENT, retry_event);
+            if ( !retry_event.is_still_pending() )
+                flow->flags.retry_queued = false;
+        }
     }
-
     else
     {
         flow->network_policy_id = get_network_policy()->policy_id;
@@ -464,6 +478,8 @@ unsigned FlowControl::process(Flow* flow, Packet* p)
 
         // process expected flows
         check_expected_flow(flow, p);
+
+        update_stats(flow, p);
 
         flow->set_client_initiate(p);
         DataBus::publish(FLOW_STATE_SETUP_EVENT, p);
@@ -525,7 +541,6 @@ unsigned FlowControl::process(Flow* flow, Packet* p)
         break;
     }
 
-    update_stats(flow, p);
     return news;
 }
 
@@ -579,10 +594,10 @@ int FlowControl::add_expected_ignore( const Packet* ctrlPkt, PktType type, IpPro
 int FlowControl::add_expected( const Packet* ctrlPkt, PktType type, IpProtocol ip_proto,
     const SfIp *srcIP, uint16_t srcPort, const SfIp *dstIP, uint16_t dstPort,
     SnortProtocolId snort_protocol_id, FlowData* fd, bool swap_app_direction, bool expect_multi,
-    bool bidirectional)
+    bool bidirectional, bool expect_persist)
 {
     return exp_cache->add_flow( ctrlPkt, type, ip_proto, srcIP, srcPort, dstIP, dstPort,
-        SSN_DIR_BOTH, fd, snort_protocol_id, swap_app_direction, expect_multi, bidirectional);
+        SSN_DIR_BOTH, fd, snort_protocol_id, swap_app_direction, expect_multi, bidirectional, expect_persist);
 }
 
 bool FlowControl::is_expected(Packet* p)

@@ -341,6 +341,11 @@ void SnortConfig::post_setup()
     }
 }
 
+void SnortConfig::update_scratch(ControlConn* ctrlcon)
+{
+    main_broadcast_command(new ACScratchUpdate(this, scratch_handlers, ctrlcon));
+}
+
 void SnortConfig::clone(const SnortConfig* const conf)
 {
     *this = *conf;
@@ -638,6 +643,11 @@ void SnortConfig::set_log_dir(const char* directory)
 void SnortConfig::set_watchdog(uint16_t n)
 {
     watchdog_timer = n;
+}
+
+void SnortConfig::set_watchdog_min_thread_count(uint16_t n)
+{
+    watchdog_min_thread_count = n;
 }
 
 void SnortConfig::set_dirty_pig(bool enabled)

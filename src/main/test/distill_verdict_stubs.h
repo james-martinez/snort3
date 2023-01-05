@@ -98,6 +98,7 @@ void CodecManager::thread_init(const snort::SnortConfig*) { }
 void CodecManager::thread_term() { }
 void EventManager::open_outputs() { }
 void EventManager::close_outputs() { }
+void EventManager::reload_outputs() { }
 void IpsManager::setup_options(const snort::SnortConfig*) { }
 void IpsManager::clear_options(const snort::SnortConfig*) { }
 void ActionManager::thread_init(const snort::SnortConfig*) { }
@@ -167,6 +168,7 @@ void DetectionEngine::idle() { }
 void DetectionEngine::reset() { }
 void DetectionEngine::wait_for_context() { }
 void DetectionEngine::set_file_data(const DataPointer&) { }
+void DetectionEngine::set_file_data(const DataPointer&, uint64_t, bool, bool) { }
 void DetectionEngine::clear_replacement() { }
 void DetectionEngine::disable_all(Packet*) { }
 unsigned get_instance_id() { return 0; }

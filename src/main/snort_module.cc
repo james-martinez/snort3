@@ -33,7 +33,6 @@
 #include "framework/parameter.h"
 #include "log/messages.h"
 #include "main.h"
-#include "main/snort_debug.h"
 #include "managers/codec_manager.h"
 #include "packet_io/sfdaq_config.h"
 #include "packet_io/trough.h"
@@ -41,6 +40,7 @@
 #include "parser/parser.h"
 #include "parser/parse_utils.h"
 #include "parser/vars.h"
+#include "trace/trace_api.h"
 #include "trace/trace_config.h"
 
 #if defined(UNIT_TEST) || defined(BENCHMARK_TEST)
@@ -101,8 +101,19 @@ static const Parameter s_pktnum[] =
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
+static const Parameter s_watchdog[] =
+{
+    { "timer", Parameter::PT_INT, "0:max32", nullptr,
+      "timer for watchdog" },
+    { "min_thread_count", Parameter::PT_INT, "0:max32", nullptr,
+      "min thread count for watchdog" },
+
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
 static const Command snort_cmds[] =
 {
+    { "set_watchdog_params", main_set_watchdog_params, s_watchdog, "set watchdog parameters" },
     { "show_plugins", main_dump_plugins, nullptr, "show available plugins" },
 
     { "delete_inspector", main_delete_inspector, s_delete,
@@ -113,7 +124,6 @@ static const Command snort_cmds[] =
     { "rotate_stats", main_rotate_stats, nullptr, "roll perfmonitor log files" },
     { "reload_config", main_reload_config, s_reload_w_path, "load new configuration" },
     { "reload_policy", main_reload_policy, s_reload, "reload part or all of the default policy" },
-    { "reload_module", main_reload_module, s_module, "reload module" },
     { "reload_daq", main_reload_daq, nullptr, "reload daq module" },
     { "reload_hosts", main_reload_hosts, s_reload, "load a new hosts table" },
 

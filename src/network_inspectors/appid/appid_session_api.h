@@ -91,6 +91,7 @@ namespace snort
 #define APPID_SESSION_DECRYPT_MONITOR       (1ULL << 42)
 #define APPID_SESSION_HTTP_TUNNEL           (1ULL << 43)
 #define APPID_SESSION_OPPORTUNISTIC_TLS     (1ULL << 44)
+#define APPID_SESSION_FIRST_PKT_CACHE_MATCHED    (1ULL << 45)
 #define APPID_SESSION_IGNORE_ID_FLAGS \
     (APPID_SESSION_FUTURE_FLOW | \
     APPID_SESSION_NOT_A_SERVICE | \
@@ -129,7 +130,7 @@ public:
     const char* get_netbios_domain() const;
     ClientAppDetectType get_client_app_detect_type() const;
 
-    // For protocols such as HTTP2 which can have multiple streams within a single flow,
+    // For protocols such as HTTP2/HTTP3 which can have multiple streams within a single flow,
     // get_first_stream_* methods return the appids in the first stream seen in a packet.
     void get_first_stream_app_ids(AppId& service, AppId& client, AppId& payload, AppId& misc) const;
     void get_first_stream_app_ids(AppId& service, AppId& client, AppId& payload) const;
@@ -149,9 +150,9 @@ public:
         return session_id;
     }
 
-    void set_user_logged_in() { user_logged_in = true; }
+    void set_user_logged_in() { flags.user_logged_in = true; }
 
-    void clear_user_logged_in() { user_logged_in = false; }
+    void clear_user_logged_in() { flags.user_logged_in = false; }
 
 protected:
     AppIdSessionApi(const AppIdSession* asd, const SfIp& ip);
@@ -160,8 +161,13 @@ private:
     const AppIdSession* asd = nullptr;
     AppId application_ids[APP_PROTOID_MAX] =
         { APP_ID_NONE, APP_ID_NONE, APP_ID_NONE, APP_ID_NONE, APP_ID_NONE };
-    bool published = false;
-    bool stored_in_stash = false;
+    struct
+    {
+        bool published : 1;
+        bool stored_in_stash : 1;
+        bool finished : 1;
+        bool user_logged_in : 1;
+    } flags = {};
     std::vector<AppIdHttpSession*> hsessions;
     AppIdDnsSession* dsession = nullptr;
     snort::SfIp initiator_ip;
@@ -170,7 +176,6 @@ private:
     char* netbios_name = nullptr;
     char* netbios_domain = nullptr;
     std::string session_id;
-    bool user_logged_in = false;
 
     // Following two fields are used only for non-http sessions. For HTTP traffic,
     // these fields are maintained inside AppIdHttpSession.

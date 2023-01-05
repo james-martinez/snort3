@@ -16,7 +16,7 @@ This module defines:
 #]=======================================================================]
 
 find_package(PkgConfig)
-pkg_check_modules(PC_DAQ libdaq>=3.0.7)
+pkg_check_modules(PC_DAQ libdaq>=3.0.10)
 
 # Use DAQ_INCLUDE_DIR_HINT and DAQ_LIBRARIES_DIR_HINT from configure_cmake.sh as primary hints
 # and then package config information after that.
@@ -66,6 +66,7 @@ if (PKG_CONFIG_EXECUTABLE AND ENABLE_STATIC_DAQ)
         set(DAQ_STATIC_MODULE_LIBS ${DAQ_STATIC_MODULE_LIBS} CACHE INTERNAL "Static DAQ module libraries")
     endif()
     if (DAQ_STATIC_MODULES)
+        list(REMOVE_DUPLICATES DAQ_STATIC_MODULES)
         list(SORT DAQ_STATIC_MODULES)
         set(DAQ_STATIC_MODULES ${DAQ_STATIC_MODULES} CACHE INTERNAL "Static DAQ modules")
     endif()

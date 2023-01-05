@@ -21,6 +21,7 @@
 #define HTTP_MODULE_H
 
 #include <bitset>
+#include <set>
 #include <string>
 #include <unordered_set>
 
@@ -28,6 +29,7 @@
 #include "helpers/literal_search.h"
 #include "mime/file_mime_config.h"
 #include "profiler/profiler.h"
+#include "search_engines/search_tool.h"
 
 #include "http_enum.h"
 #include "http_str_to_code.h"
@@ -41,8 +43,6 @@ class Trace;
 struct SnortConfig;
 }
 
-extern THREAD_LOCAL const snort::Trace* http_trace;
-
 struct HttpParaList
 {
 public:
@@ -54,35 +54,36 @@ public:
     bool normalize_utf = true;
     int64_t maximum_host_length = -1;
     int64_t maximum_chunk_length = 0xFFFFFFFF;
+    uint16_t maximum_header_length = 4096;
+    uint16_t maximum_headers = 200;
+    uint16_t maximum_pipelined_requests = 99;
     bool decompress_pdf = false;
     bool decompress_swf = false;
     bool decompress_zip = false;
     bool decompress_vba = false;
     snort::DecodeConfig* mime_decode_conf;
+    uint32_t max_mime_attach = 5;
     bool script_detection = false;
     snort::LiteralSearch::Handle* script_detection_handle = nullptr;
     bool publish_request_body = true;
 
     struct JsNormParam
     {
-    public:
         ~JsNormParam();
+
+        void configure() const;
+
         bool normalize_javascript = false;
-        int64_t js_norm_bytes_depth = -1;
-        int32_t js_identifier_depth = 0;
-        uint8_t max_template_nesting = 32;
-        uint32_t max_bracket_depth = 256;
-        uint32_t max_scope_depth = 256;
-        std::unordered_set<std::string> ignored_ids;
-        std::unordered_set<std::string> ignored_props;
         int max_javascript_whitespaces = 200;
-        class HttpJsNorm* js_norm = nullptr;
+
+        mutable snort::SearchTool* mpse_otag = nullptr;
+        mutable snort::SearchTool* mpse_type = nullptr;
+        mutable snort::SearchTool* mpse_attr = nullptr;
     };
     JsNormParam js_norm_param;
 
     struct UriParam
     {
-    public:
         UriParam();
         ~UriParam() { delete[] unicode_map; }
 
@@ -118,6 +119,9 @@ public:
     // The below header_list contains the list of known static header along with
     // any custom headers mapped with the their respective Header IDs.
     StrCode header_list[HttpEnums::HEAD__MAX_VALUE + HttpEnums::MAX_CUSTOM_HEADERS + 1] = {};
+
+    std::set<std::string> allowed_methods;
+    std::set<std::string> disallowed_methods;
 
 #ifdef REG_TEST
     int64_t print_amount = 1200;
@@ -186,9 +190,6 @@ public:
 
     bool is_bindable() const override
     { return true; }
-
-    void set_trace(const snort::Trace*) const override;
-    const snort::TraceOption* get_trace_options() const override;
 
 #ifdef REG_TEST
     static const PegInfo* get_peg_names() { return peg_names; }

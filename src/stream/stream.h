@@ -173,7 +173,8 @@ public:
     static int set_snort_protocol_id_expected(
         const Packet* ctrlPkt, PktType, IpProtocol, const snort::SfIp* srcIP, uint16_t srcPort,
         const snort::SfIp* dstIP, uint16_t dstPort, SnortProtocolId, FlowData*,
-        bool swap_app_direction = false, bool expect_multi = false, bool bidirectional = false);
+        bool swap_app_direction = false, bool expect_multi = false, bool bidirectional = false,
+        bool expect_persist = false);
 
     // Get pointer to application data for a flow based on the lookup tuples for cases where
     // Snort does not have an active packet that is relevant.
@@ -212,7 +213,7 @@ public:
     static FlowKey* get_flow_key(Packet*);
 
     //  Populate a session key from the Packet
-    static void populate_flow_key(Packet*, FlowKey*);
+    static void populate_flow_key(const Packet*, FlowKey*);
 
     static void set_snort_protocol_id_from_ha(Flow*, const SnortProtocolId);
 

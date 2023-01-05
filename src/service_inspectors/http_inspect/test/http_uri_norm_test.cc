@@ -42,6 +42,7 @@ void ParseWarning(WarningGroup, const char*, ...) {}
 void ParseError(const char*, ...) {}
 void Value::get_bits(std::bitset<256ul>&) const {}
 void Value::set_first_token() {}
+bool Value::get_next_csv_token(std::string&) { return false; }
 bool Value::get_next_token(std::string& ) { return false; }
 int DetectionEngine::queue_event(unsigned int, unsigned int) { return 0; }
 LiteralSearch::Handle* LiteralSearch::setup() { return nullptr; }
@@ -52,17 +53,16 @@ void DecodeConfig::set_decompress_pdf(bool) {}
 void DecodeConfig::set_decompress_swf(bool) {}
 void DecodeConfig::set_decompress_zip(bool) {}
 void DecodeConfig::set_decompress_vba(bool) {}
+SearchTool::~SearchTool() {}
 }
+
+snort::SearchTool* js_create_mpse_open_tag() { return nullptr; }
+snort::SearchTool* js_create_mpse_tag_type() { return nullptr; }
+snort::SearchTool* js_create_mpse_tag_attr() { return nullptr; }
 
 void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
 void show_stats(PegCount*, const PegInfo*, const IndexVec&, const char*, FILE*) { }
 
-HttpJsNorm::HttpJsNorm(const HttpParaList::UriParam& uri_param_,
-    const HttpParaList::JsNormParam& js_norm_param_) :
-    uri_param(uri_param_), js_norm_param(js_norm_param_), mpse_otag(nullptr), mpse_attr(nullptr),
-    mpse_type(nullptr) {}
-HttpJsNorm::~HttpJsNorm() = default;
-void HttpJsNorm::configure() {}
 int64_t Parameter::get_int(char const*) { return 0; }
 
 TEST_GROUP(http_inspect_uri_norm)

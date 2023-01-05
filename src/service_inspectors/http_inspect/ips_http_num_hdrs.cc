@@ -41,35 +41,34 @@ using namespace snort;
 using namespace HttpCommon;
 using namespace HttpEnums;
 
-THREAD_LOCAL std::array<ProfileStats, NUM_HDRS_PSI_MAX> HttpNumHdrsRuleOptModule::http_num_hdrs_ps;
+// Base class for all range-based rule options modules
+HttpRangeRuleOptModule::HttpRangeRuleOptModule(const char* key_, const char* help,
+    HTTP_RULE_OPT rule_opt_index_, const Parameter params[], ProfileStats& ps_) :
+    HttpRuleOptModule(key_, help, rule_opt_index_, CAT_NONE, params), ps(ps_)
+{
+    const Parameter& range_param = params[0];
+    // enforce that "~range" is the first Parameter
+    assert(range_param.type ==  Parameter::PT_INTERVAL);
+    num_range = range_param.get_range();
+}
 
-const std::string hdrs_num_range = "0:" + std::to_string(HttpMsgHeadShared::MAX_HEADERS);
-
-bool HttpNumHdrsRuleOptModule::begin(const char*, int, SnortConfig*)
+bool HttpRangeRuleOptModule::begin(const char*, int, SnortConfig*)
 {
     HttpRuleOptModule::begin(nullptr, 0, nullptr);
     range.init();
-    if (rule_opt_index == HTTP_RANGE_NUM_HDRS)
-        inspect_section = IS_FLEX_HEADER;
-    else
-    {
-        inspect_section = IS_TRAILER;
-        is_trailer_opt = true;
-    }
-
     return true;
 }
 
-bool HttpNumHdrsRuleOptModule::set(const char*, Value& v, SnortConfig*)
+bool HttpRangeRuleOptModule::set(const char*, Value& v, SnortConfig*)
 {
     if (v.is("~range"))
-        return range.validate(v.get_string(), hdrs_num_range.c_str());
-    
+        return range.validate(v.get_string(), num_range);
+
     return HttpRuleOptModule::set(nullptr, v, nullptr);
 }
 
-
-uint32_t HttpNumHdrsIpsOption::hash() const
+// Base class for all range-based rule options
+uint32_t HttpRangeIpsOption::hash() const
 {
     uint32_t a = HttpIpsOption::hash();
     uint32_t b = range.hash();
@@ -79,27 +78,171 @@ uint32_t HttpNumHdrsIpsOption::hash() const
     return c;
 }
 
-bool HttpNumHdrsIpsOption::operator==(const IpsOption& ips) const
+bool HttpRangeIpsOption::operator==(const IpsOption& ips) const
 {
-    const HttpNumHdrsIpsOption& hio = static_cast<const HttpNumHdrsIpsOption&>(ips);
+    const HttpRangeIpsOption& hio = static_cast<const HttpRangeIpsOption&>(ips);
     return HttpIpsOption::operator==(ips) &&
            range == hio.range;
 }
 
-IpsOption::EvalStatus HttpNumHdrsIpsOption::eval(Cursor&, Packet* p)
+IpsOption::EvalStatus HttpRangeIpsOption::eval(Cursor&, Packet* p)
 {
-    RuleProfile profile(HttpNumHdrsRuleOptModule::http_num_hdrs_ps[idx]);
+    RuleProfile profile(ps);
 
     const HttpInspect* const hi = eval_helper(p);
     if (hi == nullptr)
         return NO_MATCH;
 
-    const int32_t num_lines = hi->http_get_num_headers(p, buffer_info);
-    if (num_lines != HttpCommon::STAT_NOT_PRESENT && range.eval(num_lines))
+    const int32_t count = get_num(hi, p);
+    if (count != STAT_NOT_PRESENT && range.eval(count))
         return MATCH;
 
     return NO_MATCH;
 }
+
+//-------------------------------------------------------------------------
+// max_header_line
+//-------------------------------------------------------------------------
+#undef IPS_OPT
+#define IPS_OPT "http_max_header_line"
+#undef IPS_HELP
+#define IPS_HELP "rule option to perform range check on longest header line"
+
+static const Parameter http_max_header_line_params[] =
+{
+    { "~range", Parameter::PT_INTERVAL, "0:65535", nullptr,
+        "check that longest line of current header is in given range" },
+    { "request", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against the version from the request message even when examining the response" },
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+static Module* max_header_line_mod_ctor()
+{
+    return new HttpNumRuleOptModule<HTTP_RANGE_MAX_HEADER_LINE, PS_HEADER>(IPS_OPT, IPS_HELP,
+        http_max_header_line_params);
+}
+
+static const IpsApi max_header_line_api =
+{
+    {
+        PT_IPS_OPTION,
+        sizeof(IpsApi),
+        IPSAPI_VERSION,
+        1,
+        API_RESERVED,
+        API_OPTIONS,
+        IPS_OPT,
+        IPS_HELP,
+        max_header_line_mod_ctor,
+        HttpRangeRuleOptModule::mod_dtor
+    },
+    OPT_TYPE_DETECTION,
+    0, PROTO_BIT__TCP,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    HttpNumIpsOption<&HttpInspect::http_get_max_header_line>::opt_ctor,
+    HttpRangeIpsOption::opt_dtor,
+    nullptr
+};
+
+//-------------------------------------------------------------------------
+// max_trailer_line
+//-------------------------------------------------------------------------
+#undef IPS_OPT
+#define IPS_OPT "http_max_trailer_line"
+#undef IPS_HELP
+#define IPS_HELP "rule option to perform range check on longest trailer line"
+
+static const Parameter http_max_trailer_line_params[] =
+{
+    { "~range", Parameter::PT_INTERVAL, "0:65535", nullptr,
+        "check that longest line of current trailer is in given range" },
+    { "request", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against the version from the request message even when examining the response" },
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+static Module* max_trailer_line_mod_ctor()
+{
+    return new HttpNumRuleOptModule<HTTP_RANGE_MAX_TRAILER_LINE, PS_TRAILER>(IPS_OPT, IPS_HELP,
+        http_max_trailer_line_params);
+}
+
+static const IpsApi max_trailer_line_api =
+{
+    {
+        PT_IPS_OPTION,
+        sizeof(IpsApi),
+        IPSAPI_VERSION,
+        1,
+        API_RESERVED,
+        API_OPTIONS,
+        IPS_OPT,
+        IPS_HELP,
+        max_trailer_line_mod_ctor,
+        HttpRangeRuleOptModule::mod_dtor
+    },
+    OPT_TYPE_DETECTION,
+    0, PROTO_BIT__TCP,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    HttpNumIpsOption<&HttpInspect::http_get_max_header_line>::opt_ctor,
+    HttpRangeIpsOption::opt_dtor,
+    nullptr
+};
+
+//-------------------------------------------------------------------------
+// num_cookies
+//-------------------------------------------------------------------------
+#undef IPS_OPT
+#define IPS_OPT "http_num_cookies"
+#undef IPS_HELP
+#define IPS_HELP "rule option to perform range check on number of cookies"
+
+static const Parameter http_num_cookies_params[] =
+{
+    { "~range", Parameter::PT_INTERVAL, "0:65535", nullptr,
+        "check that number of cookies of current header are in given range" },
+    { "request", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against the version from the request message even when examining the response" },
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+static Module* num_cookies_mod_ctor()
+{
+    return new HttpNumRuleOptModule<HTTP_RANGE_NUM_COOKIES, PS_HEADER>(IPS_OPT, IPS_HELP,
+        http_num_cookies_params);
+}
+
+static const IpsApi num_cookies_api =
+{
+    {
+        PT_IPS_OPTION,
+        sizeof(IpsApi),
+        IPSAPI_VERSION,
+        1,
+        API_RESERVED,
+        API_OPTIONS,
+        IPS_OPT,
+        IPS_HELP,
+        num_cookies_mod_ctor,
+        HttpRangeRuleOptModule::mod_dtor
+    },
+    OPT_TYPE_DETECTION,
+    0, PROTO_BIT__TCP,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    HttpNumIpsOption<&HttpInspect::http_get_num_cookies>::opt_ctor,
+    HttpRangeIpsOption::opt_dtor,
+    nullptr
+};
 
 //-------------------------------------------------------------------------
 // num_header_lines
@@ -111,23 +254,23 @@ IpsOption::EvalStatus HttpNumHdrsIpsOption::eval(Cursor&, Packet* p)
 
 static const Parameter http_num_hdrs_params[] =
 {
-    { "~range", Parameter::PT_INTERVAL, hdrs_num_range.c_str(), nullptr,
+    { "~range", Parameter::PT_INTERVAL, "0:65535", nullptr,
         "check that number of headers of current buffer are in given range" },
     { "request", Parameter::PT_IMPLIED, nullptr, nullptr,
         "match against the version from the request message even when examining the response" },
     { "with_header", Parameter::PT_IMPLIED, nullptr, nullptr,
-        "this rule is limited to examining HTTP message headers" },
+        "option is no longer used and will be removed in a future release" },
     { "with_body", Parameter::PT_IMPLIED, nullptr, nullptr,
-        "parts of this rule examine HTTP message body" },
+        "option is no longer used and will be removed in a future release" },
     { "with_trailer", Parameter::PT_IMPLIED, nullptr, nullptr,
-        "parts of this rule examine HTTP message trailers" },
+        "option is no longer used and will be removed in a future release" },
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
 static Module* num_hdrs_mod_ctor()
 {
-    return new HttpNumHdrsRuleOptModule(IPS_OPT, IPS_HELP, HTTP_RANGE_NUM_HDRS, CAT_NONE,
-	NUM_HDRS_PSI_HDRS, http_num_hdrs_params);
+    return new HttpNumRuleOptModule<HTTP_RANGE_NUM_HDRS, PS_HEADER>(IPS_OPT, IPS_HELP,
+        http_num_hdrs_params);
 }
 
 static const IpsApi num_headers_api =
@@ -142,7 +285,7 @@ static const IpsApi num_headers_api =
         IPS_OPT,
         IPS_HELP,
         num_hdrs_mod_ctor,
-        HttpNumHdrsRuleOptModule::mod_dtor
+        HttpRangeRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -150,8 +293,8 @@ static const IpsApi num_headers_api =
     nullptr,
     nullptr,
     nullptr,
-    HttpNumHdrsIpsOption::opt_ctor,
-    HttpNumHdrsIpsOption::opt_dtor,
+    HttpNumIpsOption<&HttpInspect::http_get_num_headers>::opt_ctor,
+    HttpRangeIpsOption::opt_dtor,
     nullptr
 };
 
@@ -165,8 +308,8 @@ static const IpsApi num_headers_api =
 
 static Module* num_trailers_mod_ctor()
 {
-    return new HttpNumHdrsRuleOptModule(IPS_OPT, IPS_HELP, HTTP_RANGE_NUM_TRAILERS, CAT_NONE,
-        NUM_HDRS_PSI_TRAILERS, http_num_hdrs_params);
+    return new HttpNumRuleOptModule<HTTP_RANGE_NUM_TRAILERS, PS_TRAILER>(IPS_OPT, IPS_HELP,
+        http_num_hdrs_params);
 }
 
 static const IpsApi num_trailers_api =
@@ -181,7 +324,7 @@ static const IpsApi num_trailers_api =
         IPS_OPT,
         IPS_HELP,
         num_trailers_mod_ctor,
-        HttpNumHdrsRuleOptModule::mod_dtor
+        HttpRangeRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
     0, PROTO_BIT__TCP,
@@ -189,14 +332,16 @@ static const IpsApi num_trailers_api =
     nullptr,
     nullptr,
     nullptr,
-    HttpNumHdrsIpsOption::opt_ctor,
-    HttpNumHdrsIpsOption::opt_dtor,
+    HttpNumIpsOption<&HttpInspect::http_get_num_headers>::opt_ctor,
+    HttpRangeIpsOption::opt_dtor,
     nullptr
 };
 
 //-------------------------------------------------------------------------
 // plugins
 //-------------------------------------------------------------------------
+const BaseApi* ips_http_max_header_line = &max_header_line_api.base;
+const BaseApi* ips_http_max_trailer_line = &max_trailer_line_api.base;
+const BaseApi* ips_http_num_cookies = &num_cookies_api.base;
 const BaseApi* ips_http_num_headers = &num_headers_api.base;
 const BaseApi* ips_http_num_trailers = &num_trailers_api.base;
-

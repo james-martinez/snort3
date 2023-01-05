@@ -30,6 +30,7 @@ class Http2PingFrame : public Http2Frame
 public:
     friend Http2Frame* Http2Frame::new_frame(const uint8_t*, const uint32_t, const uint8_t*,
         const uint32_t, Http2FlowData*, HttpCommon::SourceId, Http2Stream* stream);
+    bool is_detection_required() const override { return false; }
 
 private:
     Http2PingFrame(const uint8_t* header_buffer, const uint32_t header_len,

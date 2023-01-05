@@ -28,7 +28,6 @@ HOME_NET = 'any'
 EXTERNAL_NET = 'any'
 
 include 'snort_defaults.lua'
-include 'file_magic.lua'
 
 ---------------------------------------------------------------------------
 -- 2. configure inspection
@@ -85,12 +84,14 @@ ftp_server = default_ftp_server
 ftp_client = { }
 ftp_data = { }
 
-http_inspect = default_http_inspect
+http_inspect = { }
 http2_inspect = { }
 
--- see file_magic.lua for file id rules
-file_id = { file_rules = file_magic }
+-- see file_magic.rules for file id rules
+file_id = { rules_file = 'file_magic.rules' }
 file_policy = { }
+
+js_norm = default_js_norm
 
 -- the following require additional configuration to be fully effective:
 
@@ -122,7 +123,6 @@ binder =
     -- port bindings required for protocols without wizard support
     { when = { proto = 'udp', ports = '53', role='server' },  use = { type = 'dns' } },
     { when = { proto = 'tcp', ports = '53', role='server' },  use = { type = 'dns' } },
-    { when = { proto = 'tcp', ports = '102', role = 'server' }, use = { type = 's7commplus' } },
     { when = { proto = 'tcp', ports = '111', role='server' }, use = { type = 'rpc_decode' } },
     { when = { proto = 'tcp', ports = '502', role='server' }, use = { type = 'modbus' } },
     { when = { proto = 'tcp', ports = '2123 2152 3386', role='server' }, use = { type = 'gtp_inspect' } },
@@ -212,7 +212,10 @@ suppress =
     -- don't want to any of see these
     { gid = 1, sid = 1 },
 
-    -- don't want to see these for a given server
+    -- don't want to see anything for a given host
+    { track = 'by_dst', ip = '1.2.3.4' }
+
+    -- don't want to see these for a given host
     { gid = 1, sid = 2, track = 'by_dst', ip = '1.2.3.4' },
 }
 --]]

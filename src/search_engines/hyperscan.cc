@@ -205,8 +205,11 @@ bool HyperscanMpse::serialize(uint8_t*& buf, size_t& sz) const
 
 bool HyperscanMpse::deserialize(const uint8_t* buf, size_t sz)
 {
-    if ( hs_deserialize_database((const char*)buf, sz, &hs_db) != HS_SUCCESS or !hs_db )
+    if ( hs_error_t err = hs_deserialize_database((const char*)buf, sz, &hs_db) )
+    {
+        ParseWarning(WARN_RULES, "can't deserialize hyperscan database (%d)", err);
         return false;
+    }
 
     if ( hs_error_t err = hs_alloc_scratch(hs_db, &s_scratch[get_instance_id()]) )
     {
@@ -288,8 +291,15 @@ int HyperscanMpse::prep_patterns(SnortConfig* sc)
         ids.emplace_back(id++);
     }
 
+#ifdef REG_TEST
+    hs_platform_info_t info = { HS_TUNE_FAMILY_SNB, 0, 0, 0 };
+    auto pinfo = &info;
+#else
+    hs_platform_info_t* pinfo = nullptr;
+#endif
+
     if ( hs_compile_multi(&pats[0], &flags[0], &ids[0], pvector.size(), HS_MODE_BLOCK,
-            nullptr, &hs_db, &errptr) or !hs_db )
+        pinfo, &hs_db, &errptr) or !hs_db )
     {
         ParseError("can't compile hyperscan pattern database: %s (%d) - '%s'",
             errptr->message, errptr->expression,
@@ -411,7 +421,7 @@ static bool scratch_setup(SnortConfig* sc)
         hs_scratch_t** ss = (hs_scratch_t**) &sc->state[i][scratch_index];
         hs_clone_scratch(max, ss);
     }
-    hs_free_scratch(max);
+    s_scratch[get_instance_id()] = max;
     return true;
 }
 
@@ -425,17 +435,55 @@ static void scratch_cleanup(SnortConfig* sc)
     }
 }
 
+static bool need_update(SnortConfig* sc)
+{
+    if ( s_scratch.size() )
+    {
+        size_t max_sz, instance_sz;
+        hs_scratch_size(s_scratch[0], &max_sz);
+        hs_scratch_size((hs_scratch_t*)sc->state[get_instance_id()][scratch_index], &instance_sz);
+        if ( max_sz > instance_sz )
+            return true;
+        else
+            return false;
+    }
+    else
+        return false;
+}
+
+void static scratch_update(SnortConfig* sc)
+{
+    if ( !need_update(sc) )
+        return;
+
+    hs_scratch_t** ss = (hs_scratch_t**) &sc->state[get_instance_id()][scratch_index];
+    hs_free_scratch(*ss);
+    *ss = nullptr;
+    hs_clone_scratch(s_scratch[0], ss);
+}
+
 class HyperscanModule : public Module
 {
 public:
     HyperscanModule() : Module(s_name, s_help)
     {
-        scratcher = new SimpleScratchAllocator(scratch_setup, scratch_cleanup);
+        scratcher = new SimpleScratchAllocator(scratch_setup, scratch_cleanup, scratch_update);
         scratch_index = scratcher->get_id();
     }
 
     ~HyperscanModule() override
-    { delete scratcher; }
+    {
+        delete scratcher;
+
+        for ( auto& ss : s_scratch )
+        {
+             if ( ss )
+             {
+                 hs_free_scratch(ss);
+                 ss = nullptr;
+             }
+        }
+    }
 };
 
 //-------------------------------------------------------------------------

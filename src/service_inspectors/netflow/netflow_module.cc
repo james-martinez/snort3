@@ -22,6 +22,11 @@
 #include "config.h"
 #endif
 
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
+
 #include "netflow_module.h"
 
 #include "utils/util.h"
@@ -65,11 +70,21 @@ static const Parameter netflow_params[] =
     { "rules", Parameter::PT_LIST, device_rule_params, nullptr,
       "list of NetFlow device rules" },
 
+    { "flow_memcap", Parameter::PT_INT, "0:maxSZ", "0",
+      "maximum memory for flow record cache in bytes, 0 = unlimited" },
+
+    { "template_memcap", Parameter::PT_INT, "0:maxSZ", "0",
+      "maximum memory for template cache in bytes, 0 = unlimited" },
+
+    { "netflow_service_id_path", Parameter::PT_STRING, nullptr, nullptr,
+      "path to file containing service IDs for NetFlow" },
+
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
 static const PegInfo netflow_pegs[] =
 {
+    LRU_CACHE_LOCAL_PEGS("netflow"),
     { CountType::SUM, "invalid_netflow_record", "count of invalid netflow records" },
     { CountType::SUM, "packets", "total packets processed" },
     { CountType::SUM, "records", "total records found in netflow data" },
@@ -82,32 +97,32 @@ static const PegInfo netflow_pegs[] =
     { CountType::END, nullptr, nullptr},
 };
 
+unsigned NetFlowModule::module_id = 0;
+
 //-------------------------------------------------------------------------
 // netflow module
 //-------------------------------------------------------------------------
 
-NetflowModule::NetflowModule() : Module(NETFLOW_NAME, NETFLOW_HELP, netflow_params)
-{
-    conf = nullptr;
-}
+NetFlowModule::NetFlowModule() : Module(NETFLOW_NAME, NETFLOW_HELP, netflow_params)
+{ }
 
-NetflowModule::~NetflowModule()
+NetFlowModule::~NetFlowModule()
 {
     delete conf;
 }
 
-NetflowConfig* NetflowModule::get_data()
+NetFlowConfig* NetFlowModule::get_data()
 {
-    NetflowConfig* tmp = conf;
+    NetFlowConfig* tmp = conf;
     conf = nullptr;
     return tmp;
 }
 
-bool NetflowModule::begin(const char* fqn, int idx, SnortConfig*)
+bool NetFlowModule::begin(const char* fqn, int idx, SnortConfig*)
 {
     if ( !conf )
     {
-        conf = new NetflowConfig();
+        conf = new NetFlowConfig();
     }
 
     if ( idx && !strcmp(fqn, "netflow.rules") )
@@ -119,7 +134,7 @@ bool NetflowModule::begin(const char* fqn, int idx, SnortConfig*)
     return true;
 }
 
-bool NetflowModule::end(const char* fqn, int idx, SnortConfig*)
+bool NetFlowModule::end(const char* fqn, int idx, SnortConfig*)
 {
     if ( idx && !strcmp(fqn, "netflow.rules") )
     {
@@ -135,9 +150,13 @@ bool NetflowModule::end(const char* fqn, int idx, SnortConfig*)
 
     return true;
 }
-bool NetflowModule::set(const char*, Value& v, SnortConfig*)
+bool NetFlowModule::set(const char*, Value& v, SnortConfig*)
 {
-    if ( v.is("dump_file") )
+    if ( v.is("flow_memcap") )
+        conf->flow_memcap = v.get_size();
+    else if ( v.is("template_memcap") )
+        conf->template_memcap = v.get_size();
+    else if ( v.is("dump_file") )
     {
         if ( conf->dump_file )
             snort_free((void*)conf->dump_file);
@@ -193,14 +212,49 @@ bool NetflowModule::set(const char*, Value& v, SnortConfig*)
     {
         rule_cfg.create_service = v.get_bool();
     }
+    else if ( v.is("netflow_service_id_path") )
+    {
+        parse_service_id_file(v.get_string());
+    }
     return true;
 }
 
-PegCount* NetflowModule::get_counts() const
+void NetFlowModule::parse_service_id_file(const std::string& serv_id_file_path)
+{
+    std::string serv_line;
+    std::ifstream serv_id_file;
+    serv_id_file.open(serv_id_file_path);
+
+    if ( serv_id_file.is_open() )
+    {
+        while ( std::getline(serv_id_file, serv_line) )
+        {
+            std::stringstream ss(serv_line);
+            std::vector<std::string> tokens;
+
+            std::string tmp_str;
+
+            while( std::getline(ss, tmp_str, '\t') )
+                tokens.push_back(tmp_str);
+
+            // Format is <port> <tcp/udp> <internal ID>
+            uint16_t srv_port = std::stoi(tokens[0]);
+            std::string proto_str = tokens[1];
+            uint16_t id = std::stoi(tokens[2]);
+
+            if ( proto_str == "tcp" )
+                tcp_service_mappings[srv_port] = id;
+            else if ( proto_str == "udp" )
+                udp_service_mappings[srv_port] = id;
+        }
+    }
+}
+
+PegCount* NetFlowModule::get_counts() const
 { return (PegCount*)&netflow_stats; }
 
-const PegInfo* NetflowModule::get_pegs() const
+const PegInfo* NetFlowModule::get_pegs() const
 { return netflow_pegs; }
 
-ProfileStats* NetflowModule::get_profile() const
+ProfileStats* NetFlowModule::get_profile() const
 { return &netflow_perf_stats; }

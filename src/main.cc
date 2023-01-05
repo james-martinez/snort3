@@ -38,7 +38,6 @@
 #include "main/shell.h"
 #include "main/snort.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "main/snort_module.h"
 #include "main/swapper.h"
 #include "main/thread_config.h"
@@ -346,6 +345,31 @@ int main_reset_stats(lua_State* L)
     return 0;
 }
 
+int main_set_watchdog_params(lua_State* L)
+{
+    ControlConn* ctrlcon = ControlConn::query_from_lua(L);
+    SnortConfig* sc = SnortConfig::get_main_conf();
+
+    if ( sc && L )
+    {
+        int seconds = luaL_optint(L, 1, -1);
+        int thread_count = luaL_optint(L, 2, -1);
+        // Timer and thread count are accessed only in main thread context
+        if ( seconds != -1 )
+            sc->set_watchdog(seconds);
+
+        if ( thread_count != -1 )
+            sc->set_watchdog_min_thread_count(thread_count);
+
+        std::ostringstream watchdog_timer_msg;
+        watchdog_timer_msg << "== setting watchdog timer to " << sc->watchdog_timer
+                           << ", min thread count to " << sc->watchdog_min_thread_count << "\n";
+        send_response(ctrlcon, watchdog_timer_msg.str().c_str());
+    }
+
+    return 0;
+}
+
 int main_rotate_stats(lua_State* L)
 {
     ControlConn* ctrlcon = ControlConn::query_from_lua(L);
@@ -471,51 +495,6 @@ int main_reload_policy(lua_State* L)
 
     ReloadTracker::update(ctrlcon, "start swapping configuration ...");
     send_response(ctrlcon, ".. swapping policy\n");
-    main_broadcast_command(new ACSwap(new Swapper(old, sc), ctrlcon), ctrlcon);
-
-    return 0;
-}
-
-int main_reload_module(lua_State* L)
-{
-    const char* fname =  nullptr;
-
-    if ( L )
-    {
-        Lua::ManageStack(L, 1);
-        if (lua_gettop(L) >= 1)
-            fname = luaL_checkstring(L, 1);
-    }
-
-    ControlConn* ctrlcon = ControlConn::query_from_lua(L);
-    if ( !fname or *fname == '\0' )
-    {
-        send_response(ctrlcon, "== module name required\n");
-        return 0;
-    }
-
-    if ( !ReloadTracker::start(ctrlcon) )
-    {
-        send_response(ctrlcon, "== reload pending; retry\n");
-        return 0;
-    }
-
-    send_response(ctrlcon, ".. reloading module\n");
-
-    SnortConfig* old = SnortConfig::get_main_conf();
-    SnortConfig* sc = Snort::get_updated_module(old, fname);
-
-    if ( !sc )
-    {
-        ReloadTracker::failed(ctrlcon, "failed to update module");
-        send_response(ctrlcon, "== reload failed\n");
-        return 0;
-    }
-    SnortConfig::set_conf(sc);
-    proc_stats.policy_reloads++;
-
-    ReloadTracker::update(ctrlcon, "start swapping configuration ...");
-    send_response(ctrlcon, ".. swapping module\n");
     main_broadcast_command(new ACSwap(new Swapper(old, sc), ctrlcon), ctrlcon);
 
     return 0;

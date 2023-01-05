@@ -52,12 +52,12 @@
 #include "framework/module.h"
 #include "log/messages.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "packet_io/active.h"
 #include "payload_injector/payload_injector.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "service_inspectors/http2_inspect/http2_flow_data.h"
+#include "trace/trace_api.h"
 #include "utils/util.h"
 #include "utils/util_cstring.h"
 
@@ -209,8 +209,8 @@ void ReactAction::exec(Packet* p, const OptTreeNode* otn)
 {
     p->active->drop_packet(p);
     p->active->set_drop_reason("ips");
-    if ( otn )
-        Actions::alert(p, otn);
+
+    Actions::alert(p, otn);
 }
 
 //-------------------------------------------------------------------------

@@ -42,6 +42,7 @@
 #include "framework/module.h"
 #include "host_tracker/host_tracker_module.h"
 #include "host_tracker/host_cache_module.h"
+#include "js_norm/js_norm_module.h"
 #include "latency/latency_module.h"
 #include "log/messages.h"
 #include "managers/module_manager.h"
@@ -393,7 +394,7 @@ static const Parameter profiler_params[] =
 
 template<typename T>
 static bool s_profiler_module_set_max_depth(T& config, Value& v)
-{ config.max_depth = v.get_uint8(); return true; }
+{ config.max_depth = v.get_int16(); return true; }
 
 static bool s_profiler_module_set_max_depth(RuleProfilerConfig&, Value&)
 { return false; }
@@ -1146,15 +1147,12 @@ static const Parameter ips_params[] =
     { "include", Parameter::PT_STRING, nullptr, nullptr,
       "snort rules and includes" },
 
-    { "includer", Parameter::PT_STRING, "(optional)", nullptr,
-      "for internal use; where includes are included from" },
-
     // FIXIT-L no default; it breaks initialization by -Q
     { "mode", Parameter::PT_ENUM, "tap | inline | inline-test", nullptr,
       "set policy mode" },
 
-    { "obfuscate_pii", Parameter::PT_BOOL, nullptr, "false",
-      "mask all but the last 4 characters of credit card and social security numbers" },
+    { "obfuscate_pii", Parameter::PT_BOOL, nullptr, "true",
+      "mask all but the last 4 characters of credit card, SSN, phone number, and email" },
 
     { "rules", Parameter::PT_STRING, nullptr, nullptr,
       "snort rules and includes (may contain states too)" },
@@ -1213,9 +1211,6 @@ bool IpsModule::set(const char* fqn, Value& v, SnortConfig*)
 
     else if ( v.is("include") )
         p->include = v.get_string();
-
-    else if ( v.is("includer") )
-        p->includer = v.get_string();
 
     else if ( v.is("mode") )
         p->policy_mode = (PolicyMode)v.get_uint8();
@@ -1278,6 +1273,7 @@ bool IpsModule::end(const char* fqn, int idx, SnortConfig* sc)
     else if (!idx and !strcmp(fqn, "ips"))
     {
         IpsPolicy* p = get_ips_policy();
+        p->includer = ModuleManager::get_includer("ips");
         sc->policy_map->set_user_ips(p);
     }
     return true;
@@ -1332,6 +1328,9 @@ static const Parameter process_params[] =
 
     { "watchdog_timer", Parameter::PT_INT, "0:60", "0",
       "watchdog timer for packet threads (seconds, 0 to disable)" },
+
+    { "watchdog_min_thread_count", Parameter::PT_INT, "1:65535", "1",
+      "minimum unresponsive threads for watchdog to trigger" },
 
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
@@ -1399,6 +1398,9 @@ bool ProcessModule::set(const char*, Value& v, SnortConfig* sc)
 
     else if ( v.is("watchdog_timer") )
         sc->set_watchdog(v.get_uint16());
+
+    else if ( v.is("watchdog_min_thread_count") )
+        sc->set_watchdog_min_thread_count(v.get_uint16());    
 
     return true;
 }
@@ -1485,7 +1487,7 @@ bool ProcessModule::end(const char* fqn, int idx, SnortConfig* sc)
 
 static const Parameter suppress_params[] =
 {
-    { "gid", Parameter::PT_INT, "0:max32", "0",
+    { "gid", Parameter::PT_INT, "0:8129", "0",
       "rule generator ID" },
 
     { "sid", Parameter::PT_INT, "0:max32", "0",
@@ -1546,11 +1548,27 @@ bool SuppressModule::begin(const char*, int, SnortConfig*)
 
 bool SuppressModule::end(const char*, int idx, SnortConfig* sc)
 {
-    if ( idx && sfthreshold_create(sc, sc->threshold_config, &thdx, get_network_policy()->policy_id) )
+    if ( !idx )
+        return true;
+
+    if ( thdx.gen_id == 0 and thdx.sig_id >= 1 )
     {
-        ParseError("bad suppress configuration [%d]", idx);
+        ParseError("bad or incomplete gid:sid pair");
         return false;
     }
+
+    if ( ( thdx.tracking == 0 and thdx.ip_address ) or ( thdx.tracking > 0 and !thdx.ip_address ) )
+    {
+        ParseError("incomplete pair of track and IP");
+        return false;
+    }
+
+    if ( sfthreshold_create(sc, sc->threshold_config, &thdx, get_network_policy()->policy_id) )
+    {
+        ParseError("threshold object cannot be created from the given parameters");
+        return false;
+    }
+
     return true;
 }
 
@@ -1560,7 +1578,7 @@ bool SuppressModule::end(const char*, int idx, SnortConfig* sc)
 
 static const Parameter event_filter_params[] =
 {
-    { "gid", Parameter::PT_INT, "0:max32", "1",
+    { "gid", Parameter::PT_INT, "0:8129", "1",
       "rule generator ID" },
 
     { "sid", Parameter::PT_INT, "0:max32", "1",
@@ -1674,7 +1692,7 @@ function<const char*()> get_action_types = []()
 
 static const Parameter rate_filter_params[] =
 {
-    { "gid", Parameter::PT_INT, "0:max32", "1",
+    { "gid", Parameter::PT_INT, "0:8129", "1",
       "rule generator ID" },
 
     { "sid", Parameter::PT_INT, "0:max32", "1",
@@ -2106,6 +2124,7 @@ void module_init()
 
     // these modules should be in ips policy
     ModuleManager::add_module(new EventFilterModule);
+    ModuleManager::add_module(new JSNormModule);
     ModuleManager::add_module(new RateFilterModule);
     ModuleManager::add_module(new SuppressModule);
 

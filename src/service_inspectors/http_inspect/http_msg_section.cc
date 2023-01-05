@@ -131,6 +131,14 @@ void HttpMsgSection::update_depth() const
     }
 }
 
+bool HttpMsgSection::run_detection(snort::Packet* p)
+{
+    if ((p == nullptr) || !detection_required())
+        return false;
+    DetectionEngine::detect(p);
+    return true;
+}
+
 const Field& HttpMsgSection::classic_normalize(const Field& raw, Field& norm,
     bool do_path, const HttpParaList::UriParam& uri_param)
 {
@@ -155,30 +163,30 @@ const Field& HttpMsgSection::get_classic_buffer(unsigned id, uint64_t sub_id, ui
 
 const Field& HttpMsgSection::get_classic_buffer(const HttpBufferInfo& buf)
 {
-    // buffer_side replaces source_id for buffers that support the request option
+    // buffer_side replaces source_id for rule options that support the request option
     const SourceId buffer_side = (buf.form & FORM_REQUEST) ? SRC_CLIENT : source_id;
 
     switch (buf.type)
     {
     case HTTP_BUFFER_CLIENT_BODY:
-      {
+    {
         if (source_id != SRC_CLIENT)
             return Field::FIELD_NULL;
         return (get_body() != nullptr) ? get_body()->get_classic_client_body() : Field::FIELD_NULL;
-      }
+    }
     case HTTP_BUFFER_COOKIE:
     case HTTP_BUFFER_RAW_COOKIE:
-      {
+    {
         if (header[buffer_side] == nullptr)
             return Field::FIELD_NULL;
         return (buf.type == HTTP_BUFFER_COOKIE) ? header[buffer_side]->get_classic_norm_cookie() :
             header[buffer_side]->get_classic_raw_cookie();
-      }
+    }
     case HTTP_BUFFER_HEADER:
     case HTTP_BUFFER_TRAILER:
     case HTTP_HEADER_TEST:
     case HTTP_TRAILER_TEST:
-      {
+    {
         HttpMsgHeadShared* const head = (buf.type == HTTP_BUFFER_HEADER || buf.type == HTTP_HEADER_TEST) ?
             (HttpMsgHeadShared*)header[buffer_side] : (HttpMsgHeadShared*)trailer[buffer_side];
         if (head == nullptr)
@@ -186,18 +194,18 @@ const Field& HttpMsgSection::get_classic_buffer(const HttpBufferInfo& buf)
         if (buf.sub_id == 0)
             return head->get_classic_norm_header();
         return head->get_header_value_norm((HeaderId)buf.sub_id);
-      }
+    }
     case HTTP_BUFFER_METHOD:
-      {
+    {
         return (request != nullptr) ? request->get_method() : Field::FIELD_NULL;
-      }
+    }
     case HTTP_BUFFER_RAW_BODY:
-      {
-        return (get_body() != nullptr) ? get_body()->msg_text : Field::FIELD_NULL;
-      }
+    {
+        return (get_body() != nullptr) ? get_body()->get_raw_body() : Field::FIELD_NULL;
+    }
     case HTTP_BUFFER_RAW_HEADER:
     case HTTP_BUFFER_RAW_TRAILER:
-      {
+    {
         HttpMsgHeadShared* const head = (buf.type == HTTP_BUFFER_RAW_HEADER) ?
             (HttpMsgHeadShared*)header[buffer_side] : (HttpMsgHeadShared*)trailer[buffer_side];
         if (head == nullptr)
@@ -205,31 +213,31 @@ const Field& HttpMsgSection::get_classic_buffer(const HttpBufferInfo& buf)
         if (buf.sub_id == 0)
             return head->msg_text;
         return head->get_all_header_values_raw((HeaderId)buf.sub_id);
-      }
+    }
     case HTTP_BUFFER_RAW_REQUEST:
-      {
+    {
         return (request != nullptr) ? request->msg_text : Field::FIELD_NULL;
-      }
+    }
     case HTTP_BUFFER_RAW_STATUS:
-      {
+    {
         return (status != nullptr) ? status->msg_text : Field::FIELD_NULL;
-      }
+    }
     case HTTP_BUFFER_STAT_CODE:
-      {
+    {
         return (status != nullptr) ? status->get_status_code() : Field::FIELD_NULL;
-      }
+    }
     case HTTP_BUFFER_STAT_MSG:
-      {
+    {
         return (status != nullptr) ? status->get_reason_phrase() : Field::FIELD_NULL;
-      }
+    }
     case HTTP_BUFFER_TRUE_IP:
-      {
+    {
         return (header[SRC_CLIENT] != nullptr) ? header[SRC_CLIENT]->get_true_ip() :
             Field::FIELD_NULL;
-      }
+    }
     case HTTP_BUFFER_URI:
     case HTTP_BUFFER_RAW_URI:
-      {
+    {
         const bool raw = (buf.type == HTTP_BUFFER_RAW_URI);
         if (request == nullptr)
             return Field::FIELD_NULL;
@@ -255,29 +263,29 @@ const Field& HttpMsgSection::get_classic_buffer(const HttpBufferInfo& buf)
         }
         assert(false);
         return Field::FIELD_NULL;
-      }
+    }
     case HTTP_BUFFER_VERSION:
-      {
+    {
         HttpMsgStart* start = (buffer_side == SRC_CLIENT) ?
             (HttpMsgStart*)request : (HttpMsgStart*)status;
         return (start != nullptr) ? start->get_version() : Field::FIELD_NULL;
-      }
+    }
     case BUFFER_VBA_DATA:
-      {
+    {
         HttpMsgBody* msg_body = get_body();
         if (msg_body)
-            return msg_body->get_decomp_vba_data(); 
+            return msg_body->get_decomp_vba_data();
         else
             return Field::FIELD_NULL;
-      }
+    }
     case BUFFER_JS_DATA:
-      {
+    {
         HttpMsgBody* msg_body = get_body();
         if (msg_body)
-            return msg_body->get_norm_js_data(); 
+            return msg_body->get_norm_js_data();
         else
             return Field::FIELD_NULL;
-      }
+    }
     default:
         assert(false);
         return Field::FIELD_NULL;
@@ -400,21 +408,47 @@ const Field& HttpMsgSection::get_param_buffer(Cursor& c, const HttpParam& param)
 
 int32_t HttpMsgSection::get_num_headers(const HttpBufferInfo& buf) const
 {
-    // buffer_side replaces source_id for buffers that support the request option
+    // buffer_side replaces source_id for rule options that support the request option
     const SourceId buffer_side = (buf.form & FORM_REQUEST) ? SRC_CLIENT : source_id;
 
     const HttpMsgHeadShared* const head = (buf.type == HTTP_RANGE_NUM_TRAILERS) ?
         (HttpMsgHeadShared*)trailer[buffer_side]:
         (HttpMsgHeadShared*)header[buffer_side] ;
     if (head == nullptr)
-        return HttpCommon::STAT_NOT_COMPUTE;
+        return HttpCommon::STAT_NO_SOURCE;
 
     return head->get_num_headers();
 }
 
+int32_t HttpMsgSection::get_max_header_line(const HttpBufferInfo& buf) const
+{
+    // buffer_side replaces source_id for rule options that support the request option
+    const SourceId buffer_side = (buf.form & FORM_REQUEST) ? SRC_CLIENT : source_id;
+
+    const HttpMsgHeadShared* const head = (buf.type == HTTP_RANGE_MAX_TRAILER_LINE) ?
+        (HttpMsgHeadShared*)trailer[buffer_side]:
+        (HttpMsgHeadShared*)header[buffer_side] ;
+    if (head == nullptr)
+        return HttpCommon::STAT_NO_SOURCE;
+
+    return head->get_max_header_line();
+}
+
+int32_t HttpMsgSection::get_num_cookies(const HttpBufferInfo& buf) const
+{
+    // buffer_side replaces source_id for rule options that support the request option
+    const SourceId buffer_side = (buf.form & FORM_REQUEST) ? SRC_CLIENT : source_id;
+
+    HttpMsgHeader* head = header[buffer_side];
+    if (head == nullptr)
+        return HttpCommon::STAT_NO_SOURCE;
+
+    return head->get_num_cookies();
+}
+
 VersionId HttpMsgSection::get_version_id(const HttpBufferInfo& buf) const
 {
-    // buffer_side replaces source_id for buffers that support the request option
+    // buffer_side replaces source_id for rule options that support the request option
     const SourceId buffer_side = (buf.form & FORM_REQUEST) ? SRC_CLIENT : source_id;
     HttpMsgStart* start = (buffer_side == SRC_CLIENT) ?
         (HttpMsgStart*)request : (HttpMsgStart*)status;
@@ -452,13 +486,13 @@ void HttpMsgSection::print_section_wrapup(FILE* output) const
 {
     fprintf(output, "Infractions: %016" PRIx64 " %016" PRIx64 " %016" PRIx64 ", Events: %016"
         PRIx64 " %016" PRIx64 " %016" PRIx64 " %016" PRIx64 ", TCP Close: %s\n\n",
-        transaction->get_infractions(source_id)->get_raw3(),
-        transaction->get_infractions(source_id)->get_raw2(),
-        transaction->get_infractions(source_id)->get_raw(),
-        session_data->events[source_id]->get_raw4(),
-        session_data->events[source_id]->get_raw3(),
-        session_data->events[source_id]->get_raw2(),
-        session_data->events[source_id]->get_raw(),
+        transaction->get_infractions(source_id)->get_raw(128),
+        transaction->get_infractions(source_id)->get_raw(64),
+        transaction->get_infractions(source_id)->get_raw(0),
+        session_data->events[source_id]->get_raw(BASE_2XX_EVENTS + 64),
+        session_data->events[source_id]->get_raw(BASE_2XX_EVENTS),
+        session_data->events[source_id]->get_raw(BASE_1XX_EVENTS),
+        session_data->events[source_id]->get_raw(0),
         tcp_close ? "True" : "False");
     if (HttpTestManager::get_show_pegs())
     {
@@ -485,4 +519,3 @@ void HttpMsgSection::print_peg_counts(FILE* output) const
 }
 
 #endif
-

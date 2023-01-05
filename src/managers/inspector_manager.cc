@@ -31,13 +31,13 @@
 #include "detection/detect.h"
 #include "detection/detection_engine.h"
 #include "detection/fp_utils.h"
+#include "flow/expect_cache.h"
 #include "flow/flow.h"
 #include "flow/session.h"
 #include "log/messages.h"
 #include "main/shell.h"
 #include "main/snort.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "main/snort_module.h"
 #include "main/thread_config.h"
 #include "protocols/packet.h"
@@ -45,6 +45,7 @@
 #include "target_based/snort_protocols.h"
 #include "time/clock_defs.h"
 #include "time/stopwatch.h"
+#include "trace/trace_api.h"
 
 #include "module_manager.h"
 
@@ -2063,6 +2064,9 @@ void InspectorManager::execute(Packet* p)
         internal_execute<true>(p);
     else
         internal_execute<false>(p);
+
+    if ( p->flow && ( !p->is_cooked() or p->is_defrag() ) )
+        ExpectFlow::handle_expected_flows(p);
 }
 
 template<bool T>
@@ -2096,7 +2100,7 @@ void InspectorManager::internal_execute(Packet* p)
     unsigned reload_id = SnortConfig::get_thread_reload_id();
     if ( p->flow )
     {
-        if ( p->flow->reload_id != reload_id )
+        if ( p->flow->reload_id && p->flow->reload_id != reload_id )
             DataBus::publish(FLOW_STATE_RELOADED_EVENT, p, p->flow);
     }
     else
@@ -2141,7 +2145,10 @@ void InspectorManager::internal_execute(Packet* p)
     else
     {
         if ( !p->has_paf_payload() and p->flow->flow_state == Flow::FlowState::INSPECT )
-            p->flow->session->process(p);
+        {
+            Flow& flow = *p->flow;
+            flow.session->process(p);
+        }
 
         if ( p->flow->reload_id != reload_id )
         {

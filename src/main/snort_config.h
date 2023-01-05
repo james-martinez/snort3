@@ -128,6 +128,7 @@ enum DumpConfigType
 };
 
 class ConfigOutput;
+class ControlConn;
 class FastPatternConfig;
 class RuleStateMap;
 class TraceConfig;
@@ -176,6 +177,7 @@ public:
 
     void setup();
     void post_setup();
+    void update_scratch(ControlConn*);
     bool verify() const;
 
     void merge(const SnortConfig*);
@@ -232,6 +234,8 @@ public:
     bool global_rule_state = false;
     bool global_default_rule_state = true;
     bool allow_missing_so_rules = false;
+    bool enable_strict_reduction = false;
+    uint16_t max_continuations = 1024;
 
     //------------------------------------------------------
     // process stuff
@@ -241,6 +245,7 @@ public:
     int user_id = -1;
     int group_id = -1;
     uint16_t watchdog_timer = 0;
+    uint16_t watchdog_min_thread_count = 1;
     bool dirty_pig = false;
 
     std::string chroot_dir;        /* -t or config chroot */
@@ -458,6 +463,7 @@ public:
     void set_umask(uint32_t);
     void set_utc(bool);
     void set_watchdog(uint16_t);
+    void set_watchdog_min_thread_count(uint16_t);
     SO_PUBLIC bool set_latency_enable();
 
     //------------------------------------------------------
@@ -503,13 +509,16 @@ public:
     bool read_mode() const
     { return run_flags & RUN_FLAG__READ; }
 
-    bool inline_mode() const
+    bool ips_inline_mode() const
     { return get_ips_policy()->policy_mode == POLICY_MODE__INLINE; }
 
-    bool inline_test_mode() const
+    bool ips_inline_test_mode() const
     { return get_ips_policy()->policy_mode == POLICY_MODE__INLINE_TEST; }
 
-    bool passive_mode() const
+    bool nap_inline_mode() const
+    { return get_inspection_policy()->policy_mode == POLICY_MODE__INLINE; }
+
+    bool ips_passive_mode() const
     { return get_ips_policy()->policy_mode == POLICY_MODE__PASSIVE; }
 
     bool show_file_codes() const

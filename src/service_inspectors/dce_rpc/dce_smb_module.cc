@@ -81,7 +81,7 @@ static const PegInfo dce2_smb_pegs[] =
     { CountType::SUM, "ignored_bytes", "total ignored bytes" },
     { CountType::SUM, "smb_client_segs_reassembled", "total smb client segments reassembled" },
     { CountType::SUM, "smb_server_segs_reassembled", "total smb server segments reassembled" },
-    { CountType::SUM, "max_outstanding_requests", "total smb maximum outstanding requests" },
+    { CountType::MAX, "max_outstanding_requests", "maximum outstanding requests" },
     { CountType::SUM, "files_processed", "total smb files processed" },
     { CountType::SUM, "v2_setup", "total number of SMBv2 setup packets seen" },
     { CountType::SUM, "v2_setup_err_resp",
@@ -194,6 +194,7 @@ static const PegInfo dce2_smb_pegs[] =
     { CountType::SUM, "total_smb2_sessions", "total smb2 sessions" },
     { CountType::SUM, "total_encrypted_sessions", "total encrypted sessions" },
     { CountType::SUM, "total_mc_sessions", "total multichannel sessions" },
+    { CountType::SUM, "ignore_dup_sessions", "total smb req/resp dropped because of dup msg id" },
     { CountType::END, nullptr, nullptr }
 };
 
@@ -243,7 +244,7 @@ static const Parameter s_params[] =
     { "smb_legacy_mode", Parameter::PT_BOOL, nullptr, "false",
       "inspect only SMBv1" },
 
-    { "smb_max_credit", Parameter::PT_INT, "1:65536", "8192",
+    { "smb_max_credit", Parameter::PT_INT, "1:65535", "8192",
       "Maximum number of outstanding request" },
 
     { "memcap", Parameter::PT_INT, "512:maxSZ", "8388608",

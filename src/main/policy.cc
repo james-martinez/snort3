@@ -29,6 +29,7 @@
 #include "detection/detection_engine.h"
 #include "framework/file_policy.h"
 #include "framework/policy_selector.h"
+#include "js_norm/js_config.h"
 #include "log/messages.h"
 #include "main/thread_config.h"
 #include "managers/inspector_manager.h"
@@ -119,7 +120,7 @@ FilePolicy* NetworkPolicy::get_file_policy() const
 { return file_policy; }
 
 void NetworkPolicy::add_file_policy_rule(FileRule& file_rule)
-{ file_policy->insert_file_rule(file_rule); }
+{ file_policy->add_file_id(file_rule); }
 
 InspectionPolicy* NetworkPolicy::get_user_inspection_policy(unsigned user_id)
 {
@@ -168,6 +169,7 @@ void InspectionPolicy::init(InspectionPolicy* other_inspection_policy)
 InspectionPolicy::~InspectionPolicy()
 {
     InspectorManager::delete_policy(this, cloned);
+    delete jsn_config;
 }
 
 void InspectionPolicy::configure()
@@ -193,7 +195,7 @@ IpsPolicy::IpsPolicy(PolicyId id) : action(Actions::get_max_types(), nullptr)
     nonamePortVarTable = PortTableNew();
 
     enable_builtin_rules = false;
-    obfuscate_pii = false;
+    obfuscate_pii = true;
 }
 
 IpsPolicy::~IpsPolicy()

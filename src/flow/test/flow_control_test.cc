@@ -85,6 +85,7 @@ size_t FlowCache::uni_flows_size() const { return 0; }
 size_t FlowCache::uni_ip_flows_size() const { return 0; }
 size_t FlowCache::flows_size() const { return 0; }
 void Flow::init(PktType) { }
+void DataBus::publish(const char*, DataEvent&, Flow*) { }
 void DataBus::publish(const char*, const uint8_t*, unsigned, Flow*) { }
 void DataBus::publish(const char*, Packet*, Flow*) { }
 const SnortConfig* SnortConfig::get_conf() { return nullptr; }
@@ -172,7 +173,7 @@ int ExpectCache::add_flow(const Packet*,
     PktType, IpProtocol,
     const SfIp*, uint16_t,
     const SfIp*, uint16_t,
-    char, FlowData*, SnortProtocolId, bool, bool, bool)
+    char, FlowData*, SnortProtocolId, bool, bool, bool, bool)
 {
     return 1;
 }

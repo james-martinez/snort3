@@ -24,6 +24,7 @@
 #include "http_stream_splitter.h"
 
 #include "packet_io/active.h"
+#include "protocols/packet.h"
 
 #include "http_common.h"
 #include "http_cutter.h"
@@ -91,8 +92,8 @@ HttpCutter* HttpStreamSplitter::get_cutter(SectionType type,
             session_data->accelerated_blocking[source_id],
             my_inspector->script_finder,
             session_data->compression[source_id]);
-    case SEC_BODY_H2:
-        return (HttpCutter*)new HttpBodyH2Cutter(
+    case SEC_BODY_HX:
+        return (HttpCutter*)new HttpBodyHXCutter(
             session_data->data_length[source_id],
             session_data->accelerated_blocking[source_id],
             my_inspector->script_finder,
@@ -128,20 +129,24 @@ StreamSplitter::Status HttpStreamSplitter::status_value(StreamSplitter::Status r
 StreamSplitter::Status HttpStreamSplitter::scan(Packet* pkt, const uint8_t* data, uint32_t length,
     uint32_t, uint32_t* flush_offset)
 {
-    Profile profile(HttpModule::get_profile_stats());
+    return scan(pkt->flow, data, length, flush_offset);
+}
 
-    Flow* const flow = pkt->flow;
-    if (flow->session_state & STREAM_STATE_MIDSTREAM)
-        return StreamSplitter::ABORT;
+StreamSplitter::Status HttpStreamSplitter::scan(Flow* flow, const uint8_t* data, uint32_t length,
+    uint32_t* flush_offset)
+{
+    Profile profile(HttpModule::get_profile_stats());
 
     // This is the session state information we share with HttpInspect and store with stream. A
     // session is defined by a TCP connection. Since scan() is the first to see a new TCP
     // connection the new flow data object is created here.
-    HttpFlowData* session_data = HttpInspect::http_get_flow_data(flow);
+    HttpFlowData* session_data = nullptr;
+    if (flow->stream_intf)
+        session_data = (HttpFlowData*)flow->stream_intf->get_stream_flow_data(flow);
 
     if (session_data == nullptr)
     {
-        HttpInspect::http_set_flow_data(flow, session_data = new HttpFlowData(flow));
+        HttpInspect::http_set_flow_data(flow, session_data = new HttpFlowData(flow, my_inspector->params));
         HttpModule::increment_peg_counts(PEG_FLOW);
     }
 
@@ -198,7 +203,7 @@ StreamSplitter::Status HttpStreamSplitter::scan(Packet* pkt, const uint8_t* data
     // If the last request was a CONNECT and we have not yet seen the response, this is early C2S
     // traffic. If there has been a pipeline overflow or underflow we cannot match requests to
     // responses, so there is no attempt to track early C2S traffic.
-    if ((source_id == SRC_CLIENT) && (type == SEC_REQUEST) && !session_data->for_http2 &&
+    if ((source_id == SRC_CLIENT) && (type == SEC_REQUEST) && !session_data->for_httpx &&
         session_data->last_request_was_connect)
     {
         const uint64_t last_request_trans_num = session_data->expected_trans_num[SRC_CLIENT] - 1;
@@ -233,7 +238,7 @@ StreamSplitter::Status HttpStreamSplitter::scan(Packet* pkt, const uint8_t* data
         session_data->status_code_num = 200;
         HttpModule::increment_peg_counts(PEG_RESPONSE);
         prepare_flush(session_data, nullptr, SEC_HEADER, 0, 0, 0, false, 0, 0);
-        my_inspector->process((const uint8_t*)"", 0, flow, SRC_SERVER, false);
+        my_inspector->process((const uint8_t*)"", 0, flow, SRC_SERVER, false, nullptr);
         session_data->transaction[SRC_SERVER]->clear_section();
     }
 
@@ -242,12 +247,13 @@ StreamSplitter::Status HttpStreamSplitter::scan(Packet* pkt, const uint8_t* data
     {
         cutter = get_cutter(type, session_data);
     }
+
     const uint32_t max_length = MAX_OCTETS - cutter->get_octets_seen();
     const ScanResult cut_result = cutter->cut(data, (length <= max_length) ? length :
         max_length, session_data->get_infractions(source_id), session_data->events[source_id],
         session_data->section_size_target[source_id],
         session_data->stretch_section_to_packet[source_id],
-        session_data->h2_body_state[source_id]);
+        session_data->hx_body_state[source_id]);
     switch (cut_result)
     {
     case SCAN_NOT_FOUND:
@@ -255,10 +261,13 @@ StreamSplitter::Status HttpStreamSplitter::scan(Packet* pkt, const uint8_t* data
         if (cutter->get_octets_seen() == MAX_OCTETS)
         {
             *session_data->get_infractions(source_id) += INF_ENDLESS_HEADER;
-            // FIXIT-L the following call seems inappropriate for headers and trailers. Those cases
-            // should be an unconditional EVENT_LOSS_OF_SYNC.
-            session_data->events[source_id]->generate_misformatted_http(data, length);
-            // FIXIT-E need to process this data not just discard it.
+            auto event = HttpEnums::EVENT_HEADERS_TOO_LONG;
+            if (session_data ->type_expected[source_id] == HttpCommon::SEC_REQUEST)
+                event = HttpEnums::EVENT_REQ_TOO_LONG;
+            else if (session_data ->type_expected[source_id] == HttpCommon::SEC_STATUS)
+                event = HttpEnums::EVENT_STAT_TOO_LONG;
+            session_data->events[source_id]->create_event(event);
+            session_data->events[source_id]->create_event(HttpEnums::EVENT_LOSS_OF_SYNC);
             type = SEC_ABORT;
             delete cutter;
             cutter = nullptr;
@@ -281,6 +290,7 @@ StreamSplitter::Status HttpStreamSplitter::scan(Packet* pkt, const uint8_t* data
         type = SEC_ABORT;
         delete cutter;
         cutter = nullptr;
+        session_data->events[source_id]->create_event(HttpEnums::EVENT_LOSS_OF_SYNC);
         return status_value(StreamSplitter::ABORT);
     case SCAN_DISCARD:
     case SCAN_DISCARD_PIECE:
@@ -312,6 +322,9 @@ StreamSplitter::Status HttpStreamSplitter::scan(Packet* pkt, const uint8_t* data
       }
     default:
         assert(false);
+        type = SEC_ABORT;
+        delete cutter;
+        cutter = nullptr;
         return status_value(StreamSplitter::ABORT);
     }
 }

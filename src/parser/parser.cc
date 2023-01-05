@@ -68,6 +68,8 @@ using namespace snort;
 static struct rule_index_map_t* ruleIndexMap = nullptr;
 
 static std::string s_aux_rules;
+static std::string s_special_rules;
+static std::string s_special_includer;
 
 class RuleTreeHashKeyOps : public HashKeyOperations
 {
@@ -88,9 +90,9 @@ public:
 
         mix(a,b,c);
 
-        a += (uint32_t)(uintptr_t)rtn->src_portobject;
-        b += (uint32_t)(uintptr_t)rtn->dst_portobject;
-        c += (uint32_t)(uintptr_t)rtnk->policyId;
+        a += (uint32_t)(uintptr_t)rtnk->policyId;
+        b += PortObjectHash(rtn->src_portobject, seed, scale, hardener);
+        c += PortObjectHash(rtn->dst_portobject, seed, scale, hardener);
 
         finalize(a,b,c);
 
@@ -421,6 +423,8 @@ void DestroyRuleTreeNode(RuleTreeNode* rtn)
 
 void ParseRules(SnortConfig* sc)
 {
+    set_strict_rtn_reduction(sc->enable_strict_reduction);
+
     for ( unsigned idx = 0; idx < sc->policy_map->ips_policy_count(); ++idx )
     {
         set_ips_policy(sc, idx);
@@ -428,6 +432,14 @@ void ParseRules(SnortConfig* sc)
 
         if ( p->enable_builtin_rules )
             ModuleManager::load_rules(sc);
+
+        if (!idx and !s_special_rules.empty())
+        {
+            push_parse_location("W", "./", "file_id.rules_file");
+            parse_rules_string(sc, s_special_rules.c_str(), false);
+            pop_parse_location();
+            s_special_rules.clear();
+        }
 
         if ( !p->include.empty() )
         {
@@ -453,7 +465,7 @@ void ParseRules(SnortConfig* sc)
             pop_parse_location();
         }
 
-        if ( !idx and !s_aux_rules.empty() )
+        if (!idx and !s_aux_rules.empty())
         {
             p->includer.clear();
             push_parse_location("W", "./", "rule args");
@@ -698,7 +710,7 @@ void OrderRuleLists(SnortConfig* sc)
     const char* order = sc->rule_order.c_str();
     if ( !*order )
     {
-        default_priorities = Actions::get_default_priorities();  // FIXIT-M apply builtin module defaults
+        default_priorities = Actions::get_default_priorities();
         order = default_priorities.c_str();
     }
 
@@ -845,6 +857,16 @@ void parser_append_rules(const char* s)
     s_aux_rules += s;
     s_aux_rules += "\n";
 }
+
+void parser_append_rules_special(const char *s, const char* inc)
+{
+    s_special_rules += s;
+    s_special_rules += "\n";
+    s_special_includer = inc;
+}
+
+const char* parser_get_special_includer()
+{ return s_special_includer.c_str(); }
 
 void parser_append_includes(const char* d)
 {

@@ -21,6 +21,7 @@
 #define HTTP_MSG_HEADER_H
 
 #include "file_api/file_api.h"
+#include "mime/file_mime_process.h"
 
 #include "http_common.h"
 #include "http_enum.h"
@@ -37,14 +38,15 @@ public:
     HttpMsgHeader(const uint8_t* buffer, const uint16_t buf_size, HttpFlowData* session_data_,
         HttpCommon::SourceId source_id_, bool buf_owner, snort::Flow* flow_,
         const HttpParaList* params_);
-    HttpEnums::InspectSection get_inspection_section() const override
-        { return HttpEnums::IS_HEADER; }
+    snort::PduSection get_inspection_section() const override
+        { return snort::PS_HEADER; }
     bool detection_required() const override { return true; }
     void update_flow() override;
     void gen_events() override;
     void publish() override;
     const Field& get_true_ip();
     const Field& get_true_ip_addr();
+    int32_t get_num_cookies();
 
     // The multi_file_processing_id is unique for each file transferred within a single connection
     // and is used by file processing to store partially processed file contexts in the flow data.
@@ -64,6 +66,7 @@ private:
 
     Field true_ip;
     Field true_ip_addr;
+    int32_t num_cookies = HttpCommon::STAT_NOT_COMPUTE;
 
     uint64_t multi_file_processing_id = 0;
 

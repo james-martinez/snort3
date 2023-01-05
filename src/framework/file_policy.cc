@@ -78,7 +78,7 @@ bool FilePolicy::get_file_capture() const
     return capture_enabled;
 }
 
-void FilePolicy::insert_file_rule(FileRule& rule)
+void FilePolicy::add_file_id(FileRule& rule)
 {
     file_rules.emplace_back(rule);
 
@@ -112,8 +112,11 @@ void FilePolicy::insert_file_rule(FileRule& rule)
 
 void FilePolicy::load()
 {
-    if (type_enabled)
+    if (type_enabled or signature_enabled)
+    {
+        type_enabled = true;
         FileService::enable_file_type();
+    }
 
     if (signature_enabled)
         FileService::enable_file_signature();

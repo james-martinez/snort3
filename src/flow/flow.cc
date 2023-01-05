@@ -24,6 +24,7 @@
 #include "flow.h"
 
 #include "detection/context_switcher.h"
+#include "detection/detection_continuation.h"
 #include "detection/detection_engine.h"
 #include "flow/flow_key.h"
 #include "flow/ha.h"
@@ -120,6 +121,9 @@ void Flow::term()
         delete stash;
         stash = nullptr;
     }
+
+    delete ips_cont;
+    ips_cont = nullptr;
 
     service = nullptr;
 }
@@ -218,6 +222,9 @@ void Flow::reset(bool do_cleanup)
         stash->reset();
 
     deferred_trust.clear();
+
+    delete ips_cont;
+    ips_cont = nullptr;
 
     constexpr size_t offset = offsetof(Flow, context_chain);
     // FIXIT-L need a struct to zero here to make future proof
@@ -333,6 +340,8 @@ void Flow::free_flow_data(uint32_t proto)
 
 void Flow::free_flow_data()
 {
+    if (!flow_data)
+        return;
     const SnortConfig* sc = SnortConfig::get_conf();
     PolicySelector* ps = sc->policy_map->get_policy_selector();
     NetworkPolicy* np = nullptr;
@@ -398,6 +407,10 @@ void Flow::markup_packet_flags(Packet* p)
             (SSNFLAG_SEEN_SERVER|SSNFLAG_SEEN_CLIENT) )
         {
             p->packet_flags |= PKT_STREAM_UNEST_UNI;
+        }
+        if ( (ssn_state.session_flags & SSNFLAG_TCP_ONE_SIDED) == SSNFLAG_TCP_ONE_SIDED )
+        {
+            p->packet_flags |= PKT_TCP_ONE_SIDED;
         }
     }
     else

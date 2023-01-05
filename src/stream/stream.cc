@@ -34,13 +34,13 @@
 #include "flow/prune_stats.h"
 #include "main/snort.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "network_inspectors/packet_tracer/packet_tracer.h"
 #include "packet_io/active.h"
 #include "protocols/vlan.h"
 #include "stream/base/stream_module.h"
 #include "target_based/host_attributes.h"
 #include "target_based/snort_protocols.h"
+#include "trace/trace_api.h"
 #include "utils/util.h"
 
 #include "tcp/tcp_session.h"
@@ -117,7 +117,7 @@ Flow* Stream::get_flow(
     return get_flow(&key);
 }
 
-void Stream::populate_flow_key(Packet* p, FlowKey* key)
+void Stream::populate_flow_key(const Packet* p, FlowKey* key)
 {
     if (!key || !p)
         return;
@@ -221,6 +221,7 @@ void Stream::check_flow_closed(Packet* p)
     else if (flow->session_state & STREAM_STATE_BLOCK_PENDING)
     {
         flow->session->clear();
+        flow->free_flow_data();
         flow->set_state(Flow::FlowState::BLOCK);
 
         if ( !(p->packet_flags & PKT_STATELESS) )
@@ -397,13 +398,13 @@ int Stream::set_snort_protocol_id_expected(
     const SfIp* srcIP, uint16_t srcPort,
     const SfIp* dstIP, uint16_t dstPort,
     SnortProtocolId snort_protocol_id, FlowData* fd, bool swap_app_direction, bool expect_multi,
-    bool bidirectional)
+    bool bidirectional, bool expect_persist)
 {
     assert(flow_con);
 
     return flow_con->add_expected(
         ctrlPkt, type, ip_proto, srcIP, srcPort, dstIP, dstPort, snort_protocol_id, fd,
-        swap_app_direction, expect_multi, bidirectional);
+        swap_app_direction, expect_multi, bidirectional, expect_persist);
 }
 
 void Stream::set_snort_protocol_id_from_ha(

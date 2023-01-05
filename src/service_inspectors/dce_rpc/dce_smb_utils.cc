@@ -30,9 +30,9 @@
 #include "file_api/file_api.h"
 #include "hash/hash_key_operations.h"
 #include "main/snort.h"
-#include "main/snort_debug.h"
 #include "network_inspectors/packet_tracer/packet_tracer.h"
 #include "packet_io/active.h"
+#include "trace/trace_api.h"
 #include "utils/util.h"
 
 #include "dce_smb_module.h"
@@ -1303,7 +1303,9 @@ static FileContext* DCE2_get_main_file_context()
 {
     FileFlows* file_flows = FileFlows::get_file_flows(DetectionEngine::get_current_packet()->flow);
     if (file_flows)
+    {
         return file_flows->get_current_file_context();
+    }
     else
         return nullptr;
 }
@@ -1420,6 +1422,10 @@ static void DCE2_SmbFinishFileAPI(DCE2_SmbSsnData* ssd)
         return;
 
     FileFlows* file_flows = FileFlows::get_file_flows(p->flow);
+    if (!file_flows)
+    {
+        return;
+    }
     bool upload = (ftracker->ff_file_direction == DCE2_SMB_FILE_DIRECTION__UPLOAD);
 
     if (get_file_processed_size(p->flow) != 0)
@@ -1429,8 +1435,11 @@ static void DCE2_SmbFinishFileAPI(DCE2_SmbSsnData* ssd)
         if ((ftracker->ff_file_size == 0)
             && (ftracker->ff_bytes_processed != 0))
         {
-            if (file_flows->file_process(p, nullptr, 0, SNORT_FILE_END, upload,
-                ftracker->file_name_hash))
+            file_flows->file_flow_context_mutex.lock();
+            bool resault = file_flows->file_process(p, nullptr, 0, SNORT_FILE_END, upload,
+                ftracker->file_name_hash);
+            file_flows->file_flow_context_mutex.unlock();
+            if (resault)
             {
                 if (upload)
                 {
@@ -1502,6 +1511,7 @@ static DCE2_Ret DCE2_SmbFileAPIProcess(DCE2_SmbSsnData* ssd,
     if (!file_flows)
         return DCE2_RET__ERROR;
 
+    std::lock_guard<std::mutex> guard(file_flows->file_flow_context_mutex);
     if (!file_flows->file_process(p, data_ptr, (int)data_len, position, upload,
         ftracker->file_name_hash))
     {

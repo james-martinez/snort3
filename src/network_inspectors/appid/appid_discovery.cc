@@ -178,7 +178,7 @@ static bool set_network_attributes(AppIdSession* asd, Packet* p, IpProtocol& pro
             protocol = IpProtocol::TCP;
         else if (p->is_udp())
             protocol = IpProtocol::UDP;
-        else if (p->is_ip4() || p->is_ip6())
+        else if (p->is_ip4() or p->is_ip6())
         {
             protocol = p->get_ip_proto_next();
             if (p->num_layers > 3)
@@ -319,8 +319,8 @@ bool AppIdDiscovery::do_pre_discovery(Packet* p, AppIdSession*& asd, AppIdInspec
 
     if (p->ptrs.tcph and !asd->get_session_flags(APPID_SESSION_OOO))
     {
-        if ((p->packet_flags & PKT_STREAM_ORDER_BAD) ||
-            (p->dsize && !(p->packet_flags & (PKT_STREAM_ORDER_OK | PKT_REBUILT_STREAM))))
+        if ((p->packet_flags & PKT_STREAM_ORDER_BAD) or
+            (p->dsize and !(p->packet_flags & (PKT_STREAM_ORDER_OK | PKT_REBUILT_STREAM))))
         {
             asd->set_session_flags(APPID_SESSION_OOO | APPID_SESSION_OOO_CHECK_TP);
             if (appidDebug->is_active())
@@ -331,8 +331,8 @@ bool AppIdDiscovery::do_pre_discovery(Packet* p, AppIdSession*& asd, AppIdInspec
 
             // Shut off service/client discoveries, since they skip not-ok data packets and
             // may keep failing on subsequent data packets causing performance degradation
-            if (!asd->get_session_flags(APPID_SESSION_MID) ||
-                (p->ptrs.sp != 21 && p->ptrs.dp != 21)) // exception for ftp-control
+            if (!asd->get_session_flags(APPID_SESSION_MID) or
+                (p->ptrs.sp != 21 and p->ptrs.dp != 21)) // exception for ftp-control
             {
                 asd->service_disco_state = APPID_DISCO_STATE_FINISHED;
                 if (asd->get_payload_id() == APP_ID_NONE and
@@ -349,7 +349,7 @@ bool AppIdDiscovery::do_pre_discovery(Packet* p, AppIdSession*& asd, AppIdInspec
         else
         {
             const auto* tcph = p->ptrs.tcph;
-            if (tcph->is_rst() && asd->previous_tcp_flags == TH_SYN)
+            if (tcph->is_rst() and asd->previous_tcp_flags == TH_SYN)
             {
                 uint16_t port = 0;
                 const SfIp* ip = nullptr;
@@ -443,7 +443,7 @@ bool AppIdDiscovery::do_host_port_based_discovery(Packet* p, AppIdSession& asd, 
         asd.get_odp_ctxt().is_host_port_app_cache_runtime)
         check_dynamic = true;
 
-    if (!(check_static || check_dynamic))
+    if (!(check_static or check_dynamic))
         return false;
 
     uint16_t port;
@@ -493,8 +493,7 @@ bool AppIdDiscovery::do_host_port_based_discovery(Packet* p, AppIdSession& asd, 
             asd.client_disco_state = APPID_DISCO_STATE_FINISHED;
             asd.set_session_flags(APPID_SESSION_SERVICE_DETECTED);
 
-            if (asd.tpsession and tp_appid_ctxt and
-                (asd.tpsession->get_ctxt_version() == tp_appid_ctxt->get_version()))
+            if (asd.tpsession and asd.need_to_delete_tp_conn(tp_appid_ctxt))
                 asd.tpsession->reset();
             else if (asd.tpsession)
                 asd.tpsession->set_state(TP_STATE_TERMINATED);
@@ -546,12 +545,147 @@ static inline bool is_check_host_cache_valid(AppIdSession& asd, AppId service_id
     return false;
 }
 
+bool AppIdDiscovery::detect_on_first_pkt(Packet* p, AppIdSession& asd,
+    IpProtocol protocol, AppidSessionDirection direction, AppId& service_id,
+    AppId& client_id, AppId& payload_id)
+{ 
+    uint16_t port;
+    const SfIp* ip;
+
+    if (direction == APP_ID_FROM_INITIATOR)
+    {
+        ip = p->ptrs.ip_api.get_dst();
+        port = p->ptrs.dp;
+    }
+    else
+    {
+        ip = p->ptrs.ip_api.get_src();
+        port = p->ptrs.sp;
+    }
+
+    HostAppIdsVal* hv = nullptr;
+    hv = asd.get_odp_ctxt().host_first_pkt_find(ip, port, protocol);
+    if (hv)
+    {
+        const char *service_app_name = nullptr, *client_app_name = nullptr, *payload_app_name = nullptr;
+        asd.get_odp_ctxt().first_pkt_appid_prefix = NO_APPID_FOUND;
+
+        if (hv->client_appId)
+        {
+            client_id = hv->client_appId;
+            client_app_name = asd.get_odp_ctxt().get_app_info_mgr().get_app_name(client_id);
+            asd.get_odp_ctxt().first_pkt_client_id = client_id;
+            asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_CLIENT_APPID_FOUND;
+        } 
+        if (hv->protocol_appId) 
+        {
+            service_id = hv->protocol_appId;
+            service_app_name = asd.get_odp_ctxt().get_app_info_mgr().get_app_name(service_id);
+            asd.get_odp_ctxt().first_pkt_service_id = service_id;
+
+            if (asd.get_odp_ctxt().first_pkt_appid_prefix == FIRST_CLIENT_APPID_FOUND)
+            {
+                asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_SERVICE_CLIENT_APPID_FOUND;
+            } 
+            else 
+            {
+                asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_SERVICE_APPID_FOUND;
+            }
+        }
+        if (hv->web_appId) 
+        {
+            payload_id = hv->web_appId;
+            payload_app_name = asd.get_odp_ctxt().get_app_info_mgr().get_app_name(payload_id);
+            asd.get_odp_ctxt().first_pkt_payload_id = payload_id;
+
+            if (asd.get_odp_ctxt().first_pkt_appid_prefix == FIRST_CLIENT_APPID_FOUND)
+            {
+                asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_CLIENT_PAYLOAD_APPID_FOUND;
+            } 
+            else if (asd.get_odp_ctxt().first_pkt_appid_prefix == FIRST_SERVICE_APPID_FOUND)
+            {
+                asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_SERVICE_PAYLOAD_APPID_FOUND;
+            }   
+            else if (asd.get_odp_ctxt().first_pkt_appid_prefix == FIRST_SERVICE_CLIENT_APPID_FOUND)
+            {
+                asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_ALL_APPID_FOUND;
+            }
+            else 
+            {
+                asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_PAYLOAD_APPID_FOUND;
+            }
+        }
+        asd.get_odp_ctxt().need_reinspection = hv->reinspect;  
+
+        switch (asd.get_odp_ctxt().first_pkt_appid_prefix) 
+        {
+        case FIRST_PAYLOAD_APPID_FOUND :
+            service_id = payload_id;
+            service_app_name = asd.get_odp_ctxt().get_app_info_mgr().get_app_name(service_id);
+            asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_SERVICE_PAYLOAD_APPID_FOUND;
+            asd.get_odp_ctxt().first_pkt_service_id = service_id;
+            break;
+
+        case FIRST_CLIENT_APPID_FOUND :
+            service_id = client_id;
+            service_app_name = asd.get_odp_ctxt().get_app_info_mgr().get_app_name(service_id);
+            asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_SERVICE_CLIENT_APPID_FOUND;
+            asd.get_odp_ctxt().first_pkt_service_id = service_id;
+            break;
+
+        case FIRST_CLIENT_PAYLOAD_APPID_FOUND :
+            service_id = client_id;
+            service_app_name = asd.get_odp_ctxt().get_app_info_mgr().get_app_name(service_id);
+            asd.get_odp_ctxt().first_pkt_appid_prefix = FIRST_ALL_APPID_FOUND;
+            asd.get_odp_ctxt().first_pkt_service_id = service_id;
+            break;
+
+        case NO_APPID_FOUND :
+        case FIRST_SERVICE_APPID_FOUND :
+        case FIRST_SERVICE_PAYLOAD_APPID_FOUND :
+        case FIRST_SERVICE_CLIENT_APPID_FOUND :
+        case FIRST_ALL_APPID_FOUND :
+        default:
+            break;
+        }
+        asd.set_session_flags(APPID_SESSION_FIRST_PKT_CACHE_MATCHED);
+        if (appidDebug->is_active())
+        {
+            LogMessage("AppIdDbg %s Host cache match found on first packet, service: %s(%d), "
+                "client: %s(%d), payload: %s(%d), reinspect: %s \n", appidDebug->get_debug_session(),
+                (service_app_name ? service_app_name : ""), service_id,
+                (client_app_name ? client_app_name : ""), client_id,
+                (payload_app_name ? payload_app_name : ""), payload_id, (hv->reinspect ? "True" : "False"));
+        }
+        return true;
+    }
+    return false;
+}
+
 bool AppIdDiscovery::do_discovery(Packet* p, AppIdSession& asd, IpProtocol protocol,
     IpProtocol outer_protocol, AppidSessionDirection direction, AppId& service_id,
     AppId& client_id, AppId& payload_id, AppId& misc_id, AppidChangeBits& change_bits,
     ThirdPartyAppIdContext* tp_appid_ctxt)
 {
     bool is_discovery_done = false;
+
+    if (asd.session_packet_count == 1) 
+    {
+        detect_on_first_pkt(p, asd, protocol, direction, service_id, client_id, payload_id);
+    } 
+
+    if (asd.get_session_flags(APPID_SESSION_FIRST_PKT_CACHE_MATCHED) and !asd.get_odp_ctxt().need_reinspection) 
+    {
+       is_discovery_done = true;
+       asd.set_session_flags(APPID_SESSION_SERVICE_DETECTED);
+       asd.client_disco_state = APPID_DISCO_STATE_FINISHED; 
+       asd.service_disco_state = APPID_DISCO_STATE_FINISHED;
+       service_id = asd.pick_service_app_id();
+       client_id = asd.pick_ss_client_app_id();
+       payload_id = asd.pick_ss_payload_app_id(service_id);
+       
+       return is_discovery_done;
+    }  
 
     asd.check_app_detection_restart(change_bits, tp_appid_ctxt);
 
@@ -602,8 +736,8 @@ bool AppIdDiscovery::do_discovery(Packet* p, AppIdSession& asd, IpProtocol proto
     }
 
     // Third party detection
-    // Skip third-party detection for http2
-    if (tp_appid_ctxt and ((service_id = asd.pick_service_app_id()) != APP_ID_HTTP2))
+    // Skip third-party detection for http2 and http3
+    if (tp_appid_ctxt and ((service_id = asd.pick_service_app_id()) != APP_ID_HTTP2 and service_id != APP_ID_HTTP3))
     {
         // Skip third-party inspection for sessions using old config
         if (asd.tpsession and asd.tpsession->get_ctxt_version() != tp_appid_ctxt->get_version())
@@ -640,7 +774,7 @@ bool AppIdDiscovery::do_discovery(Packet* p, AppIdSession& asd, IpProtocol proto
         }
     }
     // FIXIT-M - snort 2.x has added a check for midstream pickup to this, do we need that?
-    else if (protocol != IpProtocol::TCP || (p->packet_flags & PKT_STREAM_ORDER_OK))
+    else if (protocol != IpProtocol::TCP or (p->packet_flags & PKT_STREAM_ORDER_OK))
     {
         if (asd.service_disco_state != APPID_DISCO_STATE_FINISHED)
             is_discovery_done =
@@ -688,7 +822,7 @@ bool AppIdDiscovery::do_discovery(Packet* p, AppIdSession& asd, IpProtocol proto
     bool is_http_tunnel = false;
 
     if (hsession)
-        is_http_tunnel = ((hsession->payload.get_id() == APP_ID_HTTP_TUNNEL) ||
+        is_http_tunnel = ((hsession->payload.get_id() == APP_ID_HTTP_TUNNEL) or
             (hsession->payload.get_id() == APP_ID_HTTP_SSL_TUNNEL)) ? true : false;
 
     if (is_check_host_cache_valid(asd, service_id, client_id, payload_id, misc_id) or

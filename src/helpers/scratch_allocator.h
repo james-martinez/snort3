@@ -48,23 +48,25 @@ public:
 
     virtual bool setup(SnortConfig*) = 0;
     virtual void cleanup(SnortConfig*) = 0;
+    virtual void update(SnortConfig*) = 0;
 
     int get_id() { return id; }
 
 protected:
     ScratchAllocator();
 
-private:
     int id;
 };
 
 typedef bool (* ScratchSetup)(SnortConfig*);
 typedef void (* ScratchCleanup)(SnortConfig*);
+typedef void (* ScratchUpdate)(SnortConfig*);
 
 class SO_PUBLIC SimpleScratchAllocator : public ScratchAllocator
 {
 public:
-    SimpleScratchAllocator(ScratchSetup fs, ScratchCleanup fc) : fsetup(fs), fcleanup(fc) { }
+    SimpleScratchAllocator(ScratchSetup fs, ScratchCleanup fc, ScratchUpdate fu = nullptr)
+        : fsetup(fs), fcleanup(fc), fupdate(fu) { }
 
     bool setup(SnortConfig* sc) override
     { return fsetup(sc); }
@@ -72,9 +74,16 @@ public:
     void cleanup(SnortConfig* sc) override
     { fcleanup(sc); }
 
+    void update(SnortConfig* sc) override
+    {
+        if (fupdate)
+            fupdate(sc);
+    }
+
 private:
     ScratchSetup fsetup;
     ScratchCleanup fcleanup;
+    ScratchUpdate fupdate;
 };
 
 }

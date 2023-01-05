@@ -219,6 +219,7 @@ void AppIdSession::examine_ssl_metadata(AppidChangeBits&) {}
 void AppIdSession::update_encrypted_app_id(AppId) {}
 bool AppIdSession::is_tp_processing_done() const {return false;}
 AppId AppIdSession::pick_ss_payload_app_id(AppId) const { return get_payload_id(); }
+bool AppIdSession::need_to_delete_tp_conn(ThirdPartyAppIdContext*) const { return true; }
 AppIdSession* AppIdSession::allocate_session(const Packet*, IpProtocol,
     AppidSessionDirection, AppIdInspector&, OdpContext&)
 {
@@ -279,6 +280,12 @@ HostPortVal* HostPortCache::find(const SfIp*, uint16_t, IpProtocol, const OdpCon
 {
     return nullptr;
 }
+
+HostAppIdsVal* HostPortCache::find_on_first_pkt(const SfIp*, uint16_t, IpProtocol, const OdpContext&)
+{
+    return nullptr;
+}
+
 void AppIdServiceState::check_reset(AppIdSession&, const SfIp*, uint16_t,
     int16_t, uint32_t) {}
 bool do_tp_discovery(ThirdPartyAppIdContext& , AppIdSession&, IpProtocol,
@@ -392,7 +399,7 @@ TEST(appid_discovery_tests, event_published_when_ignoring_flow)
 
     // Detect changes in service, client, payload, and misc appid
     mock().checkExpectations();
-    STRCMP_EQUAL("Published change_bits == 0000000000001111100", test_log);
+    STRCMP_EQUAL("Published change_bits == 00000000000001111100", test_log);
 
     delete &asd->get_api();
     delete asd;
@@ -426,7 +433,7 @@ TEST(appid_discovery_tests, event_published_when_processing_flow)
 
     // Detect changes in service, client, payload, and misc appid
     mock().checkExpectations();
-    STRCMP_EQUAL("Published change_bits == 0000000000001111100", test_log);
+    STRCMP_EQUAL("Published change_bits == 00000000000001111100", test_log);
     delete &asd->get_api();
     delete asd;
     delete flow;
@@ -524,10 +531,10 @@ TEST(appid_discovery_tests, change_bits_to_string)
     change_bits_to_string(change_bits, str);
     STRCMP_EQUAL(str.c_str(), "created, reset, service, client, payload, misc, referred, host,"
         " tls-host, url, user-agent, response, referrer, dns-host, service-info, client-info,"
-        " user-info, netbios-name, netbios-domain");
+        " user-info, netbios-name, netbios-domain, finished");
 
     // Failure of this test is a reminder that enum is changed, hence translator needs update
-    CHECK_EQUAL(APPID_MAX_BIT, 19);
+    CHECK_EQUAL(APPID_MAX_BIT, 20);
 }
 
 int main(int argc, char** argv)

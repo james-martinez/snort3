@@ -58,9 +58,9 @@ HttpMsgHeader::HttpMsgHeader(const uint8_t* buffer, const uint16_t buf_size,
 
 void HttpMsgHeader::publish()
 {
-    const uint32_t stream_id = session_data->get_h2_stream_id();
+    const int64_t stream_id = session_data->get_hx_stream_id();
 
-    HttpEvent http_header_event(this, session_data->for_http2, stream_id);
+    HttpEvent http_header_event(this, session_data->for_httpx, stream_id);
 
     const char* key = (source_id == SRC_CLIENT) ?
         HTTP_REQUEST_HEADER_EVENT_KEY : HTTP_RESPONSE_HEADER_EVENT_KEY;
@@ -122,6 +122,12 @@ const Field& HttpMsgHeader::get_true_ip_addr()
     addr_str[true_ip.length()] = '\0';
 
     SfIp tmp_sfip;
+    
+    /* remove port number from ip address */
+    char* colon_port = strrchr((char*)addr_str, ':');
+    if (colon_port && (strpbrk((char*)addr_str, "[.")))
+        *colon_port = '\0';
+    
     const SfIpRet status = tmp_sfip.set((char*)addr_str);
     delete[] addr_str;
     if (status != SFIP_SUCCESS)
@@ -138,10 +144,33 @@ const Field& HttpMsgHeader::get_true_ip_addr()
     return true_ip_addr;
 }
 
+int32_t HttpMsgHeader::get_num_cookies()
+{
+    if (num_cookies != STAT_NOT_COMPUTE)
+        return num_cookies;
+
+    num_cookies = 0;
+    for (int j=0; j < num_headers; j++)
+    {
+        if (header_name_id[j] == HEAD_SET_COOKIE)
+            num_cookies++;
+        else if (header_name_id[j] == HEAD_COOKIE)
+        {
+            const uint8_t* lim = header_line[j].start() + header_line[j].length();
+            for (const uint8_t* p = header_line[j].start();  p < lim; p++)
+                if (*p == ';')
+                    num_cookies++;
+            num_cookies++;
+        }
+    }
+
+    return num_cookies;
+}
+
 void HttpMsgHeader::gen_events()
 {
     if ((get_header_count(HEAD_CONTENT_LENGTH) > 0) &&
-        (get_header_count(HEAD_TRANSFER_ENCODING) > 0) && !session_data->for_http2)
+        (get_header_count(HEAD_TRANSFER_ENCODING) > 0) && !session_data->for_httpx)
     {
         add_infraction(INF_BOTH_CL_AND_TE);
         create_event(EVENT_BOTH_CL_AND_TE);
@@ -187,7 +216,7 @@ void HttpMsgHeader::gen_events()
         {
             const int32_t upgrade = get_code_from_token_list(up_header.start(), up_header.length(),
                 consumed, upgrade_list);
-            if ((upgrade == UP_H2C) || (upgrade == UP_H2) || (upgrade == UP_HTTP20))
+            if ((upgrade == UP_H2C) || (upgrade == UP_H2) || (upgrade == UP_HTTP20)) //FIXIT-E: Handle upgrade for h3
             {
                 add_infraction(INF_UPGRADE_HEADER_HTTP2);
                 if (source_id == SRC_CLIENT)
@@ -220,7 +249,7 @@ void HttpMsgHeader::update_flow()
     }
 
     if ((source_id == SRC_SERVER) && request && (request->get_method_id() == METH_CONNECT) &&
-        !session_data->for_http2)
+        !session_data->for_httpx)
     {
         // Successful CONNECT responses (2XX) switch to tunneled traffic immediately following the
         // header. Transfer-Encoding and Content-Length headers are not allowed in successful
@@ -302,7 +331,7 @@ void HttpMsgHeader::update_flow()
 
     const Field& te_header = get_header_value_norm(HEAD_TRANSFER_ENCODING);
 
-    if (session_data->for_http2)
+    if (session_data->for_httpx)
     {
         // The only transfer-encoding header we should see for HTTP/2 traffic is "identity"
         if (te_header.length() > 0)
@@ -327,11 +356,11 @@ void HttpMsgHeader::update_flow()
                 create_event(EVENT_BAD_CONTENT_LENGTH);
             }
         }
-        if (session_data->h2_body_state[source_id] == H2_BODY_NO_BODY)
+        if (session_data->hx_body_state[source_id] == HX_BODY_NO_BODY)
             session_data->half_reset(source_id);
         else
         {
-            session_data->type_expected[source_id] = SEC_BODY_H2;
+            session_data->type_expected[source_id] = SEC_BODY_HX;
             prepare_body();
         }
         return;
@@ -453,7 +482,6 @@ void HttpMsgHeader::prepare_body()
         const int64_t& depth = (source_id == SRC_CLIENT) ? params->request_depth :
             params->response_depth;
         session_data->detect_depth_remaining[source_id] = (depth != -1) ? depth : INT64_MAX;
-        params->js_norm_param.js_norm->set_detection_depth(session_data->detect_depth_remaining[source_id]);
     }
     else
     {
@@ -463,7 +491,7 @@ void HttpMsgHeader::prepare_body()
         // body
         session_data->detect_depth_remaining[source_id] = INT64_MAX;
     }
-    if ((source_id == SRC_CLIENT) and params->publish_request_body and session_data->for_http2)
+    if ((source_id == SRC_CLIENT) and params->publish_request_body and session_data->for_httpx)
     {
         session_data->publish_octets[source_id] = 0;
         session_data->publish_depth_remaining[source_id] = REQUEST_PUBLISH_DEPTH;
@@ -482,7 +510,7 @@ void HttpMsgHeader::prepare_body()
         HttpModule::increment_peg_counts(PEG_REQUEST_BODY);
 
         // Message bodies for CONNECT requests have no defined semantics
-        if ((method_id == METH_CONNECT) && !session_data->for_http2)
+        if ((method_id == METH_CONNECT) && !session_data->for_httpx)
         {
             add_infraction(INF_CONNECT_REQUEST_BODY);
             create_event(EVENT_CONNECT_REQUEST_BODY);
@@ -501,7 +529,7 @@ void HttpMsgHeader::setup_mime()
             if (boundary_present(content_type))
             {
                 // Generate the unique file id for multi file processing
-                set_multi_file_processing_id(get_transaction_id(), session_data->get_h2_stream_id());
+                set_multi_file_processing_id(get_transaction_id(), session_data->get_hx_stream_id());
 
                 Packet* p = DetectionEngine::get_current_packet();
                 const Field& uri = request->get_uri_norm_classic();
@@ -534,6 +562,9 @@ void HttpMsgHeader::setup_file_processing()
     if (session_data->mime_state[source_id])
         return;
 
+    // Generate the unique file id for multi file processing and set ID for file_data buffer
+    set_multi_file_processing_id(get_transaction_id(), session_data->get_hx_stream_id());
+
     session_data->file_octets[source_id] = 0;
     const int64_t max_file_depth = FileService::get_max_file_depth();
     if (max_file_depth <= 0)
@@ -541,9 +572,6 @@ void HttpMsgHeader::setup_file_processing()
         session_data->file_depth_remaining[source_id] = 0;
         return;
     }
-
-    // Generate the unique file id for multi file processing
-    set_multi_file_processing_id(get_transaction_id(), session_data->get_h2_stream_id());
 
     session_data->file_depth_remaining[source_id] = max_file_depth;
     FileFlows* file_flows = FileFlows::get_file_flows(flow);

@@ -29,7 +29,6 @@
 #include "detection/detection_engine.h"
 #include "main/policy.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "managers/inspector_manager.h"
 #include "packet_io/active.h"
 #include "packet_tracer/packet_tracer.h"
@@ -44,6 +43,7 @@
 #include "flow/flow_cache.h"
 #include "flow/ha.h"
 #include "flow/session.h"
+#include "trace/trace_api.h"
 
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
@@ -83,6 +83,7 @@ void Flow::term() { }
 void Flow::flush(bool) { }
 void Flow::reset(bool) { }
 void Flow::free_flow_data() { }
+void DataBus::publish(const char*, DataEvent&, Flow*) { }
 void DataBus::publish(const char*, const uint8_t*, unsigned, Flow*) { }
 void DataBus::publish(const char*, Packet*, Flow*) { }
 const SnortConfig* SnortConfig::get_conf() { return nullptr; }
@@ -131,7 +132,7 @@ void Stream::stop_inspection(Flow*, Packet*, char, int32_t, int) { }
 
 
 int ExpectCache::add_flow(const Packet*, PktType, IpProtocol, const SfIp*, uint16_t,
-    const SfIp*, uint16_t, char, FlowData*, SnortProtocolId, bool, bool, bool)
+    const SfIp*, uint16_t, char, FlowData*, SnortProtocolId, bool, bool, bool, bool)
 {
     return 1;
 }

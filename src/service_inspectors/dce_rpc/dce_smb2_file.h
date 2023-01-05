@@ -27,6 +27,7 @@
 #include <atomic>
 
 class Dce2Smb2TreeTracker;
+using Dce2Smb2TreeTrackerPtr = std::shared_ptr<Dce2Smb2TreeTracker>;
 
 typedef struct _tcp_flow_state
 {
@@ -43,13 +44,13 @@ public:
     Dce2Smb2FileTracker(const Dce2Smb2FileTracker& arg) = delete;
     Dce2Smb2FileTracker& operator=(const Dce2Smb2FileTracker& arg) = delete;
 
-    Dce2Smb2FileTracker(uint64_t file_idv, const uint32_t flow_key, Dce2Smb2TreeTracker* p_tree,
+    Dce2Smb2FileTracker(uint64_t file_idv, const uint32_t flow_key, Dce2Smb2TreeTrackerPtr p_tree,
         uint64_t sid) :
         ignore(true), file_name_len(0), file_flow_key(flow_key),
         file_id(file_idv), file_size(0), file_name_hash(0), file_name(nullptr),
         direction(FILE_DOWNLOAD), parent_tree(p_tree), session_id(sid)
     {
-	    SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
+        SMB_DEBUG(dce_smb_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
             "file tracker %" PRIu64 " created\n", file_id);
     }
 
@@ -64,17 +65,28 @@ public:
         std::lock_guard<std::mutex> guard(flow_state_mutex);
         return (flow_state[current_flow_key].pdu_state == DCE2_SMB_PDU_STATE__RAW_DATA);
     }
+
     void stop_accepting_raw_data_from(uint32_t);
 
     void set_direction(FileDirection dir) { direction = dir; }
-    Dce2Smb2TreeTracker* get_parent() { return parent_tree; }
-    void set_parent(Dce2Smb2TreeTracker* pt) { parent_tree = pt; }
+    Dce2Smb2TreeTrackerPtr get_parent() { return parent_tree; }
+    void set_parent(Dce2Smb2TreeTrackerPtr pt) { parent_tree = pt; }
     uint64_t get_file_id() { return file_id; }
     uint64_t get_file_name_hash() { return file_name_hash; }
     uint64_t get_session_id() { return session_id; }
     std::unordered_map<uint32_t, tcp_flow_state, std::hash<uint32_t> > get_flow_state_map()
     {
         return flow_state;
+    }
+
+    uint32_t get_flow_key()
+    {
+        return file_flow_key;
+    }
+
+    void set_flow_key(uint32_t key)
+    {
+        file_flow_key = key;
     }
 
 private:
@@ -89,7 +101,7 @@ private:
     uint64_t file_name_hash;
     char* file_name;
     FileDirection direction;
-    Dce2Smb2TreeTracker* parent_tree;
+    Dce2Smb2TreeTrackerPtr parent_tree;
     std::unordered_map<uint32_t, tcp_flow_state, std::hash<uint32_t> > flow_state;
     uint64_t session_id;
     std::mutex process_file_mutex;
@@ -98,7 +110,7 @@ private:
 
 using Dce2Smb2FileTrackerPtr = std::shared_ptr<Dce2Smb2FileTracker>;
 using Dce2Smb2FileTrackerMap =
-    std::unordered_map<uint64_t, Dce2Smb2FileTrackerPtr, std::hash<uint64_t> >;
+        std::unordered_map<uint64_t, Dce2Smb2FileTrackerPtr, std::hash<uint64_t> >;
 
 #endif
 

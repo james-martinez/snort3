@@ -26,7 +26,6 @@
 #include "service_inspectors/http_inspect/http_flow_data.h"
 #include "service_inspectors/http_inspect/http_stream_splitter.h"
 
-#include "http2_dummy_packet.h"
 #include "http2_utils.h"
 
 using namespace snort;
@@ -74,7 +73,7 @@ StreamSplitter::Status Http2DataCutter::skip_over_frame(Http2Stream* const strea
 bool Http2DataCutter::check_http_state(Http2Stream* const stream)
 {
     HttpFlowData* const http_flow = stream->get_hi_flow_data();
-    if ((http_flow->get_type_expected(source_id) != SEC_BODY_H2))
+    if ((http_flow->get_type_expected(source_id) != SEC_BODY_HX))
     {
         stream->set_state(source_id, STREAM_ERROR);
         if (data_len > 0)
@@ -131,17 +130,14 @@ StreamSplitter::Status Http2DataCutter::scan(const uint8_t* data, uint32_t lengt
     if (cur_data > 0)
     {
         uint32_t http_flush_offset = 0;
-        Http2DummyPacket dummy_pkt;
-        dummy_pkt.flow = session_data->flow;
-        uint32_t unused = 0;
         session_data->stream_in_hi = session_data->current_stream[source_id];
         if ((data_bytes_read == data_len) && (frame_flags & FLAG_END_STREAM))
         {
             HttpFlowData* const hi_flow = stream->get_hi_flow_data();
-            hi_flow->set_h2_body_state(source_id, H2_BODY_LAST_SEG);
+            hi_flow->set_hx_body_state(source_id, HX_BODY_LAST_SEG);
         }
-        scan_result = session_data->hi_ss[source_id]->scan(&dummy_pkt, data + cur_data_offset,
-            cur_data, unused, &http_flush_offset);
+        scan_result = session_data->hi_ss[source_id]->scan(session_data->flow, data + cur_data_offset, cur_data,
+            &http_flush_offset);
         session_data->stream_in_hi = NO_STREAM_ID;
         switch (scan_result)
         {

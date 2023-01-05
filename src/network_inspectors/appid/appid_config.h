@@ -83,6 +83,8 @@ public:
     // indicate the first packet from where the flow is decrypted (usually immediately
     // after certificate-exchange). Such manual detection is disabled by default (0).
     uint32_t first_decrypted_packet_debug = 0;
+    bool log_eve_process_client_mappings = false;
+    bool log_alpn_service_mappings = false;
 #endif
     bool log_stats = false;
     uint32_t app_stats_period = 300;
@@ -113,6 +115,10 @@ public:
     bool check_host_cache_unknown_ssl = false;
     bool ftp_userid_disabled = false;
     bool chp_body_collection_disabled = false;
+    bool need_reinspection = false;
+    AppId first_pkt_service_id = 0;
+    AppId first_pkt_payload_id = 0;
+    AppId first_pkt_client_id = 0;
     uint32_t chp_body_collection_max = 0;
     uint32_t rtmp_max_packets = 15;
     uint32_t max_tp_flow_depth = 5;
@@ -124,6 +130,7 @@ public:
     uint64_t max_bytes_before_service_fail = MIN_MAX_BYTES_BEFORE_SERVICE_FAIL;
     uint16_t max_packet_before_service_fail = MIN_MAX_PKTS_BEFORE_SERVICE_FAIL;
     uint16_t max_packet_service_fail_ignore_bytes = MIN_MAX_PKT_BEFORE_SERVICE_FAIL_IGNORE_BYTES;
+    FirstPktAppIdDiscovered first_pkt_appid_prefix = NO_APPID_FOUND;
 
     OdpContext(const AppIdConfig&, snort::SnortConfig*);
     void initialize(AppIdInspector& inspector);
@@ -158,6 +165,17 @@ public:
         IpProtocol proto, unsigned type, AppId appid)
     {
         return host_port_cache.add(sc, ip, port, proto, type, appid);
+    }
+
+    bool host_first_pkt_add(const snort::SnortConfig* sc, const snort::SfIp* ip, uint16_t port,
+        IpProtocol proto, AppId protocol_appid, AppId client_appid, AppId web_appid, unsigned reinspect)
+    {
+        return first_pkt_cache.add_host(sc, ip, port, proto, protocol_appid, client_appid, web_appid, reinspect);
+    }
+
+    HostAppIdsVal* host_first_pkt_find(const snort::SfIp* ip, uint16_t port, IpProtocol proto)
+    {
+        return first_pkt_cache.find_on_first_pkt(ip, port, proto, *this);
     }
 
     AppId length_cache_find(const LengthKey& key)
@@ -224,6 +242,7 @@ private:
     AppInfoManager app_info_mgr;
     ClientDiscovery client_disco_mgr;
     HostPortCache host_port_cache;
+    HostPortCache first_pkt_cache;
     LengthCache length_cache;
     DnsPatternMatchers dns_matchers;
     HttpPatternMatchers http_matchers;

@@ -69,6 +69,10 @@ static const Parameter s_params[] =
 #ifdef REG_TEST
     { "first_decrypted_packet_debug", Parameter::PT_INT, "0:max32", "0",
       "the first packet of an already decrypted SSL flow (debug single session only)" },
+    { "log_eve_process_client_mappings", Parameter::PT_BOOL, nullptr, "false",
+      "enable logging of encrypted visibility engine process to client mappings" },
+    { "log_alpn_service_mappings", Parameter::PT_BOOL, nullptr, "false",
+      "enable logging of alpn service mappings" },
 #endif
     { "memcap", Parameter::PT_INT, "1024:maxSZ", "1048576",
       "max size of the service cache before we start pruning the cache" },
@@ -177,8 +181,9 @@ ACThirdPartyAppIdContextSwap::~ACThirdPartyAppIdContextSwap()
     const AppIdContext& ctxt = inspector.get_ctxt();
     std::string file_path = ctxt.get_tp_appid_ctxt()->get_user_config();
     ctxt.get_odp_ctxt().get_app_info_mgr().dump_appid_configurations(file_path);
+    log_message("== reload third-party complete\n");
     LogMessage("== third-party configuration swap complete\n");
-    ReloadTracker::end(ctrlcon);
+    ReloadTracker::end(ctrlcon, true);
 }
 
 class ACThirdPartyAppIdContextUnload : public AnalyzerCommand
@@ -217,7 +222,7 @@ ACThirdPartyAppIdContextUnload::~ACThirdPartyAppIdContextUnload()
     AppIdContext& ctxt = inspector.get_ctxt();
     ctxt.create_tp_appid_ctxt();
     main_broadcast_command(new ACThirdPartyAppIdContextSwap(inspector, ctrlcon));
-    log_message("== reload third-party complete\n");
+    log_message("== unload old third-party complete\n");
     ReloadTracker::update(ctrlcon, "unload old third-party complete, start swapping to new configuration.");
 }
 
@@ -267,7 +272,7 @@ ACOdpContextSwap::~ACOdpContextSwap()
             file_path = std::string(ctxt.config.app_detector_dir) + "/../userappid.conf";
         ctxt.get_odp_ctxt().get_app_info_mgr().dump_appid_configurations(file_path);
     }
-    ReloadTracker::end(ctrlcon);
+    SnortConfig::get_main_conf()->update_scratch(ctrlcon);
     log_message("== reload detectors complete\n");
 }
 
@@ -476,6 +481,10 @@ bool AppIdModule::set(const char*, Value& v, SnortConfig*)
 #ifdef REG_TEST
     if ( v.is("first_decrypted_packet_debug") )
         config->first_decrypted_packet_debug = v.get_uint32();
+    else if ( v.is("log_eve_process_client_mappings") )
+        config->log_eve_process_client_mappings = v.get_bool();
+    else if (v.is("log_alpn_service_mappings") )
+        config->log_alpn_service_mappings = v.get_bool();
     else
 #endif
     if ( v.is("memcap") )

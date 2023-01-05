@@ -31,7 +31,6 @@
 #include "latency/packet_latency.h"
 #include "main/analyzer.h"
 #include "main/snort_config.h"
-#include "main/snort_debug.h"
 #include "main/thread.h"
 #include "managers/inspector_manager.h"
 #include "managers/mpse_manager.h"
@@ -42,6 +41,7 @@
 #include "protocols/packet.h"
 #include "stream/stream.h"
 #include "time/packet_time.h"
+#include "trace/trace_api.h"
 #include "utils/stats.h"
 
 #include "context_switcher.h"
@@ -105,6 +105,7 @@ DetectionEngine::DetectionEngine()
     context = Analyzer::get_switcher()->interrupt();
 
     context->file_data = DataPointer(nullptr, 0);
+    context->file_data_id = 0;
 
     reset();
 }
@@ -193,15 +194,7 @@ Packet* DetectionEngine::set_next_packet(const Packet* parent, Flow* flow)
         p->action = parent->action;
     }
 
-    // processing but parent is already gone (flow cache flush etc..)
-    else if ( Analyzer::get_switcher()->get_context() )
-    {
-        p->daq_msg = nullptr;
-        p->daq_instance = nullptr;
-        p->active = get_current_packet()->active;
-        p->action = get_current_packet()->action;
-    }
-
+    // processing but parent is already gone (flow cache flush etc..) or
     // shutdown, so use a dummy so null checking is not needed everywhere
     else
     {
@@ -307,10 +300,33 @@ DataBuffer& DetectionEngine::get_alt_buffer(Packet* p)
 }
 
 void DetectionEngine::set_file_data(const DataPointer& dp)
-{ Analyzer::get_switcher()->get_context()->file_data = dp; }
+{
+    auto c = Analyzer::get_switcher()->get_context();
+    c->file_data = dp;
+    c->file_data_id = 0;
+    c->file_data_drop_sse = false;
+    c->file_data_no_sse = false;
+}
 
-DataPointer& DetectionEngine::get_file_data(IpsContext* c)
+void DetectionEngine::set_file_data(const DataPointer& dp, uint64_t id, bool is_accum, bool no_flow)
+{
+    auto c = Analyzer::get_switcher()->get_context();
+    c->file_data = dp;
+    c->file_data_id = id;
+    c->file_data_drop_sse = is_accum;
+    c->file_data_no_sse = no_flow;
+}
+
+const DataPointer& DetectionEngine::get_file_data(const IpsContext* c)
 { return c->file_data; }
+
+const DataPointer& DetectionEngine::get_file_data(const IpsContext* c, uint64_t& id, bool& drop_sse, bool& no_sse)
+{
+    id = c->file_data_id;
+    drop_sse = c->file_data_drop_sse;
+    no_sse = c->file_data_no_sse;
+    return c->file_data;
+}
 
 void DetectionEngine::set_data(unsigned id, IpsContextData* p)
 { Analyzer::get_switcher()->get_context()->set_context_data(id, p); }
@@ -612,7 +628,7 @@ bool DetectionEngine::inspect(Packet* p)
 
         if ( p->ptrs.decode_flags & DECODE_ERR_FLAGS )
         {
-            if ( p->context->conf->inline_mode() and
+            if ( p->context->conf->ips_inline_mode() and
                 snort::get_network_policy()->checksum_drops(p->ptrs.decode_flags &
                     DECODE_ERR_CKSUM_ALL) )
             {
@@ -622,7 +638,6 @@ bool DetectionEngine::inspect(Packet* p)
         else
         {
             enable_content(p);
-            p->alt_dsize = 0;  // FIXIT-M should be redundant
 
             InspectorManager::execute(p);
             inspected = true;
